@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Only signed-in Google accounts on the team list can read or write.
+// 1. Put your own Gmail in OWNERS below (and in config.js → ownerEmails).
+// 2. Paste this file into Firebase console → Firestore → Rules → Publish.
+// 3. Add your HS / PGs from the app: Settings → Team.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owners() {
+      return [
+        'you@gmail.com'
+      ];
+    }
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function me() {
+      return request.auth.token.email.lower();
+    }
+    function isOwner() {
+      return signedIn() && me() in owners();
+    }
+    function isMember(unit) {
+      return signedIn() && (isOwner() || exists(/databases/$(database)/documents/units/$(unit)/members/$(me())));
+    }
+
+    match /units/{unit}/members/{email} {
+      allow read: if isMember(unit);
+      allow write: if isOwner();
+    }
+    match /units/{unit}/{coll}/{doc} {
+      allow read, write: if coll != 'members' && isMember(unit);
+    }
+  }
+}
