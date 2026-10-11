@@ -9,15 +9,17 @@ no install, no build step.
 
 | Screen | Use |
 | --- | --- |
-| **Cases** | Every active patient as a card: bed, diagnosis, plan, a progress bar and red/amber chips for what's still pending. Filter Pre-op / Posted / Post-op / Discharged. |
-| **Case page** | The full checklist in notebook order — CBC (Hb/WBC/Plt), RFT (U/C/Na/K), LFT (T.Bili/SGOT/SGPT), VM, VCTC, ECG, ECHO & cardio opinion, Opinions (any department), X-ray, CT, MRI, Anaesthesia assessment, ESR, qCRP, Pus C/S. Each item is *Pending → Sent → Done / N/A*; typing all values of a lab panel marks it Done. Upload X-ray/CT/MRI photos straight from the phone camera. **Pending works** lets you assign tasks to HS / PG; whoever ticks it off is recorded. The **Activity** log shows who changed what and when. |
-| **Ward** | The ward notebook, digital: S.No · Name · Diagnosis · To do's · Assessment/Scheme, with **BOT** on posted cases. To do's compile themselves from the checklist, opinions and pending works. A *Detailed* toggle shows every investigation. Print / PDF for rounds. |
-| **OT list** | Tick cases → reorder → confirm ward / level / anaes / implants / scheme → set date, day, Professor (title line) and Assistant Professor (signature) → **Generate OT list PDF** in the unit's format (`OT LIST FOR ORTHO UNIT I ON 04/09/2026 FRIDAY PROF. …`, 11 columns, landscape). **Download Word** gives the same list as an editable .doc. Optionally marks the cases *Posted*. |
-| **Implants** | Procedure → keywords → implants + default level + anaesthesia. When a case's plan contains a keyword (e.g. "CR/ORIF WITH SHORT **PFN** LEFT") implants, level and anaesthesia fill in automatically. Starts with ~26 common procedures in the unit's wording; edit freely. |
-| **Discharge / transfer** | The unit's discharge format: letterhead and grey patient box repeated on every page, CAPS underlined sections (diagnosis, procedure, unit, H/O, past history, examination, treatment, course, condition, advice). Disposition: Discharge, Discharge at request, Transfer to post-op ward, LAMA/AA, Absconded. Past-history and examination templates, an **auto-written course in hospital** (from diagnosis, procedure, opinions and disposition), and one-tap advice phrases that add the matching **Tamil** line, including a review-date generator. |
+| **Cases** | Every active patient as a card: ward, diagnosis, plan, a progress bar, out-of-range values in red bold and red chips for what's pending. |
+| **New case** | Patient details, diagnosis, plan, level and scheme status (Approved / Validation / To be submitted / Denied / No scheme), implants auto-filled from the implant database, and the first set of investigations with one date for the whole set. |
+| **Investigations** | The unit's standard parameters and ranges: CBC (Hb, WBC, PLT), RFT (RBS, urea, creatinine, Na, K), LFT (T/D/I bilirubin, SGOT, SGPT, ALP), ESR, qCRP, VM (HBsAg, HCV: positive/negative) and VCTC (HIV: reactive/non-reactive). Values outside the range show in **red bold** with ↑/↓. Add any other investigation with its own normal range and units. **Repeat investigations** adds a dated set; the flowsheet shows every date side by side. Pus C/S takes the organism (in italics) and the antibiotics it is sensitive to. Counts can be typed as said: PLT 2.4 = 2,40,000, WBC 8.4 = 8,400. |
+| **Pending** | Any empty investigation except ESR, qCRP and pus C/S is pending, as is any empty work-up item (ECG, ECHO & cardio opinion, X-ray, CT, MRI, PAC) or opinion without advice. Type "NA" in a work-up item that isn't needed. |
+| **Ward** | The ward notebook: S.No · Name · Diagnosis · To do's · Assessment/Scheme, with **BOT** on posted cases. To do's compile themselves and lead with abnormal values in red. *Detailed* shows every value. Print / PDF for rounds. |
+| **OT list** | Case picker table (name, age/sex, IP, ward, DOA, diagnosis, plan) → reorder → confirm ward / level / implants / scheme → date, day, unit, chief (dropdown) and signing Assistant Professor (dropdown) → **Generate OT list PDF** in the unit's format, chief on the second header line, anaesthesia GA/RA. **Download Word** gives an editable .doc. |
+| **Discharge / transfer** | The unit's discharge format: letterhead and patient box on every page, CAPS underlined sections, templates, auto-written course in hospital, advice phrases with Tamil lines, review-date generator. Dispositions: Discharge, Discharge at request, Transfer to post-op ward, AMA, Absconded. |
+| **Settings** | Unit (sets chief and Assistant Professors), OPD number, letterhead, the **implant database** (procedure, other names, implants, level), team and backup. |
 
 PDFs use the browser's print dialog — choose **Save as PDF** as the printer.
-The letterhead image, unit, Professor's name and OPD number are set under Settings.
+Unit, OPD number and letterhead image are set under Settings.
 
 ## Try it (local mode)
 

@@ -53,10 +53,15 @@ const Store = (() => {
         state[k] = {};
       }
     }
-    if (localStorage.getItem(LS + 'implants') === null) {
-      state.implants = Object.fromEntries(SEED_IMPLANTS.map((r) => [r.id, { ...r }]));
-      saveLocal('implants');
+    // Old saves: fold labs into dated sets; drop the starter implant list
+    // and the activity log, which the unit no longer uses.
+    for (const c of Object.values(state.cases)) {
+      migrateCase(c);
+      delete c.log;
     }
+    for (const id of Object.keys(state.implants)) if (id.startsWith('seed')) delete state.implants[id];
+    saveLocal('cases');
+    saveLocal('implants');
   }
   function saveLocal(k) {
     if (mode !== 'local') return;
@@ -121,17 +126,12 @@ const Store = (() => {
 
   function listen() {
     status = 'connecting';
-    let seeded = false;
     for (const coll of [...COLLS, 'members']) {
       unsubs.push(fb.fsM.onSnapshot(collRef(coll), { includeMetadataChanges: false }, (snap) => {
         const m = {};
-        snap.forEach((d) => { m[d.id] = d.data(); });
+        snap.forEach((d) => { m[d.id] = coll === 'cases' ? migrateCase(d.data()) : d.data(); });
         state[coll] = m;
         status = 'ok';
-        if (coll === 'implants' && snap.empty && !snap.metadata.fromCache && !seeded) {
-          seeded = true;
-          SEED_IMPLANTS.forEach((r) => fb.fsM.setDoc(ref('implants', r.id), r));
-        }
         emit();
       }, (err) => {
         status = err.code === 'permission-denied' ? 'denied' : 'error: ' + err.code;
@@ -173,11 +173,10 @@ const Store = (() => {
     if (fb) return fb.fsM.setDoc(ref(coll, id), doc).catch(remoteFail);
   }
 
-  function patch(coll, id, changes, logMsg) {
+  function patch(coll, id, changes) {
     const doc = state[coll][id];
     if (!doc) return;
     const all = { ...changes, updatedAt: Date.now(), updatedBy: who() };
-    if (logMsg) all['log.' + uid()] = { at: Date.now(), by: who(), msg: logMsg };
     for (const [p, v] of Object.entries(all)) setPath(doc, p, v);
     saveLocal(coll);
     emit();
@@ -202,7 +201,7 @@ const Store = (() => {
     if (fb) await fb.fsM.setDoc(ref('images', id), rec);
     else await idbDo('put', rec);
     imgCache.set(id, dataUrl);
-    await patch('cases', caseId, { ['images.' + id]: { kind, caption, at: rec.at, by: rec.by } }, `Uploaded ${kind.toUpperCase()} image`);
+    await patch('cases', caseId, { ['images.' + id]: { kind, caption, at: rec.at, by: rec.by } });
   }
   async function getImage(id) {
     if (imgCache.has(id)) return imgCache.get(id);
@@ -216,7 +215,7 @@ const Store = (() => {
     if (fb) await fb.fsM.deleteDoc(ref('images', id)).catch(remoteFail);
     else await idbDo('delete', id);
     imgCache.delete(id);
-    await patch('cases', caseId, { ['images.' + id]: DELETE }, 'Deleted an image');
+    await patch('cases', caseId, { ['images.' + id]: DELETE });
   }
 
   // ---- team (shared mode) ----

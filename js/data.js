@@ -1,7 +1,5 @@
-// Domain definitions: the pre-op checklist, option lists and the starter
-// implant database.
-
-const STATUS = { '': 'Not needed', pending: 'Pending', sent: 'Sent', done: 'Done', na: 'N/A' };
+// Domain definitions: investigation parameters (the unit's standard ranges),
+// work-up items, units and staff, option lists, and case helpers.
 
 const CASE_STATUS = {
   preop: 'Pre-op',
@@ -10,26 +8,77 @@ const CASE_STATUS = {
   discharged: 'Discharged',
 };
 
-// Order follows the ward notebook. `req` items count as pending until marked.
-// `fields` are values typed straight into the checklist.
-const CHECKS = [
-  { k: 'cbc', label: 'CBC', req: true, fields: [['hb', 'Hb'], ['wbc', 'WBC'], ['plt', 'Plt']] },
-  { k: 'rft', label: 'RFT', req: true, fields: [['u', 'U'], ['c', 'C'], ['na', 'Na'], ['k', 'K']] },
-  { k: 'lft', label: 'LFT', req: true, fields: [['tbili', 'T.Bili'], ['sgot', 'SGOT'], ['sgpt', 'SGPT']] },
-  { k: 'vm', label: 'VM', long: 'Viral markers', req: true },
-  { k: 'vctc', label: 'VCTC', req: true },
-  { k: 'ecg', label: 'ECG', req: true },
-  { k: 'echo', label: 'ECHO', long: 'ECHO & cardio opinion', req: true },
-  // Opinions are rendered here (separate list).
-  { k: 'xray', label: 'X-ray', req: true, img: true },
+const ANAES = 'GA/RA';
+const LEVELS = ['I', 'II', 'III', 'IV'];
+const SCHEMES = ['APPROVED', 'VALIDATION', 'TO BE SUBMITTED', 'DENIED', 'NO SCHEME'];
+const ROLES = ['House Surgeon', 'PG', 'Senior PG', 'Assistant Professor', 'Professor'];
+
+const UNITS = [
+  { id: 'I', chief: 'PROF. DR. PATHIARASAKUMAR MS ORTHO', aps: ['DR. KARTHIKEYAN MS ORTHO', 'DR. PARAMAGURU RAJESH MS ORTHO', 'DR. ASHOK MS ORTHO'] },
+  { id: 'II', chief: 'PROF. DR. K.P. SARAVANAKUMAR MS ORTHO', aps: ['DR. SARAVANAMUTHU MS ORTHO', 'DR. CHANDRU MS ORTHO'] },
+  { id: 'III', chief: 'PROF. DR. RAMANATHAN MS ORTHO', aps: ['DR. MANOJ DEEPAK MS ORTHO', 'DR. ANBARASAN MS ORTHO'] },
+  { id: 'IV', chief: 'PROF. DR. PATHIARASAKUMAR MS ORTHO', aps: ['DR. BALAJI MS ORTHO', 'DR. SARAVANAN MS ORTHO'] },
+  { id: 'V', chief: 'PROF. DR. SENTHIL KUMAR MS ORTHO', aps: ['DR. ALAGURAJESH MS ORTHO', 'DR. MOHAN RAJ MS ORTHO'] },
+  { id: 'VI', chief: 'PROF. DR. SINGARAVEL MS ORTHO', aps: ['DR. GOPINATH MS ORTHO', 'DR. GOPI MANOHAR DNB ORTHO'] },
+];
+const unitOf = (id) => UNITS.find((u) => u.id === id) || UNITS[0];
+const unitName = (id) => 'UNIT ' + unitOf(id).id;
+
+// Defaults match the unit's letterhead; editable in Settings.
+const DEFAULT_META = {
+  institution: 'Govt. Rajaji Hospital & Madurai Medical College',
+  department: 'Department of Orthopaedic Surgery & Traumatology',
+  unitId: 'I',
+  opd: '802',
+};
+
+// ---- Investigations ------------------------------------------------------
+// Standard parameters from the unit's reference table. `scale` lets people
+// type counts the way they say them (WBC 8.4 → 8,400; PLT 2.4 → 2,40,000).
+const LAB_GROUPS = [
+  { k: 'cbc', label: 'CBC', params: [
+    { k: 'hb', label: 'Hb', range: '10 – 17.5', unit: 'g/dL' },
+    { k: 'wbc', label: 'WBC', range: '4,000 – 11,000', unit: 'cells/µL', scale: 1000 },
+    { k: 'plt', label: 'PLT', range: '1,50,000 – 4,50,000', unit: 'cells/µL', scale: 100000 },
+  ] },
+  { k: 'rft', label: 'RFT', params: [
+    { k: 'rbs', label: 'RBS', range: '70 – 140', unit: 'mg/dL' },
+    { k: 'urea', label: 'Urea', range: '15 – 40', unit: 'mg/dL' },
+    { k: 'creat', label: 'Creat', range: '0.5 – 1.2', unit: 'mg/dL' },
+    { k: 'na', label: 'Na', range: '135 – 145', unit: 'mEq/L' },
+    { k: 'k', label: 'K', range: '3.5 – 5.0', unit: 'mEq/L' },
+  ] },
+  { k: 'lft', label: 'LFT', params: [
+    { k: 'tbili', label: 'T.Bili', range: '0.2 – 1.2', unit: 'mg/dL' },
+    { k: 'dbili', label: 'D.Bili', range: '0.0 – 0.3', unit: 'mg/dL' },
+    { k: 'ibili', label: 'I.Bili', range: '0.1 – 1.0', unit: 'mg/dL' },
+    { k: 'sgot', label: 'SGOT', range: '10 – 40', unit: 'U/L' },
+    { k: 'sgpt', label: 'SGPT', range: '7 – 56', unit: 'U/L' },
+    { k: 'alp', label: 'ALP', range: '44 – 147', unit: 'U/L' },
+  ] },
+  { k: 'inflam', label: 'Inflammatory markers', optional: true, params: [
+    { k: 'esr', label: 'ESR', range: '0 – 20', unit: 'mm/hr' },
+    { k: 'crp', label: 'qCRP', range: '< 5', unit: 'mg/L' },
+  ] },
+  { k: 'vm', label: 'VM', long: 'Viral markers', params: [
+    { k: 'hbsag', label: 'HBsAg', range: 'Negative', options: ['Negative', 'Positive'] },
+    { k: 'hcv', label: 'HCV', range: 'Negative', options: ['Negative', 'Positive'] },
+  ] },
+  { k: 'vctc', label: 'VCTC', params: [
+    { k: 'hiv', label: 'HIV', range: 'Non-reactive', options: ['Non-reactive', 'Reactive'] },
+  ] },
+];
+const ALL_PARAMS = LAB_GROUPS.flatMap((g) => g.params.map((p) => ({ ...p, group: g })));
+
+// Work-up items recorded as text. Empty = pending.
+const WORKUP = [
+  { k: 'ecg', label: 'ECG' },
+  { k: 'echo', label: 'ECHO', long: 'ECHO & cardio opinion' },
+  { k: 'xray', label: 'X-ray', img: true },
   { k: 'ct', label: 'CT', img: true },
   { k: 'mri', label: 'MRI', img: true },
-  { k: 'anaes', label: 'PAC', long: 'Anaesthesia assessment', req: true },
-  { k: 'esr', label: 'ESR', fields: [['v', 'ESR']] },
-  { k: 'crp', label: 'qCRP', fields: [['v', 'qCRP']] },
-  { k: 'pus', label: 'Pus C/S', long: 'Pus culture & sensitivity' },
+  { k: 'anaes', label: 'PAC', long: 'Anaesthesia assessment (PAC)' },
 ];
-const CHECKS_BEFORE_OPINIONS = 7;
 
 const OPINION_DEPTS = [
   'General Medicine', 'Cardiology', 'Pulmonology', 'Nephrology', 'Neurology',
@@ -37,104 +86,82 @@ const OPINION_DEPTS = [
   'Plastic Surgery', 'Vascular Surgery', 'Neurosurgery', 'CTVS', 'General Surgery', 'Urology', 'Obstetrics & Gynaecology',
 ];
 
-const ANAESTHESIA = ['GA/RA', 'RA', 'GA', 'SA', 'SA + EA', 'Brachial plexus block', 'Local'];
-const SCHEMES = ['APPROVED', 'APPLIED', 'TO BE APPLIED', 'NO SCHEME'];
-const ROLES = ['House Surgeon', 'PG', 'Senior PG', 'Assistant Professor', 'Professor'];
-const SIDES = ['Right', 'Left', 'Bilateral', 'N/A'];
-
-const DISPOSITIONS = {
-  discharge: { label: 'Discharge', title: '', status: 'discharged', course: 'PATIENT IS BEING DISCHARGED IN A STABLE CONDITION.' },
-  dar: { label: 'Discharge at request', title: '', status: 'discharged', course: 'PATIENT DISCHARGED AT REQUEST.' },
-  postop: { label: 'Transfer to Post-operative Ward', title: 'TRANSFER SUMMARY', status: 'postop', course: 'PATIENT IS BEING TRANSFERRED TO THE POST-OPERATIVE WARD FOR FURTHER MANAGEMENT.' },
-  lama: { label: 'LAMA / AA', title: 'LAMA / AGAINST ADVICE', status: 'discharged', course: 'PATIENT LEFT AGAINST MEDICAL ADVICE. THE CONSEQUENCES WERE EXPLAINED TO THE PATIENT AND ATTENDERS.' },
-  absconded: { label: 'Absconded', title: 'ABSCONDED', status: 'discharged', course: 'PATIENT ABSCONDED FROM THE WARD.' },
-};
-
-const LEVELS = ['I', 'II', 'III', 'IV'];
-
-// Defaults match the unit's existing letterhead / OT list; editable in Settings.
-const DEFAULT_META = {
-  institution: 'Govt. Rajaji Hospital & Madurai Medical College',
-  department: 'Department of Orthopaedic Surgery & Traumatology',
-  unit: 'UNIT I',
-  chief: 'PROF. DR. PATHIARASAKUMAR M.S. ORTHO',
-  profs: ['DR KARTHIKEYAN MS ORTHO'],
-  opd: '802',
-};
-
-// [procedure, keywords, implants, level, anaesthesia]
-const SEED_IMPLANTS = [
-  ['Hemiarthroplasty (bipolar / AMP)', 'hemiarthroplasty, bipolar, austin moore, amp', '39-47 BIPOLAR AND AUSTIN MOORE PROSTHESIS', 'III', 'GA/RA'],
-  ['Short PFN', 'pfn, short pfn, pfna, proximal femoral nail', '9,10,11*250MM SHORT PFN, 6.2MM DEROTATION SCREW, 8MM CERVICAL SCREW, 4.9MM LOCKING BOLTS', 'II', 'GA/RA'],
-  ['Long PFN', 'long pfn', '9,10,11 MM LONG PFN (340-420MM), 6.2MM DEROTATION SCREW, 8MM CERVICAL SCREW, 4.9MM LOCKING BOLTS', 'III', 'GA/RA'],
-  ['DHS', 'dhs, dynamic hip screw', '135° DHS BARREL PLATE 4/5 HOLE, 70-100MM DHS LAG SCREW, 4.5MM CORTICAL SCREWS', 'II', 'GA/RA'],
-  ['THR', 'thr, total hip', 'THR SET – ACETABULAR CUP, LINER, FEMORAL STEM & HEAD (SIZES), BONE CEMENT 40G X 2', 'IV', 'GA/RA'],
-  ['TKR', 'tkr, total knee', 'TKR SET – FEMORAL & TIBIAL COMPONENTS, POLY INSERT, BONE CEMENT 40G X 2', 'IV', 'GA/RA'],
-  ['ILN femur', 'iln femur, ilin femur, femur iln, femur ilin, interlocking nail femur, femur interlocking nail, femoral iln', '9-12MM X 340-440MM FEMUR INTERLOCKING NAIL, 4.9MM LOCKING BOLTS', 'III', 'GA/RA'],
-  ['ILN tibia', 'iln tibia, ilin tibia, tibia iln, tibia ilin, interlocking nail tibia, tibia interlocking nail, tibial iln', '8-11MM X 280-380MM TIBIA INTERLOCKING NAIL, 4.5MM LOCKING BOLTS', 'II', 'GA/RA'],
-  ['Humerus nail', 'humerus nail, iln humerus, ilin humerus, humeral nail', '7-9MM HUMERUS INTERLOCKING NAIL, 4MM LOCKING BOLTS', 'II', 'GA'],
-  ['Forearm plating', 'both bone forearm, bbfa, bb forearm, radius ulna, radius and ulna, orif radius, orif ulna, forearm plating', '3.5MM LC-DCP / LCP 6-8 HOLE X 2, 3.5MM CORTICAL SCREWS', 'II', 'GA/RA'],
-  ['Distal radius plating', 'distal radius, drf, volar plate, volar plating', 'DISTAL RADIUS VOLAR LOCKING PLATE, 2.7MM LOCKING SCREWS, 1.5/1.8MM K-WIRES', 'II', 'GA/RA'],
-  ['K-wire fixation', 'k wire, k-wire, kwire, k wiring, crpp', '1.5 / 1.8 / 2MM K-WIRES', 'I', 'GA/RA'],
-  ['Tension band wiring', 'tbw, tension band', '1.8 / 2MM K-WIRES, 18G SS WIRE', 'II', 'GA/RA'],
-  ['CC screws', 'cc screw, cc screws, cc screwing, cannulated cancellous, ccs, cannulated screw', '6.5 / 7MM CANNULATED CANCELLOUS SCREWS WITH WASHERS', 'II', 'GA/RA'],
-  ['Distal femur plating', 'distal femur, dfl, supracondylar femur', 'DISTAL FEMUR LOCKING PLATE, 5MM LOCKING & 4.5MM CORTICAL SCREWS', 'III', 'GA/RA'],
-  ['Proximal tibia plating', 'proximal tibia, tibial plateau, schatzker', 'PROXIMAL TIBIA LOCKING PLATE (LATERAL / MEDIAL), 5MM LOCKING SCREWS, 6.5MM CC SCREWS', 'III', 'GA/RA'],
-  ['Proximal humerus plating', 'proximal humerus, philos', 'PHILOS PLATE, 3.5MM LOCKING & CORTICAL SCREWS', 'III', 'GA'],
-  ['Clavicle plating', 'clavicle', 'CLAVICLE ANATOMICAL LOCKING PLATE / 3.5MM RECON PLATE, 3.5MM SCREWS', 'II', 'GA'],
-  ['Ankle ORIF', 'bimalleolar, trimalleolar, malleolus, malleolar, ankle orif', '1/3 TUBULAR PLATE, 3.5MM SCREWS, 4MM CC SCREWS, K-WIRES', 'II', 'GA/RA'],
-  ['External fixator', 'external fixator, ex-fix, exfix, jess, spanning fixator', '3.5MM SCHANZ PINS, AO CLAMPS, AO RODS', 'I', 'GA/RA'],
-  ['LRS', 'lrs, limb reconstruction', 'LRS RAIL, CLAMPS, 6MM SCHANZ PINS', 'III', 'GA/RA'],
-  ['Implant removal', 'implant removal, implant exit, hardware removal', 'SCREWDRIVER SET, BROKEN SCREW REMOVAL SET, NAIL EXTRACTOR', 'I', 'GA/RA'],
-  ['ACL reconstruction', 'acl, aclr', 'ENDOBUTTON, 7-9MM INTERFERENCE SCREW', 'III', 'GA/RA'],
-  ['Spine fixation', 'pedicle screw, tlif, plif, spinal fixation, spine fixation', 'PEDICLE SCREWS, RODS, LOCKING CAPS, CAGE (IF TLIF/PLIF)', 'IV', 'GA'],
-  ['Debridement', 'debridement, wound debridement, i&d, wd', 'NIL', 'I', 'GA/RA'],
-  ['SSG', 'ssg, split skin graft', 'NIL', 'I', 'GA/RA'],
-].map(([name, kw, implants, level, anaes], i) => ({
-  id: 'seed' + i,
-  name,
-  keywords: kw.split(',').map((x) => x.trim()).filter(Boolean),
-  implants,
-  level,
-  anaes,
-}));
-
-// ---- Case helpers -------------------------------------------------------
-
-function effStatus(c, chk) {
-  const s = c.inv?.[chk.k]?.s || '';
-  return s || (chk.req ? 'pending' : '');
+function parseNum(v, p = {}) {
+  const m = String(v ?? '').trim().toLowerCase().replace(/,/g, '').match(/^[<>]?\s*(\d*\.?\d+)\s*(lakhs?|lacs?|l|k)?\b/);
+  if (!m) return NaN;
+  let n = parseFloat(m[1]);
+  if (m[2] === 'k') n *= 1000;
+  else if (m[2]) n *= 100000;
+  else if (p.scale && n < 100) n *= p.scale;
+  return n;
 }
 
-function checkSummary(c, chk) {
-  const d = c.inv?.[chk.k] || {};
-  const st = effStatus(c, chk);
-  let out = '';
-  if (chk.fields && chk.fields.some(([f]) => d[f])) {
-    out = chk.fields.map(([f]) => d[f] || '–').join('/');
-  } else if (st) {
-    out = STATUS[st];
-  }
-  if (d.note) out += (out ? ' · ' : '') + d.note;
-  return out;
+function parseRange(r) {
+  const s = String(r || '').replace(/,/g, '').trim();
+  let m;
+  if ((m = s.match(/^<\s*=?\s*(\d*\.?\d+)/))) return { hi: +m[1] };
+  if ((m = s.match(/^>\s*=?\s*(\d*\.?\d+)/))) return { lo: +m[1] };
+  if ((m = s.match(/(\d*\.?\d+)\s*(?:–|-|to)\s*(\d*\.?\d+)/))) return { lo: +m[1], hi: +m[2] };
+  return s ? { normal: s.toLowerCase() } : {};
 }
+
+// 'high' | 'low' | 'abn' | ''
+function flagOf(value, p) {
+  if (value == null || String(value).trim() === '') return '';
+  const r = parseRange(p.range);
+  if (r.normal) return String(value).trim().toLowerCase() === r.normal ? '' : 'abn';
+  const n = parseNum(value, p);
+  if (isNaN(n)) return '';
+  if (r.hi != null && n > r.hi) return 'high';
+  if (r.lo != null && n < r.lo) return 'low';
+  return '';
+}
+const FLAG_MARK = { high: ' ↑', low: ' ↓', abn: '' };
 
 const listOf = (map) => Object.entries(map || {})
   .map(([id, v]) => ({ id, ...v }))
   .sort((a, b) => (a.at || 0) - (b.at || 0));
 
+function customParams(c) {
+  return listOf(c.custom).map((x) => ({ k: 'x_' + x.id, label: x.label, range: x.range, unit: x.unit, custom: true }));
+}
+
+function labSets(c) {
+  return listOf(c.labs).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.at || 0) - (b.at || 0));
+}
+
+function latest(c, key) {
+  const sets = labSets(c);
+  for (let i = sets.length - 1; i >= 0; i--) {
+    const v = sets[i].v?.[key];
+    if (v != null && String(v).trim() !== '') return { value: String(v).trim(), date: sets[i].date };
+  }
+  return null;
+}
+
+const hasText = (x) => x != null && String(x).trim() !== '';
+
 function pendingList(c) {
   const out = [];
-  for (const chk of CHECKS) {
-    const s = effStatus(c, chk);
-    if (s === 'pending') out.push({ kind: 'inv', text: chk.label });
-    if (s === 'sent') out.push({ kind: 'sent', text: chk.label + ' (sent)' });
+  for (const g of LAB_GROUPS) {
+    if (g.optional) continue;
+    const missing = g.params.filter((p) => !latest(c, p.k));
+    if (missing.length === g.params.length) out.push({ kind: 'inv', text: g.label });
+    else if (missing.length) out.push({ kind: 'inv', text: `${g.label}: ${missing.map((p) => p.label).join(', ')}` });
   }
-  for (const o of listOf(c.opinions)) {
-    if (o.s !== 'done' && o.s !== 'na') out.push({ kind: o.s === 'sent' ? 'sent' : 'inv', text: o.dept + ' opinion' + (o.s === 'sent' ? ' (sent)' : '') });
-  }
-  for (const t of listOf(c.tasks)) {
-    if (!t.done) out.push({ kind: 'task', text: t.text + (t.to ? ` → ${t.to}` : '') });
+  for (const p of customParams(c)) if (!latest(c, p.k)) out.push({ kind: 'inv', text: p.label });
+  for (const w of WORKUP) if (!hasText(c.work?.[w.k])) out.push({ kind: 'inv', text: w.label });
+  for (const o of listOf(c.opinions)) if (!hasText(o.note)) out.push({ kind: 'inv', text: o.dept + ' op.' });
+  for (const t of listOf(c.tasks)) if (!t.done) out.push({ kind: 'task', text: t.text + (t.to ? ` → ${t.to}` : '') });
+  return out;
+}
+
+function abnormalList(c) {
+  const out = [];
+  for (const p of [...ALL_PARAMS, ...customParams(c)]) {
+    const l = latest(c, p.k);
+    const f = l && flagOf(l.value, p);
+    if (f) out.push({ kind: 'flag', text: `${p.label} ${l.value}${FLAG_MARK[f]}` });
   }
   return out;
 }
@@ -142,21 +169,30 @@ function pendingList(c) {
 function readiness(c) {
   let total = 0;
   let done = 0;
-  for (const chk of CHECKS) {
-    const s = effStatus(c, chk);
-    if (!s) continue;
-    total++;
-    if (s === 'done' || s === 'na') done++;
-  }
-  for (const o of listOf(c.opinions)) {
-    total++;
-    if (o.s === 'done' || o.s === 'na') done++;
-  }
+  const tick = (ok) => { total++; if (ok) done++; };
+  for (const g of LAB_GROUPS) if (!g.optional) g.params.forEach((p) => tick(latest(c, p.k)));
+  customParams(c).forEach((p) => tick(latest(c, p.k)));
+  WORKUP.forEach((w) => tick(hasText(c.work?.[w.k])));
+  listOf(c.opinions).forEach((o) => tick(hasText(o.note)));
   return { done, total, ready: total > 0 && done === total };
 }
 
 function ageSex(c) {
   return [c.age, c.sex].filter(Boolean).join('/');
+}
+
+// Older saves stored labs as inv.cbc.hb etc.; fold them into one dated set.
+function migrateCase(c) {
+  if (!c.inv || c.labs) return c;
+  const map = { cbc: { hb: 'hb', wbc: 'wbc', plt: 'plt' }, rft: { u: 'urea', c: 'creat', na: 'na', k: 'k' }, lft: { tbili: 'tbili', sgot: 'sgot', sgpt: 'sgpt' }, esr: { v: 'esr' }, crp: { v: 'crp' } };
+  const v = {};
+  for (const [g, fields] of Object.entries(map)) for (const [f, k] of Object.entries(fields)) if (hasText(c.inv[g]?.[f])) v[k] = c.inv[g][f];
+  if (Object.keys(v).length) c.labs = { m0: { date: c.doa || '', at: c.createdAt || 0, v } };
+  c.work ||= {};
+  for (const w of WORKUP) if (hasText(c.inv[w.k]?.note) && !hasText(c.work[w.k])) c.work[w.k] = c.inv[w.k].note;
+  if (hasText(c.inv.pus?.note) && !c.pus) c.pus = { organism: c.inv.pus.note };
+  delete c.inv;
+  return c;
 }
 
 // ---- Implant matching ---------------------------------------------------
@@ -166,15 +202,12 @@ function keywordRegex(k) {
   return new RegExp(`(^|[^a-z0-9])${e}([^a-z0-9]|$)`, 'i');
 }
 
+// A rule matches on its procedure name or any of its other names.
 function matchImplants(text, rules) {
   if (!text) return [];
   return Object.values(rules || {})
-    .filter((r) => (r.keywords || []).some((k) => k && keywordRegex(k).test(text)))
+    .filter((r) => [r.name, ...(r.keywords || [])].some((k) => k && keywordRegex(k).test(text)))
     .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-}
-
-function suggestImplants(c, rules) {
-  return matchImplants(c.plan, rules).map((r) => r.implants).filter((x) => x && x !== 'NIL').join(', ');
 }
 
 function suggestFromPlan(plan, rules) {
@@ -182,11 +215,19 @@ function suggestFromPlan(plan, rules) {
   const levels = m.map((r) => LEVELS.indexOf(r.level)).filter((i) => i >= 0);
   return {
     matches: m,
-    implants: suggestImplants({ plan }, rules),
+    implants: m.map((r) => r.implants).filter((x) => x && x.toUpperCase() !== 'NIL').join(', '),
     level: levels.length ? LEVELS[Math.max(...levels)] : '',
-    anaesthesia: m.find((r) => r.anaes)?.anaes || '',
   };
 }
+
+const DISPOSITIONS = {
+  discharge: { label: 'Discharge', title: '', status: 'discharged', course: 'PATIENT IS BEING DISCHARGED IN A STABLE CONDITION.' },
+  dar: { label: 'Discharge at request', title: '', status: 'discharged', course: 'PATIENT DISCHARGED AT REQUEST.' },
+  postop: { label: 'Transfer to Post-operative Ward', title: 'TRANSFER SUMMARY', status: 'postop', course: 'PATIENT IS BEING TRANSFERRED TO THE POST-OPERATIVE WARD FOR FURTHER MANAGEMENT.' },
+  ama: { label: 'AMA', title: 'DISCHARGED AGAINST MEDICAL ADVICE (AMA)', status: 'discharged', course: 'PATIENT LEFT AGAINST MEDICAL ADVICE. THE CONSEQUENCES WERE EXPLAINED TO THE PATIENT AND ATTENDERS.' },
+  absconded: { label: 'Absconded', title: 'ABSCONDED', status: 'discharged', course: 'PATIENT ABSCONDED FROM THE WARD.' },
+};
+
 
 // ---- Discharge helpers --------------------------------------------------
 
@@ -219,7 +260,9 @@ function reviewPhrase(weeks, day, opd, time = '8AM') {
 }
 
 const EXAM_TEMPLATE = `PT. CONSCIOUS, ORIENTED, AFEBRILE
-BP:   MMHG   PR:   /MIN   SpO2:   % (RA)
+BP:    MMHG
+PR:    /MIN
+SpO2:    % (RA)
 
 SYSTEMIC EXAMINATION:
 CVS: S1, S2 +
@@ -257,7 +300,7 @@ function courseTemplate(c, d) {
     'THE PATIENT WAS ADMITTED FROM TRIAGE. INITIAL MANAGEMENT WAS DONE AS PER MODIFIED ATLS PROTOCOL. NECESSARY INVESTIGATIONS WERE TAKEN.',
     up(d.diagnosis) ? `PATIENT WAS DIAGNOSED WITH ${up(d.diagnosis)}.` : '',
     operated
-      ? `AFTER OBTAINING FITNESS, PATIENT UNDERWENT ${up(d.procedure)}${c.anaesthesia ? ' UNDER ' + up(c.anaesthesia) : ''} ON ${fmtDate(d.dos)}. POST-OPERATIVE PERIOD WAS UNEVENTFUL.`
+      ? `AFTER OBTAINING FITNESS, PATIENT UNDERWENT ${up(d.procedure)} UNDER ${ANAES} ON ${fmtDate(d.dos)}. POST-OPERATIVE PERIOD WAS UNEVENTFUL.`
       : (up(d.procedure) ? managedSentence(up(d.procedure)) : ''),
     ops.length ? `EXPERT OPINIONS WERE OBTAINED FROM ${ops.length > 1 ? ops.slice(0, -1).join(', ') + ' AND ' + ops.at(-1) : ops[0]} AND ORDERS WERE FOLLOWED.` : '',
     (DISPOSITIONS[d.disposition] || DISPOSITIONS.discharge).course,

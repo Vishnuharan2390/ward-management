@@ -47,7 +47,7 @@ const Print = (() => {
       case 'diagnosis': return nl(up(c.diagnosis));
       case 'procedure': return nl(up(c.plan));
       case 'level': return esc(c.level);
-      case 'anaes': return esc(up(c.anaesthesia));
+      case 'anaes': return ANAES;
       case 'implants': return nl(up(c.implants));
       case 'scheme': return esc(up(c.scheme));
       case 'remarks': return nl(up(draft.remarks?.[c.id]));
@@ -55,8 +55,12 @@ const Print = (() => {
     }
   }
 
+  // Line 1: list, unit, date, day. Line 2: the unit chief.
   function otTitle(draft) {
-    return `OT LIST FOR ORTHO ${up(draft.unit)} ON ${fmtDate(draft.date)} ${up(draft.day)} ${up(draft.chief)}`.replace(/\s+/g, ' ').trim();
+    return [
+      `OT LIST FOR ORTHO ${up(draft.unit)} ON ${fmtDate(draft.date)} ${up(draft.day)}`.replace(/\s+/g, ' ').trim(),
+      up(draft.chief),
+    ];
   }
 
   function otHTML(cases, draft) {
@@ -64,7 +68,7 @@ const Print = (() => {
     const total = cols.reduce((a, k) => a + OT_COLUMNS[k][1], 0);
     return `
       <div class="pr ot">
-        <div class="ot-title">${esc(otTitle(draft))}</div>
+        <div class="ot-title">${otTitle(draft).map(esc).join('<br>')}</div>
         <table class="ot-table">
           <colgroup>${cols.map((k) => `<col style="width:${((OT_COLUMNS[k][1] / total) * 100).toFixed(2)}%">`).join('')}</colgroup>
           <thead><tr>${cols.map((k) => `<th>${OT_COLUMNS[k][0]}</th>`).join('')}</tr></thead>
@@ -105,12 +109,12 @@ const Print = (() => {
         <td class="nb-sno">${c.status === 'posted' ? '<span class="nb-bot">BOT</span>' : ''}${i + 1}</td>
         <td><b>${esc(c.name)}</b><div class="pr-sub">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
         <td>${nl(c.diagnosis)}${c.plan ? `<div class="pr-sub">▸ ${esc(c.plan)}</div>` : ''}</td>
-        <td class="nb-todo">${todoList(c).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
+        <td class="nb-todo">${abnormalList(c).map((t) => `<b class="pr-flag">${esc(t.text)}</b>`).join('')}${todoList(c).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
         <td>${esc(assessmentScheme(c))}</td>
       </tr>`).join('');
     const html = `
       <div class="pr nb">
-        <div class="nb-head"><b>${esc(up(meta.unit))} — PRE-OP WARD</b><span>${fmtDate(todayISO())} · ${cases.length} cases</span></div>
+        <div class="nb-head"><b>${esc(unitName(meta.unitId))} — PRE-OP WARD</b><span>${fmtDate(todayISO())} · ${cases.length} cases</span></div>
         <table class="nb-table">
           <colgroup><col style="width:6%"><col style="width:17%"><col style="width:30%"><col style="width:32%"><col style="width:15%"></colgroup>
           <thead><tr><th>S.NO</th><th>NAME</th><th>DIAGNOSIS</th><th>TO DO'S</th><th>ASSESSMENT / SCHEME</th></tr></thead>
@@ -172,10 +176,9 @@ const Print = (() => {
 
 // Shared with the on-screen ward view.
 function todoList(c) {
-  return pendingList(c).map((p) => p.text.replace(' opinion', ' op.'));
+  return pendingList(c).map((p) => p.text);
 }
 function assessmentScheme(c) {
-  const pac = effStatus(c, CHECKS.find((x) => x.k === 'anaes'));
-  const a = pac === 'done' ? 'Assessed' : pac === 'sent' ? 'Sent for PAC' : pac === 'na' ? '' : 'TBA';
-  return [a, c.scheme].filter(Boolean).join(' / ') || '—';
+  const a = hasText(c.work?.anaes) ? 'Assessed' : 'TBA';
+  return [a, c.scheme].filter(Boolean).join(' / ');
 }
