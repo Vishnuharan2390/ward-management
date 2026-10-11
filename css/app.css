@@ -388,3 +388,10 @@ table.dc > thead { display: table-header-group; }
 .level-table td:nth-child(3) { width: 34%; }
 .level-table td:nth-child(5) { width: 64px; text-align: center; }
 .level-table .lv-head th { background: var(--blue-bg); color: var(--brand); position: static; font-size: .8rem; text-align: left; }
+.ver { font-size: .7rem; opacity: .7; }
+.jump { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 84px); z-index: 5; background: var(--bg); padding: .4rem 0; margin-bottom: .5rem; }
+.jump .chip { text-decoration: none; }
+.form > fieldset.card { margin-bottom: 12px; padding: 14px; scroll-margin-top: 190px; }
+.form > fieldset.card > legend { font-size: 1.05rem; padding: 0 .3rem; }
+#sec-inv { border-top: 3px solid var(--red); }
+@media (min-width: 760px) { .jump { top: 52px; } }

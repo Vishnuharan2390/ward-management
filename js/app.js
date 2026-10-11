@@ -287,8 +287,14 @@ const App = (() => {
         if (!c) return notFound();
         return `
           <h2>${id ? 'Edit case' : 'New case'}</h2>
-          <form id="case-form" class="card form" autocomplete="off">
-            <fieldset><legend>Patient</legend>
+          <nav class="chips jump" aria-label="Sections">
+            <a class="chip" href="#sec-patient" data-jump>Patient</a>
+            <a class="chip" href="#sec-plan" data-jump>Diagnosis & plan</a>
+            <a class="chip on" href="#sec-inv" data-jump>Investigations</a>
+            ${id ? '' : '<a class="chip" href="#sec-work" data-jump>Work-up</a>'}
+          </nav>
+          <form id="case-form" class="form" autocomplete="off">
+            <fieldset class="card" id="sec-patient"><legend>Patient</legend>
               <label class="span2">Name<input name="name" required value="${esc(c.name)}"></label>
               <label>Age<input name="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
@@ -299,7 +305,7 @@ const App = (() => {
               <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
               <label>Address<input name="address" value="${esc(c.address)}"></label>
             </fieldset>
-            <fieldset><legend>Diagnosis & plan</legend>
+ <fieldset class="card" id="sec-plan"><legend>Diagnosis & plan</legend>
               <label class="span2">Diagnosis<textarea name="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
               <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT">${esc(c.plan)}</textarea></label>
               <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
@@ -311,13 +317,17 @@ const App = (() => {
               </label>
               <div class="span2"><button type="button" class="btn small" id="impl-fill">↻ Fill implants & level from database</button></div>
             </fieldset>
-            ${id ? '' : `
-            <fieldset class="block-fs"><legend>Investigations</legend>
+            ${id ? `
+            <fieldset class="card" id="sec-inv"><legend>Investigations</legend>
+              <p class="span2 muted">Blood investigations are entered as dated sets on the case page.</p>
+              <div class="span2"><button type="button" class="btn primary" id="edit-labs">+ Enter / repeat investigations</button></div>
+            </fieldset>` : `
+            <fieldset class="card block-fs" id="sec-inv"><legend>Investigations</legend>
               <div class="span2">${labFormHTML(c)}</div>
               <label>Pus C/S — organism<input name="pusOrganism" class="italic" placeholder="if sent"></label>
               <label>Sensitive to<input name="pusSensitive" placeholder="antibiotics"></label>
             </fieldset>
-            <fieldset><legend>Work-up</legend>
+            <fieldset class="card" id="sec-work"><legend>Work-up</legend>
               ${WORKUP.map((w) => `<label>${esc(w.long || w.label)}<input name="w_${w.k}" placeholder="Result / remarks"></label>`).join('')}
             </fieldset>`}
             <div class="form-actions">
@@ -331,6 +341,15 @@ const App = (() => {
         const f = $('#case-form', el);
         if (!f) return;
         if (!id) bindLabForm(f, {});
+        // In-page jumps (the URL hash is the router, so scroll instead of navigating).
+        $$('[data-jump]', el).forEach((a) => {
+          a.onclick = (e) => {
+            e.preventDefault();
+            $(a.getAttribute('href'), el)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          };
+        });
+        const el2 = $('#edit-labs', el);
+        if (el2) el2.onclick = () => openLabModal(id);
         // Implants follow the plan until someone edits them by hand.
         const auto = ['implants', 'level'];
         const touched = Object.fromEntries(auto.map((k) => [k, !!f.elements[k].value.trim()]));
