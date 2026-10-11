@@ -192,7 +192,7 @@ label > input, label > select, label > textarea { margin-top: .2rem; color: var(
 .thumb img { width: 100%; height: 100px; object-fit: cover; background: #222; }
 .thumb span { font-size: .7rem; color: #fff; padding: .2rem .35rem; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-#modal { position: fixed; inset: 0; background: rgba(0,0,0,.92); z-index: 50; }
+#modal { position: fixed; inset: 0; background: #05080f; z-index: 50; }
 .viewer { display: flex; flex-direction: column; height: 100%; }
 .viewer-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; padding: .5rem 16px; color: #fff; }
 .viewer-bar .muted { color: #aaa; }
@@ -365,7 +365,6 @@ table.dc > thead { display: table-header-group; }
 .sheet { max-width: 760px; margin: 4vh auto; }
 
 /* ---------- OT picker ---------- */
-.picker { min-width: 760px; }
 .picker tr[data-row] { cursor: pointer; }
 .picker tr.picked { background: var(--blue-bg); }
 .picker input { transform: scale(1.2); }
@@ -395,3 +394,51 @@ table.dc > thead { display: table-header-group; }
 .form > fieldset.card > legend { font-size: 1.05rem; padding: 0 .3rem; }
 #sec-inv { border-top: 3px solid var(--red); }
 @media (min-width: 760px) { .jump { top: 52px; } }
+
+/* viewer navigation */
+.viewer-img { position: relative; }
+.v-nav {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 52px; height: 72px; border: 0; border-radius: 8px; cursor: pointer;
+  background: rgba(19, 41, 75, .75); color: #fff; font-size: 2.2rem; line-height: 1;
+}
+.v-nav:disabled { opacity: .2; cursor: default; }
+.v-prev { left: 12px; }
+.v-next { right: 12px; }
+.viewer-strip { display: flex; gap: .35rem; overflow-x: auto; padding: .5rem 16px calc(.5rem + env(safe-area-inset-bottom, 0px)); }
+.v-dot { flex: none; border: 1px solid #556; background: transparent; color: #ccd; border-radius: 99px; padding: .2rem .6rem; font: inherit; font-size: .8rem; cursor: pointer; }
+.v-dot.on { background: #c8102e; border-color: #c8102e; color: #fff; }
+.img-link { color: var(--red); font-weight: 600; text-decoration: none; }
+.img-link:hover { text-decoration: underline; }
+.picker { min-width: 640px; }
+a.btn[aria-disabled="true"] { opacity: .45; }
+
+/* Picker on phones: one compact block per case instead of a wide table. */
+@media (max-width: 640px) {
+  .picker { min-width: 0; }
+  .picker thead { display: none; }
+  .picker tr[data-row] {
+    display: grid; grid-template-columns: 30px 1fr auto;
+    grid-template-areas: "cb name age" "cb dx dx" "cb plan plan" "cb doa img";
+    gap: .15rem .4rem; padding: .55rem .4rem; border-bottom: 1px solid var(--line);
+  }
+  .picker tr[data-row] td { border: 0; padding: 0; }
+  .picker td:nth-child(1) { grid-area: cb; padding-top: .15rem; }
+  .picker td:nth-child(2) { grid-area: name; }
+  .picker td:nth-child(3) { grid-area: age; color: var(--muted); }
+  .picker td:nth-child(4) { grid-area: dx; }
+  .picker td:nth-child(5) { grid-area: plan; color: var(--brand); font-weight: 600; }
+  .picker td:nth-child(5):not(:empty)::before { content: "▸ "; }
+  .picker td:nth-child(6) { grid-area: doa; color: var(--muted); }
+  .picker td:nth-child(6)::before { content: "DOA "; }
+  .picker td:nth-child(7) { grid-area: img; text-align: right; }
+}
+
+/* OT list x2 on one sheet */
+#print.measuring { display: block !important; position: absolute; left: -10000px; top: 0; }
+.ot-dup { display: flex; flex-direction: column; }
+.ot-half { height: var(--half); overflow: hidden; }
+.ot-half .ot-title { font-size: 12pt; margin-bottom: 8pt; }
+.ot-half .ot-table td { height: auto; }
+.ot-half .ot-sign { margin-top: 14pt; }
+.ot-cut { border-top: 1px dashed #000; }

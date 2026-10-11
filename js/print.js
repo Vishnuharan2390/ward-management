@@ -4,9 +4,10 @@ const Print = (() => {
   const nl = (s) => esc(s).replace(/\n/g, '<br>');
   const up = (s) => String(s ?? '').toUpperCase();
 
-  function go(html, { title, page }) {
+  function go(html, { title, page, margin = '12mm', fit }) {
     $('#print').innerHTML = html;
-    $('#page-style').textContent = `@page { size: ${page}; margin: 12mm; }`;
+    $('#page-style').textContent = `@page { size: ${page}; margin: ${margin}; }`;
+    if (fit) fit();
     const old = document.title;
     document.title = title;
     // Let images (letterhead) load before the print snapshot.
@@ -31,10 +32,9 @@ const Print = (() => {
     diagnosis: ['DIAGNOSIS', 2002],
     procedure: ['PLAN', 2108],
     level: ['LEVEL', 851],
-    anaes: ['ANAES', 609],
-    implants: ['IMPLANTS', 2300],
+    anaes: ['ANAES', 780],
+    implants: ['IMPLANTS', 2130],
     scheme: ['SCHEME STATUS', 1554],
-    remarks: ['REMARKS', 1300],
   };
 
   function otCell(col, c, i, draft) {
@@ -50,7 +50,6 @@ const Print = (() => {
       case 'anaes': return ANAES;
       case 'implants': return nl(up(c.implants));
       case 'scheme': return esc(up(c.scheme));
-      case 'remarks': return nl(up(draft.remarks?.[c.id]));
       default: return '';
     }
   }
@@ -64,7 +63,7 @@ const Print = (() => {
   }
 
   function otHTML(cases, draft) {
-    const cols = Object.keys(OT_COLUMNS).filter((k) => draft.cols[k] !== false);
+    const cols = Object.keys(OT_COLUMNS);
     const total = cols.reduce((a, k) => a + OT_COLUMNS[k][1], 0);
     return `
       <div class="pr ot">
@@ -78,27 +77,50 @@ const Print = (() => {
       </div>`;
   }
 
-  function otList(cases, draft) {
-    go(otHTML(cases, draft), { title: `OT LIST ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'letter landscape' });
-  }
+  // US Letter landscape, like the unit's Word template.
+  const PAGE_W_MM = 279.4;
+  const PAGE_H_MM = 215.9;
+  const MM = 96 / 25.4; // CSS px per mm
 
-  // Same list as an editable Word file, for last-minute changes in MS Word.
-  function otWord(cases, draft) {
-    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
-      <style>
-        @page WordSection1 { size: 11in 8.5in; mso-page-orientation: landscape; margin: 1in; }
-        div.WordSection1 { page: WordSection1; }
-        .ot-title { font: bold 14pt Arial; text-align: center; margin-bottom: 12pt; }
-        table { border-collapse: collapse; width: 100%; }
-        th, td { border: 1px solid #000; font: bold 8pt "Times New Roman"; padding: 2pt 4pt; vertical-align: top; text-align: left; }
-        th { font-size: 8pt; }
-        .ot-sign { font: bold 8pt "Times New Roman"; text-align: right; margin-top: 30pt; }
-      </style></head><body><div class="WordSection1">${otHTML(cases, draft)}</div></body></html>`;
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['﻿', html], { type: 'application/msword' }));
-    a.download = `OT_LIST_${(draft.unit || 'UNIT').replace(/\s+/g, '_')}_${fmtDate(draft.date).replace(/\//g, '')}.doc`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  // `twice`: two copies on one sheet, top and bottom, each shrunk to fit its half.
+  function otList(cases, draft, twice) {
+    const title = `OT LIST ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`;
+    if (!twice) {
+      go(otHTML(cases, draft), { title, page: 'letter landscape' });
+      return;
+    }
+    const margin = 8;
+    const gap = 8;
+    const halfH = (PAGE_H_MM - 2 * margin - gap) / 2;
+    const one = otHTML(cases, draft);
+    const html = `<div class="ot-dup" style="--half:${halfH}mm">
+      <div class="ot-half">${one}</div><div class="ot-cut" style="height:${gap}mm"></div><div class="ot-half">${one}</div></div>`;
+    const fit = () => {
+      // Lay the page out off-screen at print width, then zoom each copy into its half.
+      const pr = $('#print');
+      pr.classList.add('measuring');
+      pr.style.width = `${PAGE_W_MM - 2 * margin}mm`;
+      // Zoom changes how text wraps, so search for the largest zoom that fits.
+      const target = (halfH - 5) * MM; // keep the signature clear of the cut line
+      $$('.ot-half > .pr', pr).forEach((el) => {
+        const fits = (z) => {
+          el.style.zoom = String(z);
+          return el.getBoundingClientRect().height <= target;
+        };
+        if (fits(1)) return;
+        let lo = 0.25;
+        let hi = 1;
+        for (let i = 0; i < 10; i++) {
+          const mid = (lo + hi) / 2;
+          if (fits(mid)) lo = mid;
+          else hi = mid;
+        }
+        el.style.zoom = lo.toFixed(3);
+      });
+      pr.classList.remove('measuring');
+      pr.style.width = '';
+    };
+    go(html, { title: title + ' PRINT', page: 'letter landscape', margin: margin + 'mm', fit });
   }
 
   // ---------------------------------------------------------------- Ward board
@@ -171,7 +193,7 @@ const Print = (() => {
     go(html, { title: `${up(c.name)}_DISCHARGE`, page: 'A4 portrait' });
   }
 
-  return { otList, otWord, wardBoard, discharge, OT_COLUMNS, otTitle };
+  return { otList, wardBoard, discharge, OT_COLUMNS, otTitle };
 })();
 
 // Shared with the on-screen ward view.

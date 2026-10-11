@@ -601,35 +601,71 @@ const App = (() => {
     };
   }
 
+  // Full-screen image viewer. Without `kind` it walks every image of the
+  // case in order X-ray → CT → MRI, oldest first within each.
+  const IMG_ORDER = ['xray', 'ct', 'mri'];
+  const caseImages = (caseId, kind) => listOf(Store.cases[caseId]?.images)
+    .filter((i) => !kind || i.kind === kind)
+    .sort((a, b) => IMG_ORDER.indexOf(a.kind) - IMG_ORDER.indexOf(b.kind) || (a.at || 0) - (b.at || 0));
+
   function openViewer(caseId, imgId, kind) {
     const m = $('#modal');
+    const c = Store.cases[caseId];
+    let cur = imgId || caseImages(caseId, kind)[0]?.id;
     const close = () => {
       m.hidden = true;
       m.innerHTML = '';
+      document.removeEventListener('keydown', onKey);
+    };
+    const step = (dir) => {
+      const all = caseImages(caseId, kind);
+      const i = all.findIndex((x) => x.id === cur) + dir;
+      if (all[i]) show(all[i].id);
+    };
+    const onKey = (e) => {
+      if (e.key === 'ArrowRight') step(1);
+      else if (e.key === 'ArrowLeft') step(-1);
+      else if (e.key === 'Escape') close();
     };
     const show = async (iid) => {
-      const all = listOf(Store.cases[caseId]?.images).filter((i) => !kind || i.kind === kind);
+      cur = iid;
+      const all = caseImages(caseId, kind);
       const idx = all.findIndex((i) => i.id === iid);
       const im = all[idx];
       if (!im) return close();
       m.innerHTML = `
         <div class="viewer">
           <div class="viewer-bar">
-            <span>${esc(im.kind.toUpperCase())} ${idx + 1}/${all.length} · ${esc(im.caption)} <span class="muted small">${esc(im.by)} · ${fmtTime(im.at)}</span></span>
+            <span><b>${esc(c?.name || '')}</b> · ${esc(im.kind === 'xray' ? 'X-RAY' : im.kind.toUpperCase())} · ${idx + 1} of ${all.length}${im.caption ? ' · ' + esc(im.caption) : ''}</span>
             <span>
-              <button class="btn small" data-v="prev" ${idx ? '' : 'disabled'}>‹</button>
-              <button class="btn small" data-v="next" ${idx < all.length - 1 ? '' : 'disabled'}>›</button>
               <button class="btn small danger" data-v="del">Delete</button>
               <button class="btn small" data-v="close">Close</button>
             </span>
           </div>
-          <div class="viewer-img"><img alt=""></div>
+          <div class="viewer-img">
+            <button class="v-nav v-prev" data-v="prev" ${idx ? '' : 'disabled'} aria-label="Previous image">‹</button>
+            <img alt="">
+            <button class="v-nav v-next" data-v="next" ${idx < all.length - 1 ? '' : 'disabled'} aria-label="Next image">›</button>
+          </div>
+          <div class="viewer-strip">${all.map((x, i) => `<button class="v-dot${i === idx ? ' on' : ''}" data-go-img="${x.id}">${esc(x.kind === 'xray' ? 'X-ray' : x.kind.toUpperCase())} ${all.filter((y, j) => y.kind === x.kind && j <= i).length}</button>`).join('')}</div>
         </div>`;
       $('img', m).src = (await Store.getImage(im.id)) || '';
+      // Swipe on phones.
+      const area = $('.viewer-img', m);
+      let x0 = null;
+      area.ontouchstart = (e) => { x0 = e.touches.length === 1 ? e.touches[0].clientX : null; };
+      area.ontouchend = (e) => {
+        if (x0 == null) return;
+        const dx = e.changedTouches[0].clientX - x0;
+        if (Math.abs(dx) > 50) step(dx < 0 ? 1 : -1);
+        x0 = null;
+      };
       m.onclick = async (e) => {
-        const v = e.target.dataset.v || (e.target === m || e.target.classList.contains('viewer-img') ? 'close' : '');
-        if (v === 'prev') show(all[idx - 1].id);
-        if (v === 'next') show(all[idx + 1].id);
+        const go = e.target.closest('[data-go-img]');
+        if (go) return show(go.dataset.goImg);
+        const v = e.target.closest('[data-v]')?.dataset.v || (e.target === m || e.target.classList.contains('viewer-img') ? 'close' : '');
+        if (v === 'prev') step(-1);
+        if (v === 'next') step(1);
         if (v === 'close') close();
         if (v === 'del' && confirm('Delete this image for everyone?')) {
           await Store.deleteImage(caseId, im.id);
@@ -637,8 +673,10 @@ const App = (() => {
         }
       };
     };
+    if (!cur) return toast('No radiographs uploaded for this patient yet');
     m.hidden = false;
-    show(imgId);
+    document.addEventListener('keydown', onKey);
+    show(cur);
   }
 
   // ---------------------------------------------------------------- OT builder
@@ -651,8 +689,6 @@ const App = (() => {
     d.date ||= todayISO(1);
     d.day ||= dayName(d.date).toUpperCase();
     d.selected ||= [];
-    d.cols ||= { remarks: false };
-    d.remarks ||= {};
     d.unitId ||= m.unitId || 'I';
     d.chief ||= unitOf(d.unitId).chief;
     d.prof ||= m.lastProf || unitOf(d.unitId).aps[0];
@@ -675,8 +711,38 @@ const App = (() => {
       const unitFirst = [unitOf(d.unitId), ...allUnits().filter((u) => u.id !== d.unitId)];
       const chiefs = [...new Set(unitFirst.map((u) => u.chief))];
       const apOptions = unitFirst.map((u) => `<optgroup label="Unit ${u.id}">${opts(u.aps, d.prof)}</optgroup>`).join('');
+      if (!/^#\/ot\/list/.test(location.hash)) {
+        return `
+        <div class="toolbar">
+          <h2>OT list · pick cases</h2>
+          <a class="btn primary" href="#/ot/list" ${sel.length ? '' : 'aria-disabled="true"'} id="ot-next">Next (${sel.length}) →</a>
+        </div>
+        <div class="card">
+          <div class="row-between"><p class="muted small">Tap a row to add it to the list. Radiographs open in a viewer; use → to step through X-ray, CT and MRI.</p>
+            <label class="small nowrap"><input type="checkbox" id="ot-all" ${OT.showAll ? 'checked' : ''}> show all statuses</label></div>
+          <div class="table-wrap">
+            <table class="board picker">
+              <thead><tr><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Radiographs</th></tr></thead>
+              <tbody>
+                ${pool.map((c) => {
+                  const n = listOf(c.images).length;
+                  return `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}">
+                  <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
+                  <td><b>${esc(c.name)}</b></td><td class="nowrap">${esc(ageSex(c))}</td>
+                  <td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
+                  <td class="nowrap">${esc(fmtDate(c.doa))}</td>
+                  <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
+                </tr>`;
+                }).join('') || '<tr><td colspan="7" class="empty">No pre-op cases.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="form-actions"><a class="btn primary" href="#/ot/list" ${sel.length ? '' : 'aria-disabled="true"'}>Next (${sel.length} selected) →</a></div>`;
+      }
       return `
-        <h2>OT list builder</h2>
+        <div class="toolbar"><a class="btn" href="#/ot">← Pick cases</a></div>
+        <h2>OT list · details</h2>
         <div class="card form">
           <fieldset><legend>List details</legend>
             <label>Date<input type="date" id="ot-date" value="${esc(d.date)}"></label>
@@ -689,24 +755,7 @@ const App = (() => {
         </div>
 
         <div class="card">
-          <div class="row-between"><h3>1 · Pick cases</h3>
-            <label class="small"><input type="checkbox" id="ot-all" ${OT.showAll ? 'checked' : ''}> show all statuses</label></div>
-          <div class="table-wrap">
-            <table class="board picker">
-              <thead><tr><th></th><th>Name</th><th>Age/Sex</th><th>IP No</th><th>Ward</th><th>DOA</th><th>Diagnosis</th><th>Plan</th></tr></thead>
-              <tbody>
-                ${pool.map((c) => `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}">
-                  <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
-                  <td><b>${esc(c.name)}</b></td><td>${esc(ageSex(c))}</td><td>${esc(c.ipNo)}</td><td>${esc(c.ward)}</td>
-                  <td class="nowrap">${esc(fmtDate(c.doa))}</td><td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
-                </tr>`).join('') || '<tr><td colspan="8" class="empty">No pre-op cases.</td></tr>'}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <h3>2 · Order & confirm <span class="pill">${sel.length}</span></h3>
+          <h3>Order & confirm <span class="pill">${sel.length}</span></h3>
           <p class="muted small">Edits here are saved back to the case. Anaesthesia prints as ${ANAES}.</p>
           <div class="ot-rows">
             ${sel.map((c, i) => `
@@ -726,20 +775,18 @@ const App = (() => {
                   <label class="span3">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
                   <label class="span3">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
                   <label class="span3">Implants <button type="button" class="link small" data-refill>↻ implants & level from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
-                  ${d.cols.remarks !== false ? `<label class="span3">Remarks (this list only)<input data-remark value="${esc(d.remarks[c.id])}"></label>` : ''}
                 </div>
               </div>`).join('') || '<div class="empty">Tick cases above to add them.</div>'}
           </div>
         </div>
 
-        <div class="card">
-          <h3>3 · Columns & print</h3>
-          <div class="chips">${Object.entries(Print.OT_COLUMNS).map(([k, [l]]) => `<label class="chip ${d.cols[k] !== false ? 'on' : ''}"><input type="checkbox" data-col="${k}" ${d.cols[k] !== false ? 'checked' : ''} hidden>${l}</label>`).join('')}</div>
+        <div class="card print-card">
           <label class="small"><input type="checkbox" id="ot-mark" checked> Mark these cases as “Posted” (BOT)</label>
           <div class="form-actions">
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
-            <button class="btn" id="ot-word" ${sel.length ? '' : 'disabled'}>Download Word (.doc)</button>
+            <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
           </div>
+          <p class="muted small">The print PDF puts the same list twice on one landscape sheet — top and bottom — to print and cut.</p>
         </div>`;
     },
     mount(el) {
@@ -748,19 +795,19 @@ const App = (() => {
         fn(d);
         saveDraft(d);
         if (rerender) render();
-        else $('.ot-preview-title', el).innerHTML = Print.otTitle(otDraft()).map(esc).join('<br>');
+        else if ($('.ot-preview-title', el)) $('.ot-preview-title', el).innerHTML = Print.otTitle(otDraft()).map(esc).join('<br>');
       };
-      $('#ot-date', el).onchange = (e) => upd((x) => { x.date = e.target.value; x.day = dayName(x.date).toUpperCase(); });
-      $('#ot-day', el).onchange = (e) => upd((x) => { x.day = e.target.value; }, false);
-      $('#ot-unit', el).onchange = (e) => upd((x) => {
+      if ($('#ot-date', el)) $('#ot-date', el).onchange = (e) => upd((x) => { x.date = e.target.value; x.day = dayName(x.date).toUpperCase(); });
+      if ($('#ot-day', el)) $('#ot-day', el).onchange = (e) => upd((x) => { x.day = e.target.value; }, false);
+      if ($('#ot-unit', el)) $('#ot-unit', el).onchange = (e) => upd((x) => {
         const u = unitOf(e.target.value);
         x.unitId = u.id;
         x.chief = u.chief;
         x.prof = u.aps[0];
       });
-      $('#ot-chief', el).onchange = (e) => upd((x) => { x.chief = e.target.value; }, false);
-      $('#ot-prof', el).onchange = (e) => upd((x) => { x.prof = e.target.value; }, false);
-      $('#ot-all', el).onchange = (e) => { OT.showAll = e.target.checked; render(); };
+      if ($('#ot-chief', el)) $('#ot-chief', el).onchange = (e) => upd((x) => { x.chief = e.target.value; }, false);
+      if ($('#ot-prof', el)) $('#ot-prof', el).onchange = (e) => upd((x) => { x.prof = e.target.value; }, false);
+      if ($('#ot-all', el)) $('#ot-all', el).onchange = (e) => { OT.showAll = e.target.checked; render(); };
 
       el.addEventListener('change', (e) => {
         const t = e.target;
@@ -769,17 +816,22 @@ const App = (() => {
             x.selected = x.selected.filter((i) => i !== t.dataset.pick);
             if (t.checked) x.selected.push(t.dataset.pick);
           });
-        } else if (t.dataset.col) {
-          upd((x) => { x.cols[t.dataset.col] = t.checked; });
         } else if (t.dataset.f) {
           Store.patch('cases', t.closest('[data-case]').dataset.case, { [t.dataset.f]: t.value.trim() });
-        } else if (t.dataset.remark !== undefined) {
-          const cid = t.closest('[data-case]').dataset.case;
-          upd((x) => { x.remarks[cid] = t.value; }, false);
         }
       });
 
       el.addEventListener('click', (e) => {
+        const img = e.target.closest('[data-imaging]');
+        if (img) {
+          e.preventDefault();
+          return openViewer(img.dataset.imaging);
+        }
+        const nx = e.target.closest('[aria-disabled="true"]');
+        if (nx) {
+          e.preventDefault();
+          return toast('Tick at least one case first');
+        }
         // Tapping anywhere on a picker row toggles it.
         const pr = e.target.closest('[data-row]');
         if (pr && e.target.tagName !== 'INPUT') {
@@ -820,14 +872,16 @@ const App = (() => {
         Store.setMeta({ lastProf: dd.prof });
         return [dd.selected.map((id) => ({ id, ...Store.cases[id] })), dd];
       };
-      $('#ot-go', el).onclick = () => {
+      if (!$('#ot-go', el)) return;
+      const generate = (twice) => {
         const [cases, dd] = build();
         if ($('#ot-mark', el).checked) {
           cases.filter((c) => c.status !== 'posted').forEach((c) => Store.patch('cases', c.id, { status: 'posted', otDate: dd.date }));
         }
-        Print.otList(cases, dd);
+        Print.otList(cases, dd, twice);
       };
-      $('#ot-word', el).onclick = () => Print.otWord(...build());
+      $('#ot-go', el).onclick = () => generate(false);
+      $('#ot-go2', el).onclick = () => generate(true);
     },
   };
 
@@ -1303,7 +1357,7 @@ const App = (() => {
     [/^#\/new$/, () => CaseForm()],
     [/^#\/case\/(\w+)$/, (id) => CaseDetail(id)],
     [/^#\/case\/(\w+)\/edit$/, (id) => CaseForm(id)],
-    [/^#\/ot$/, () => OT],
+    [/^#\/ot(\/list)?$/, () => OT],
     [/^#\/discharge\/(\w+)$/, (id) => Discharge(id)],
     [/^#\/(settings|implants)$/, () => Settings],
   ];
