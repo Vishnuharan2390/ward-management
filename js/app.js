@@ -93,44 +93,68 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------- Ward board
+  const activeCases = () => caseList().filter((c) => ['preop', 'posted', undefined, ''].includes(c.status))
+    .sort((a, b) => String(a.ward || '').localeCompare(String(b.ward || ''), undefined, { numeric: true })
+      || String(a.bed || '').localeCompare(String(b.bed || ''), undefined, { numeric: true })
+      || (a.doa || '').localeCompare(b.doa || ''));
+
   const Ward = {
     live: true,
+    detailed: sessionStorage.getItem('wm.wardDetailed') === '1',
     render() {
-      const list = caseList().filter((c) => ['preop', 'posted', undefined, ''].includes(c.status))
-        .sort((a, b) => String(a.bed || '').localeCompare(String(b.bed || ''), undefined, { numeric: true }));
+      const list = activeCases();
       const cell = (c, k) => {
         const chk = CHECKS.find((x) => x.k === k);
         return `<td class="s-${effStatus(c, chk) || 'none'}">${esc(checkSummary(c, chk))}</td>`;
       };
+      const notebook = `
+        <table class="board nb-screen">
+          <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
+          <tbody>
+            ${list.map((c, i) => `<tr data-go="${c.id}">
+              <td>${c.status === 'posted' ? '<span class="tag task">BOT</span><br>' : ''}${i + 1}</td>
+              <td><b>${esc(c.name)}</b><div class="muted small">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
+              <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
+              <td>${pendingList(c).map((p) => `<span class="tag ${p.kind}">${esc(p.text)}</span>`).join('') || '<span class="muted">—</span>'}</td>
+              <td>${esc(assessmentScheme(c))}</td>
+            </tr>`).join('') || '<tr><td colspan="5" class="empty">No active pre-op cases.</td></tr>'}
+          </tbody>
+        </table>`;
+      const detailed = `
+        <table class="board">
+          <thead><tr><th>Patient</th><th>Diagnosis / Plan</th><th>CBC</th><th>RFT</th><th>LFT</th><th>VM</th><th>VCTC</th><th>ECG</th><th>ECHO</th><th>Opinions</th><th>X-ray</th><th>CT</th><th>MRI</th><th>PAC</th><th>Pending works</th></tr></thead>
+          <tbody>
+            ${list.map((c) => `<tr data-go="${c.id}">
+              <td><b>${esc(c.name)}</b><div class="muted small">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
+              <td>${esc(c.diagnosis)}<div class="muted small">▸ ${esc(c.plan)}</div></td>
+              ${['cbc', 'rft', 'lft', 'vm', 'vctc', 'ecg', 'echo'].map((k) => cell(c, k)).join('')}
+              <td>${listOf(c.opinions).map((o) => `<div class="s-${o.s || 'pending'}">${esc(o.dept)}</div>`).join('')}</td>
+              ${['xray', 'ct', 'mri', 'anaes'].map((k) => cell(c, k)).join('')}
+              <td>${listOf(c.tasks).filter((t) => !t.done).map((t) => `<div>• ${esc(t.text)}</div>`).join('')}</td>
+            </tr>`).join('') || '<tr><td colspan="15" class="empty">No active pre-op cases.</td></tr>'}
+          </tbody>
+        </table>`;
       return `
         <div class="toolbar">
           <h2>Ward status <span class="muted small">${fmtDate(todayISO())}</span></h2>
           <button class="btn" id="print-ward">Print / PDF</button>
         </div>
-        <div class="table-wrap">
-          <table class="board">
-            <thead><tr><th>Patient</th><th>Diagnosis / Plan</th><th>CBC</th><th>RFT</th><th>LFT</th><th>VM</th><th>VCTC</th><th>ECG</th><th>ECHO</th><th>Opinions</th><th>X-ray</th><th>CT</th><th>MRI</th><th>PAC</th><th>Pending works</th></tr></thead>
-            <tbody>
-              ${list.map((c) => `<tr data-go="${c.id}">
-                <td><b>${esc(c.name)}</b><div class="muted small">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.bed ? ' · Bed ' + esc(c.bed) : ''}</div></td>
-                <td>${esc(c.diagnosis)}<div class="muted small">▸ ${esc(c.plan)}</div></td>
-                ${['cbc', 'rft', 'lft', 'vm', 'vctc', 'ecg', 'echo'].map((k) => cell(c, k)).join('')}
-                <td>${listOf(c.opinions).map((o) => `<div class="s-${o.s || 'pending'}">${esc(o.dept)}</div>`).join('')}</td>
-                ${['xray', 'ct', 'mri', 'anaes'].map((k) => cell(c, k)).join('')}
-                <td>${listOf(c.tasks).filter((t) => !t.done).map((t) => `<div>• ${esc(t.text)}</div>`).join('')}</td>
-              </tr>`).join('') || '<tr><td colspan="15" class="empty">No active pre-op cases.</td></tr>'}
-            </tbody>
-          </table>
+        <div class="chips">
+          <button class="chip ${Ward.detailed ? '' : 'on'}" data-layout="0">Notebook</button>
+          <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
-        <p class="muted small">Tap a row to open the case. Green = done, amber = sent, red = pending.</p>`;
+        <div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>
+        <p class="muted small">Tap a row to open the case. BOT = posted for OT. To do's are compiled automatically from the checklist, opinions and pending works.</p>`;
     },
     mount(el) {
-      $('#print-ward', el).onclick = () => {
-        const list = caseList().filter((c) => ['preop', 'posted', undefined, ''].includes(c.status))
-          .sort((a, b) => String(a.bed || '').localeCompare(String(b.bed || ''), undefined, { numeric: true }));
-        Print.wardBoard(list, Store.meta);
-      };
+      $('#print-ward', el).onclick = () => Print.wardBoard(activeCases(), Store.meta);
       el.addEventListener('click', (e) => {
+        const l = e.target.closest('[data-layout]');
+        if (l) {
+          Ward.detailed = l.dataset.layout === '1';
+          sessionStorage.setItem('wm.wardDetailed', l.dataset.layout);
+          return render();
+        }
         const tr = e.target.closest('[data-go]');
         if (tr) location.hash = '#/case/' + tr.dataset.go;
       });
@@ -152,22 +176,27 @@ const App = (() => {
               <label>Age<input name="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
               <label>IP number<input name="ipNo" value="${esc(c.ipNo)}"></label>
+              <label>Ward<input name="ward" value="${esc(c.ward)}" placeholder="e.g. 90A"></label>
               <label>Bed<input name="bed" value="${esc(c.bed)}"></label>
               <label>Date of admission<input type="date" name="doa" value="${esc(c.doa)}"></label>
               <label>Status<select name="status">${opts(Object.entries(CASE_STATUS), c.status || 'preop')}</select></label>
+              <label>Attender<input name="attender" value="${esc(c.attender)}" placeholder="e.g. S/O BOMMU"></label>
+              <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
+              <label class="span2">Address<input name="address" value="${esc(c.address)}"></label>
             </fieldset>
             <fieldset><legend>Diagnosis & plan</legend>
               <label class="span2">Diagnosis<textarea name="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
               <label>Side / level<input name="side" list="dl-sides" value="${esc(c.side)}"></label>
               <label>Comorbidities<input name="comorbid" value="${esc(c.comorbid)}" placeholder="DM, SHTN…"></label>
               <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2" placeholder="e.g. CRIF with PFN">${esc(c.plan)}</textarea></label>
+              <label>Level<select name="level">${opts([['', '—'], ...LEVELS.map((l) => [l, l])], c.level || '')}</select></label>
               <label>Anaesthesia<input name="anaesthesia" list="dl-anaes" value="${esc(c.anaesthesia)}"></label>
               <label>Scheme status<input name="scheme" list="dl-schemes" value="${esc(c.scheme)}"></label>
               <label class="span2">Implants
                 <textarea name="implants" rows="3" placeholder="Auto-filled from the implant database when you type the plan">${esc(c.implants)}</textarea>
                 <span class="hint" id="impl-hint"></span>
               </label>
-              <div class="span2"><button type="button" class="btn small" id="impl-fill">↻ Fill implants from database</button></div>
+              <div class="span2"><button type="button" class="btn small" id="impl-fill">↻ Fill implants, level & anaesthesia from database</button></div>
             </fieldset>
             <div class="form-actions">
               <button class="btn primary" type="submit">${id ? 'Save' : 'Add case'}</button>
@@ -180,22 +209,24 @@ const App = (() => {
       mount(el) {
         const f = $('#case-form', el);
         if (!f) return;
-        const impl = f.elements.implants;
-        let touched = !!impl.value.trim();
-        impl.addEventListener('input', () => { touched = true; });
+        // Implants / level / anaesthesia follow the plan until someone edits them by hand.
+        const auto = ['implants', 'level', 'anaesthesia'];
+        const touched = Object.fromEntries(auto.map((k) => [k, !!f.elements[k].value.trim()]));
+        auto.forEach((k) => f.elements[k].addEventListener('input', () => { touched[k] = true; }));
+        auto.forEach((k) => f.elements[k].addEventListener('change', () => { touched[k] = true; }));
         const hint = () => {
           const m = matchImplants(f.elements.plan.value, Store.implants);
           $('#impl-hint', el).textContent = m.length ? 'Matches: ' + m.map((r) => r.name).join(', ') : 'No implant database match for this plan.';
         };
-        const fill = () => { impl.value = suggestImplants({ plan: f.elements.plan.value }, Store.implants); };
+        const fill = (force) => {
+          const sug = suggestFromPlan(f.elements.plan.value, Store.implants);
+          auto.forEach((k) => { if (force || !touched[k]) f.elements[k].value = sug[k]; });
+        };
         f.elements.plan.addEventListener('input', () => {
           hint();
-          if (!touched) fill();
+          fill(false);
         });
-        $('#impl-fill', el).onclick = () => {
-          fill();
-          touched = true;
-        };
+        $('#impl-fill', el).onclick = () => fill(true);
         hint();
         f.onsubmit = (e) => {
           e.preventDefault();
@@ -265,7 +296,7 @@ const App = (() => {
             <div class="row-between">
               <div>
                 <h2>${c.bed ? `<span class="bed">${esc(c.bed)}</span>` : ''}${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span></h2>
-                <div class="muted">IP ${esc(c.ipNo || '—')} · DOA ${esc(fmtDate(c.doa))}${d != null ? ` (day ${d})` : ''}</div>
+                <div class="muted">IP ${esc(c.ipNo || '—')}${c.ward ? ' · Ward ' + esc(c.ward) : ''} · DOA ${esc(fmtDate(c.doa))}${d != null ? ` (day ${d})` : ''}</div>
               </div>
               <select id="case-status" class="badge-select st-${esc(c.status || 'preop')}">${opts(Object.entries(CASE_STATUS), c.status || 'preop')}</select>
             </div>
@@ -273,7 +304,7 @@ const App = (() => {
               <dt>Diagnosis</dt><dd>${esc(c.diagnosis) || '—'}${c.side ? ` <span class="muted">(${esc(c.side)})</span>` : ''}</dd>
               <dt>Plan</dt><dd>${esc(c.plan) || '—'}</dd>
               ${c.comorbid ? `<dt>Comorbid</dt><dd>${esc(c.comorbid)}</dd>` : ''}
-              <dt>Anaesthesia</dt><dd>${esc(c.anaesthesia) || '—'}</dd>
+              <dt>Level / Anaes</dt><dd>${esc(c.level) || '—'} / ${esc(c.anaesthesia) || '—'}</dd>
               <dt>Implants</dt><dd class="pre">${esc(c.implants) || '—'}</dd>
               <dt>Scheme</dt><dd>${esc(c.scheme) || '—'}</dd>
             </dl>
@@ -457,12 +488,15 @@ const App = (() => {
     let d;
     try { d = JSON.parse(localStorage.getItem(OT_KEY)); } catch { /* ignore */ }
     d ||= {};
+    const m = Store.meta;
     d.date ||= todayISO(1);
-    d.day ||= dayName(d.date);
+    d.day ||= dayName(d.date).toUpperCase();
     d.selected ||= [];
     d.cols ||= { remarks: false };
     d.remarks ||= {};
-    d.prof ??= Store.meta.lastProf || '';
+    d.unit ??= m.unit || 'UNIT I';
+    d.chief ??= m.chief || '';
+    d.prof ??= m.lastProf || (m.profs || [])[0] || '';
     return d;
   }
   const saveDraft = (d) => localStorage.setItem(OT_KEY, JSON.stringify(d));
@@ -475,7 +509,7 @@ const App = (() => {
       d.selected = d.selected.filter((id) => Store.cases[id]);
       const pool = caseList()
         .filter((c) => OT.showAll || d.selected.includes(c.id) || ['preop', 'posted', undefined, ''].includes(c.status))
-        .sort((a, b) => String(a.bed || '').localeCompare(String(b.bed || ''), undefined, { numeric: true }));
+        .sort((a, b) => String(a.ward || '').localeCompare(String(b.ward || ''), undefined, { numeric: true }) || String(a.bed || '').localeCompare(String(b.bed || ''), undefined, { numeric: true }));
       const sel = d.selected.map((id) => ({ id, ...Store.cases[id] }));
       const profs = Store.meta.profs || [];
       return `
@@ -484,9 +518,11 @@ const App = (() => {
           <fieldset><legend>List details</legend>
             <label>Date<input type="date" id="ot-date" value="${esc(d.date)}"></label>
             <label>Day<input id="ot-day" value="${esc(d.day)}"></label>
-            <label>Theatre / OT<input id="ot-theatre" value="${esc(d.theatre)}" placeholder="optional"></label>
-            <label>Assistant Professor<input id="ot-prof" list="dl-profs" value="${esc(d.prof)}"></label>
+            <label>Unit<input id="ot-unit" value="${esc(d.unit)}"></label>
+            <label>Professor (title line)<input id="ot-chief" value="${esc(d.chief)}"></label>
+            <label class="span2">Assistant Professor (signs the list)<input id="ot-prof" list="dl-profs" value="${esc(d.prof)}"></label>
           </fieldset>
+          <div class="ot-preview-title">${esc(Print.otTitle(d))}</div>
         </div>
 
         <div class="card">
@@ -496,7 +532,7 @@ const App = (() => {
             ${pool.map((c) => {
               const r = readiness(c);
               return `<label class="pick"><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''}>
-                <span><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))} · ${esc(c.ipNo)}</span><br>
+                <span><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</span><br>
                 <span class="small">${esc(c.diagnosis)} ▸ ${esc(c.plan)}</span></span>
                 <span class="pill ${r.ready ? 'ok' : ''}">${r.ready ? 'Fit' : `${r.done}/${r.total}`}</span></label>`;
             }).join('') || '<div class="empty">No pre-op cases.</div>'}
@@ -507,37 +543,44 @@ const App = (() => {
           <h3>2 · Order & confirm <span class="pill">${sel.length}</span></h3>
           <p class="muted small">Edits here are saved back to the case.</p>
           <div class="ot-rows">
-            ${sel.map((c, i) => `
+            ${sel.map((c, i) => {
+              const pend = pendingList(c).filter((p) => p.kind !== 'task');
+              return `
               <div class="ot-row" data-case="${c.id}">
                 <div class="ot-row-head">
                   <b>${i + 1}. ${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))} · IP ${esc(c.ipNo)}</span>
                   <span class="right">
-                    <button class="icon" data-move="-1" ${i ? '' : 'disabled'}>↑</button>
-                    <button class="icon" data-move="1" ${i < sel.length - 1 ? '' : 'disabled'}>↓</button>
-                    <button class="icon" data-unpick>✕</button>
+                    <button class="icon" data-move="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
+                    <button class="icon" data-move="1" ${i < sel.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
+                    <button class="icon" data-unpick title="Remove">✕</button>
                   </span>
                 </div>
-                ${pendingList(c).filter((p) => p.kind !== 'task').length ? `<div class="warn small">⚠ Pending: ${esc(pendingList(c).filter((p) => p.kind !== 'task').map((p) => p.text).join(', '))}</div>` : ''}
+                ${pend.length ? `<div class="warn small">⚠ Pending: ${esc(pend.map((p) => p.text).join(', '))}</div>` : ''}
                 <div class="ot-fields">
-                  <label>Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
-                  <label>Procedure<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
-                  <label>Side / level<input data-f="side" list="dl-sides" value="${esc(c.side)}"></label>
-                  <label>Anaesthesia<input data-f="anaesthesia" list="dl-anaes" value="${esc(c.anaesthesia)}"></label>
-                  <label>Scheme<input data-f="scheme" list="dl-schemes" value="${esc(c.scheme)}"></label>
-                  <label class="span2">Implants <button type="button" class="link small" data-refill>↻ from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
-                  ${d.cols.remarks !== false ? `<label class="span2">Remarks (this list only)<input data-remark value="${esc(d.remarks[c.id])}"></label>` : ''}
+                  <label>Ward<input data-f="ward" value="${esc(c.ward)}"></label>
+                  <label>Level<select data-f="level">${opts([['', '—'], ...LEVELS.map((l) => [l, l])], c.level || '')}</select></label>
+                  <label>Anaes<input data-f="anaesthesia" list="dl-anaes" value="${esc(c.anaesthesia)}"></label>
+                  <label class="span2">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
+                  <label>Scheme status<input data-f="scheme" list="dl-schemes" value="${esc(c.scheme)}"></label>
+                  <label class="span2">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
+                  <label class="span3">Implants <button type="button" class="link small" data-refill>↻ from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
+                  ${d.cols.remarks !== false ? `<label class="span3">Remarks (this list only)<input data-remark value="${esc(d.remarks[c.id])}"></label>` : ''}
                 </div>
-              </div>`).join('') || '<div class="empty">Tick cases above to add them.</div>'}
+              </div>`;
+            }).join('') || '<div class="empty">Tick cases above to add them.</div>'}
           </div>
         </div>
 
         <div class="card">
           <h3>3 · Columns & print</h3>
-          <div class="chips">${Object.entries(Print.OT_COLUMNS).map(([k, l]) => `<label class="chip ${d.cols[k] !== false ? 'on' : ''}"><input type="checkbox" data-col="${k}" ${d.cols[k] !== false ? 'checked' : ''} hidden>${l}</label>`).join('')}</div>
-          <label class="small"><input type="checkbox" id="ot-mark" checked> Mark these cases as “Posted”</label>
-          <div class="form-actions"><button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button></div>
+          <div class="chips">${Object.entries(Print.OT_COLUMNS).map(([k, [l]]) => `<label class="chip ${d.cols[k] !== false ? 'on' : ''}"><input type="checkbox" data-col="${k}" ${d.cols[k] !== false ? 'checked' : ''} hidden>${l}</label>`).join('')}</div>
+          <label class="small"><input type="checkbox" id="ot-mark" checked> Mark these cases as “Posted” (BOT)</label>
+          <div class="form-actions">
+            <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
+            <button class="btn" id="ot-word" ${sel.length ? '' : 'disabled'}>Download Word (.doc)</button>
+          </div>
         </div>
-        ${datalist('dl-profs', profs)}${datalist('dl-anaes', ANAESTHESIA)}${datalist('dl-schemes', SCHEMES)}${datalist('dl-sides', SIDES)}`;
+        ${datalist('dl-profs', profs)}${datalist('dl-anaes', ANAESTHESIA)}${datalist('dl-schemes', SCHEMES)}`;
     },
     mount(el) {
       const d = otDraft();
@@ -545,10 +588,12 @@ const App = (() => {
         fn(d);
         saveDraft(d);
         if (rerender) render();
+        else $('.ot-preview-title', el).textContent = Print.otTitle(d);
       };
-      $('#ot-date', el).onchange = (e) => upd((x) => { x.date = e.target.value; x.day = dayName(x.date); });
+      $('#ot-date', el).onchange = (e) => upd((x) => { x.date = e.target.value; x.day = dayName(x.date).toUpperCase(); });
       $('#ot-day', el).onchange = (e) => upd((x) => { x.day = e.target.value; }, false);
-      $('#ot-theatre', el).onchange = (e) => upd((x) => { x.theatre = e.target.value; }, false);
+      $('#ot-unit', el).onchange = (e) => upd((x) => { x.unit = e.target.value; }, false);
+      $('#ot-chief', el).onchange = (e) => upd((x) => { x.chief = e.target.value; }, false);
       $('#ot-prof', el).onchange = (e) => upd((x) => { x.prof = e.target.value.trim(); }, false);
       $('#ot-all', el).onchange = (e) => { OT.showAll = e.target.checked; render(); };
 
@@ -590,21 +635,24 @@ const App = (() => {
         }
       });
 
-      $('#ot-go', el).onclick = () => {
-        // Flush any field still focused.
-        document.activeElement?.blur();
+      const build = () => {
+        document.activeElement?.blur(); // flush the field being edited
         const dd = otDraft();
-        const cases = dd.selected.map((id) => ({ id, ...Store.cases[id] }));
         if (dd.prof) {
           const profs = new Set(Store.meta.profs || []);
           profs.add(dd.prof);
           Store.setMeta({ profs: [...profs], lastProf: dd.prof });
         }
+        return [dd.selected.map((id) => ({ id, ...Store.cases[id] })), dd];
+      };
+      $('#ot-go', el).onclick = () => {
+        const [cases, dd] = build();
         if ($('#ot-mark', el).checked) {
           cases.filter((c) => c.status !== 'posted').forEach((c) => Store.patch('cases', c.id, { status: 'posted', otDate: dd.date }, `Posted for OT on ${fmtDate(dd.date)}`));
         }
-        Print.otList(cases, dd, Store.meta);
+        Print.otList(cases, dd);
       };
+      $('#ot-word', el).onclick = () => Print.otWord(...build());
     },
   };
 
@@ -613,50 +661,85 @@ const App = (() => {
     return CHECKS.map((chk) => {
       const d = c.inv?.[chk.k] || {};
       const vals = (chk.fields || []).filter(([f]) => d[f]).map(([f, l]) => (chk.fields.length > 1 ? `${l} ${d[f]}` : d[f]));
-      const st = effStatus(c, chk);
-      const text = [vals.join(', '), d.note].filter(Boolean).join(' · ') || (st === 'done' ? 'Done' : '');
+      const text = [vals.join(', '), d.note].filter(Boolean).join(' · ');
       return text ? `${chk.long || chk.label}: ${text}` : '';
     }).filter(Boolean).join('\n');
   }
 
   function Discharge(id) {
+    // [key, label, rows, helper button]
     const FIELDS = [
-      ['diagnosis', 'Diagnosis', 2], ['procedure', 'Procedure done', 2],
-      ['history', 'H/O injury / illness', 3], ['past', 'Past history / treatment history', 2],
-      ['exam', 'Examination findings', 3], ['investigations', 'Investigations', 3],
-      ['treatment', 'Treatment / drugs given', 3], ['opNotes', 'Procedure / operative notes', 4],
-      ['course', 'Course in hospital', 3], ['condition', 'Condition on discharge', 2],
-      ['meds', 'Discharge medications', 4], ['advice', 'Discharge advice', 3], ['review', 'Review', 1],
+      ['diagnosis', 'Diagnosis in detail', 2],
+      ['procedure', 'Procedure in detail', 2],
+      ['unitLine', 'Unit / consultants', 1],
+      ['history', 'H/O injury / illness', 6],
+      ['past', 'Past history / treatment history', 4, ['past', '↻ template']],
+      ['exam', 'Examination findings', 10, ['exam', '↻ template']],
+      ['investigations', 'Investigations (optional)', 3, ['inv', '↻ from checklist']],
+      ['opNotes', 'Operative notes (optional)', 4],
+      ['treatment', 'Treatment given', 6],
+      ['course', 'Course in hospital', 5, ['course', '↻ auto-write']],
+      ['condition', 'Condition on discharge', 4],
+      ['meds', 'Discharge medications (optional)', 3],
     ];
     return {
       live: false,
       render() {
         const c = Store.cases[id];
         if (!c) return notFound();
+        const m = Store.meta;
         const d = {
           disposition: 'discharge',
           dod: todayISO(),
           dos: c.otDate || '',
+          consultant: m.unit || 'UNIT I',
+          unitLine: m.unit || 'UNIT I',
+          doctor: 'ORTHO ' + (m.unit || 'UNIT I'),
+          attender: c.attender,
+          phone: c.phone,
+          address: c.address,
           diagnosis: c.diagnosis,
           procedure: c.plan,
-          investigations: investigationsText(c),
-          preparedBy: Store.profile().name || '',
-          signedBy: Store.meta.lastProf || '',
+          past: pastTemplate(c),
+          exam: EXAM_TEMPLATE,
+          condition: 'PATIENT VITALS STABLE',
           ...(c.discharge || {}),
         };
+        if (!d.course) d.course = courseTemplate(c, d);
+        const field = ([k, l, rows, btn]) => `<label class="span2">${l}${btn ? ` <button type="button" class="link small" data-tpl="${btn[0]}">${btn[1]}</button>` : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>`;
         return `
           <h2>Discharge / transfer — ${esc(c.name)} <span class="muted small">${esc(ageSex(c))} · IP ${esc(c.ipNo)}</span></h2>
           <form id="dc-form" class="card form" autocomplete="off">
             <fieldset><legend>Disposition</legend>
               <div class="span2 radios">${Object.entries(DISPOSITIONS).map(([k, v]) => `<label class="chip ${d.disposition === k ? 'on' : ''}"><input type="radio" name="disposition" value="${k}" ${d.disposition === k ? 'checked' : ''} hidden>${v.label}</label>`).join('')}</div>
+            </fieldset>
+            <fieldset><legend>Patient box</legend>
               <label>AR number<input name="arNo" value="${esc(d.arNo)}"></label>
+              <label>Consultant<input name="consultant" value="${esc(d.consultant)}"></label>
               <label>Date of surgery<input type="date" name="dos" value="${esc(d.dos)}"></label>
               <label>Date of discharge / transfer<input type="date" name="dod" value="${esc(d.dod)}"></label>
+              <label>Time<input name="dodTime" value="${esc(d.dodTime)}" placeholder="e.g. 2 PM"></label>
+              <label>Attender<input name="attender" value="${esc(d.attender)}" placeholder="S/O …"></label>
+              <label>Ph. no<input name="phone" type="tel" value="${esc(d.phone)}"></label>
+              <label>Contact no (optional)<input name="contact" type="tel" value="${esc(d.contact)}"></label>
+              <label class="span2">Address<input name="address" value="${esc(d.address)}"></label>
             </fieldset>
             <fieldset><legend>Summary</legend>
-              ${FIELDS.map(([k, l, rows]) => `<label class="span2">${l}${k === 'investigations' ? ' <button type="button" class="link small" id="inv-refill">↻ from checklist</button>' : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>`).join('')}
-              <label>Prepared by (PG)<input name="preparedBy" value="${esc(d.preparedBy)}"></label>
-              <label>Assistant Professor<input name="signedBy" list="dl-profs" value="${esc(d.signedBy)}"></label>
+              ${FIELDS.map(field).join('')}
+            </fieldset>
+            <fieldset><legend>Discharge advice</legend>
+              <div class="span2 chips">${ADVICE_PHRASES.map(([en], i) => `<button type="button" class="chip" data-phrase="${i}">+ ${esc(en)}</button>`).join('')}</div>
+              <div class="span2 review-row">
+                <span>Review after</span>
+                <input id="rv-weeks" type="number" min="1" value="2">
+                <span>weeks on</span>
+                <select id="rv-day">${opts(EN_DAYS.slice(1), 'MONDAY')}</select>
+                <span>OPD</span><input id="rv-opd" value="${esc(m.opd || '')}">
+                <button type="button" class="btn small" id="rv-add">+ Add review</button>
+              </div>
+              <label class="span2">Advice (English)<textarea name="advice" rows="4">${esc(d.advice)}</textarea></label>
+              <label class="span2">Advice (Tamil — printed below, one line each)<textarea name="adviceTa" rows="4" lang="ta">${esc(d.adviceTa)}</textarea></label>
+              <label class="span2">Discharging doctor<input name="doctor" value="${esc(d.doctor)}"></label>
             </fieldset>
             <div class="form-actions">
               <button class="btn" type="button" id="dc-save">Save draft</button>
@@ -664,20 +747,49 @@ const App = (() => {
               <a class="btn" href="#/case/${id}">Back</a>
             </div>
             <label class="small"><input type="checkbox" id="dc-status" checked> Update case status (Transfer → Post-op, others → Discharged)</label>
-          </form>
-          ${datalist('dl-profs', Store.meta.profs || [])}`;
+          </form>`;
       },
       mount(el) {
         const f = $('#dc-form', el);
         if (!f) return;
+        const c = () => Store.cases[id];
+        const data = () => Object.fromEntries(new FormData(f).entries());
+        const addLine = (name, line) => {
+          const ta = f.elements[name];
+          if (!ta.value.split('\n').includes(line)) ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + line;
+        };
         f.addEventListener('change', (e) => {
-          if (e.target.name === 'disposition') $$('.radios .chip', f).forEach((l) => l.classList.toggle('on', l.querySelector('input').checked));
+          if (e.target.name !== 'disposition') return;
+          $$('.radios .chip', f).forEach((l) => l.classList.toggle('on', l.querySelector('input').checked));
+          // Keep the closing line of the course in step with the disposition.
+          const course = f.elements.course;
+          const endings = Object.values(DISPOSITIONS).map((x) => x.course);
+          const hit = endings.find((x) => course.value.trim().endsWith(x));
+          if (hit) course.value = course.value.trim().slice(0, -hit.length) + DISPOSITIONS[e.target.value].course;
         });
-        $('#inv-refill', el).onclick = () => { f.elements.investigations.value = investigationsText(Store.cases[id]); };
+        f.addEventListener('click', (e) => {
+          const t = e.target.closest('[data-tpl],[data-phrase]');
+          if (!t) return;
+          if (t.dataset.phrase) {
+            const [en, ta] = ADVICE_PHRASES[t.dataset.phrase];
+            addLine('advice', en);
+            addLine('adviceTa', ta);
+          } else if (t.dataset.tpl === 'inv') f.elements.investigations.value = investigationsText(c());
+          else if (t.dataset.tpl === 'exam') f.elements.exam.value = EXAM_TEMPLATE;
+          else if (t.dataset.tpl === 'past') f.elements.past.value = pastTemplate(c());
+          else if (t.dataset.tpl === 'course') f.elements.course.value = courseTemplate(c(), data());
+        });
+        $('#rv-add', el).onclick = () => {
+          const opd = $('#rv-opd', el).value.trim();
+          const [en, ta] = reviewPhrase($('#rv-weeks', el).value, $('#rv-day', el).value, opd);
+          addLine('advice', en);
+          addLine('adviceTa', ta);
+          if (opd && opd !== Store.meta.opd) Store.setMeta({ opd });
+        };
         const save = (msg) => {
-          const data = Object.fromEntries(new FormData(f).entries());
-          Store.patch('cases', id, { discharge: data }, msg);
-          return data;
+          const d = data();
+          Store.patch('cases', id, { discharge: d }, msg);
+          return d;
         };
         $('#dc-save', el).onclick = () => {
           save('Discharge summary draft saved');
@@ -685,12 +797,12 @@ const App = (() => {
         };
         f.onsubmit = (e) => {
           e.preventDefault();
-          const data = save('Discharge summary generated');
+          const d = save('Discharge summary generated');
           if ($('#dc-status', el).checked) {
-            const st = DISPOSITIONS[data.disposition].status;
-            if (Store.cases[id].status !== st) Store.patch('cases', id, { status: st }, 'Status → ' + CASE_STATUS[st]);
+            const st = DISPOSITIONS[d.disposition].status;
+            if (c().status !== st) Store.patch('cases', id, { status: st }, 'Status → ' + CASE_STATUS[st]);
           }
-          Print.discharge(Store.cases[id], data, Store.meta);
+          Print.discharge(c(), d, Store.meta);
         };
       },
     };
@@ -703,7 +815,7 @@ const App = (() => {
       const rules = Object.entries(Store.implants).map(([id, r]) => ({ ...r, id })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       return `
         <h2>Implant database</h2>
-        <p class="muted small">When a case's <b>plan</b> contains any keyword below, its implants are filled in automatically. Keywords match whole words, case-insensitive.</p>
+        <p class="muted small">When a case's <b>plan</b> contains any keyword below, its implants, level and anaesthesia are filled in automatically. Keywords match whole words, case-insensitive. With several matches, implants are combined and the highest level wins.</p>
         <div class="card">
           <label class="block">Try a plan<input id="impl-test" placeholder="e.g. CRIF with PFN right"></label>
           <div id="impl-out" class="muted small"></div>
@@ -715,6 +827,8 @@ const App = (() => {
                 <label>Procedure<input data-k="name" value="${esc(r.name)}"></label>
                 <label>Keywords (comma separated)<input data-k="keywords" value="${esc((r.keywords || []).join(', '))}"></label>
                 <label class="span2">Implants needed<textarea data-k="implants" rows="2">${esc(r.implants)}</textarea></label>
+                <label>Level<select data-k="level">${opts([['', '—'], ...LEVELS.map((l) => [l, l])], r.level || '')}</select></label>
+                <label>Anaesthesia<input data-k="anaes" list="dl-anaes" value="${esc(r.anaes)}"></label>
               </div>
               <button class="icon" data-del-rule title="Delete">✕</button>
             </div>`).join('')}
@@ -724,15 +838,20 @@ const App = (() => {
             <label>Procedure<input name="name" required></label>
             <label>Keywords<input name="keywords" required placeholder="e.g. tens, titanium elastic nail"></label>
             <label class="span2">Implants needed<textarea name="implants" rows="2" required></textarea></label>
+            <label>Level<select name="level">${opts([['', '—'], ...LEVELS.map((l) => [l, l])], '')}</select></label>
+            <label>Anaesthesia<input name="anaes" list="dl-anaes"></label>
           </fieldset>
           <div class="form-actions"><button class="btn primary">Add</button></div>
-        </form>`;
+        </form>
+        <div class="card"><button class="btn" id="impl-reset">Restore starter procedures</button>
+          <span class="muted small">Re-adds the built-in list (overwrites those entries, keeps your own).</span></div>
+        ${datalist('dl-anaes', ANAESTHESIA)}`;
     },
     mount(el) {
       const test = $('#impl-test', el);
       test.oninput = () => {
         const m = matchImplants(test.value, Store.implants);
-        $('#impl-out', el).innerHTML = m.length ? m.map((r) => `<div><b>${esc(r.name)}</b>: ${esc(r.implants)}</div>`).join('') : (test.value ? 'No match' : '');
+        $('#impl-out', el).innerHTML = m.length ? m.map((r) => `<div><b>${esc(r.name)}</b> (level ${esc(r.level || '—')}, ${esc(r.anaes || '—')}): ${esc(r.implants)}</div>`).join('') : (test.value ? 'No match' : '');
       };
       el.addEventListener('change', (e) => {
         const k = e.target.dataset.k;
@@ -755,8 +874,15 @@ const App = (() => {
           name: f.name.value.trim(),
           keywords: f.keywords.value.split(',').map((s) => s.trim()).filter(Boolean),
           implants: f.implants.value.trim(),
+          level: f.level.value,
+          anaes: f.anaes.value.trim(),
         });
         e.target.reset();
+      };
+      $('#impl-reset', el).onclick = () => {
+        if (!confirm('Restore the starter procedures? Your edits to those entries are replaced.')) return;
+        SEED_IMPLANTS.forEach((r) => Store.create('implants', r.id, { ...r }));
+        toast('Starter procedures restored');
       };
     },
   };
@@ -781,10 +907,16 @@ const App = (() => {
         <form class="card form" id="meta">
           <fieldset><legend>Letterhead (shared)</legend>
             <label class="span2">Institution<input name="institution" value="${esc(m.institution)}" placeholder="Government … Medical College Hospital"></label>
-            <label>Department<input name="department" value="${esc(m.department || 'Department of Orthopaedics')}"></label>
-            <label>Unit<input name="unit" value="${esc(m.unit || 'Unit I')}"></label>
-            <label class="span2">Unit chief<input name="chief" value="${esc(m.chief)}"></label>
+            <label>Department<input name="department" value="${esc(m.department)}"></label>
+            <label>Unit<input name="unit" value="${esc(m.unit)}"></label>
+            <label class="span2">Professor / unit chief (OT list title)<input name="chief" value="${esc(m.chief)}"></label>
+            <label>Ortho OPD no.<input name="opd" value="${esc(m.opd)}"></label>
           </fieldset>
+          <div class="lh-preview"><img src="${esc(m.letterhead || 'assets/letterhead.jpg')}" alt="Letterhead"></div>
+          <div class="actions">
+            <label class="btn small">Replace letterhead image<input type="file" id="lh-file" accept="image/*" hidden></label>
+            ${m.letterhead ? '<button type="button" class="btn small" id="lh-reset">Use default</button>' : ''}
+          </div>
         </form>
 
         <div class="card">
@@ -811,7 +943,16 @@ const App = (() => {
     },
     mount(el) {
       $('#prof', el).onchange = (e) => Store.setProfile({ [e.target.name]: e.target.value.trim() });
-      $('#meta', el).onchange = (e) => Store.setMeta({ [e.target.name]: e.target.value.trim() });
+      $('#meta', el).onchange = async (e) => {
+        if (e.target.id === 'lh-file') {
+          const file = e.target.files[0];
+          if (file) Store.setMeta({ letterhead: await compressImage(file, 1800, 0.85) });
+          return;
+        }
+        Store.setMeta({ [e.target.name]: e.target.value.trim() });
+      };
+      const lr = $('#lh-reset', el);
+      if (lr) lr.onclick = () => Store.setMeta({ letterhead: '' });
       const so = $('#signout', el);
       if (so) so.onclick = () => Store.signOut();
       const am = $('#add-member', el);

@@ -11,13 +11,13 @@ no install, no build step.
 | --- | --- |
 | **Cases** | Every active patient as a card: bed, diagnosis, plan, a progress bar and red/amber chips for what's still pending. Filter Pre-op / Posted / Post-op / Discharged. |
 | **Case page** | The full checklist in notebook order — CBC (Hb/WBC/Plt), RFT (U/C/Na/K), LFT (T.Bili/SGOT/SGPT), VM, VCTC, ECG, ECHO & cardio opinion, Opinions (any department), X-ray, CT, MRI, Anaesthesia assessment, ESR, qCRP, Pus C/S. Each item is *Pending → Sent → Done / N/A*; typing all values of a lab panel marks it Done. Upload X-ray/CT/MRI photos straight from the phone camera. **Pending works** lets you assign tasks to HS / PG; whoever ticks it off is recorded. The **Activity** log shows who changed what and when. |
-| **Ward** | The notebook replacement: one table of every pre-op case and its status. Print / PDF for rounds. |
-| **OT list** | Tick cases → reorder → confirm procedure / anaesthesia / implants / scheme → set date, day and Assistant Professor → **Generate OT list PDF**. Implants are pre-filled from the implant database. Optionally marks the cases as *Posted*. |
-| **Implants** | Procedure → keywords → implants. When a case's plan contains a keyword (e.g. "CRIF with **PFN**") the implants fill in automatically. Starts with ~23 common ortho procedures; edit freely. |
-| **Discharge / transfer** | Disposition (Transfer to post-op ward, Discharge, LAMA/AA, Absconded), AR number, dates, history, examination, investigations (auto-pulled from the checklist), treatment, operative notes, course, condition, medications, advice → PDF. |
+| **Ward** | The ward notebook, digital: S.No · Name · Diagnosis · To do's · Assessment/Scheme, with **BOT** on posted cases. To do's compile themselves from the checklist, opinions and pending works. A *Detailed* toggle shows every investigation. Print / PDF for rounds. |
+| **OT list** | Tick cases → reorder → confirm ward / level / anaes / implants / scheme → set date, day, Professor (title line) and Assistant Professor (signature) → **Generate OT list PDF** in the unit's format (`OT LIST FOR ORTHO UNIT I ON 04/09/2026 FRIDAY PROF. …`, 11 columns, landscape). **Download Word** gives the same list as an editable .doc. Optionally marks the cases *Posted*. |
+| **Implants** | Procedure → keywords → implants + default level + anaesthesia. When a case's plan contains a keyword (e.g. "CR/ORIF WITH SHORT **PFN** LEFT") implants, level and anaesthesia fill in automatically. Starts with ~26 common procedures in the unit's wording; edit freely. |
+| **Discharge / transfer** | The unit's discharge format: letterhead and grey patient box repeated on every page, CAPS underlined sections (diagnosis, procedure, unit, H/O, past history, examination, treatment, course, condition, advice). Disposition: Discharge, Discharge at request, Transfer to post-op ward, LAMA/AA, Absconded. Past-history and examination templates, an **auto-written course in hospital** (from diagnosis, procedure, opinions and disposition), and one-tap advice phrases that add the matching **Tamil** line, including a review-date generator. |
 
 PDFs use the browser's print dialog — choose **Save as PDF** as the printer.
-The letterhead (institution, department, unit, chief) is set under Settings.
+The letterhead image, unit, Professor's name and OPD number are set under Settings.
 
 ## Try it (local mode)
 
@@ -66,6 +66,7 @@ itself contains only code — no patient data is ever committed.
 
 ```
 index.html        app shell
+assets/           default letterhead image
 config.js         Firebase config + unit id (edit this)
 firestore.rules   database security rules (paste into Firebase console)
 css/app.css       styles, incl. print layouts

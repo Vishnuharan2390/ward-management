@@ -1,151 +1,181 @@
-// Builds printable pages and opens the browser's print dialog
-// (choose "Save as PDF" as the printer to get a PDF).
+// Builds printable pages in the unit's own formats and opens the browser's
+// print dialog (choose "Save as PDF" as the printer to get a PDF).
 const Print = (() => {
   const nl = (s) => esc(s).replace(/\n/g, '<br>');
+  const up = (s) => String(s ?? '').toUpperCase();
 
-  function header(meta, title) {
-    return `
-      <div class="pr-head">
-        ${meta.institution ? `<div class="pr-inst">${esc(meta.institution)}</div>` : ''}
-        <div class="pr-dept">${esc(meta.department || 'Department of Orthopaedics')}${meta.unit ? ' — ' + esc(meta.unit) : ''}</div>
-        ${meta.chief ? `<div class="pr-chief">Unit chief: ${esc(meta.chief)}</div>` : ''}
-        <div class="pr-title">${esc(title)}</div>
-      </div>`;
-  }
-
-  function go(html, { title, landscape }) {
+  function go(html, { title, page }) {
     $('#print').innerHTML = html;
-    $('#page-style').textContent = `@page { size: A4 ${landscape ? 'landscape' : 'portrait'}; margin: 10mm; }`;
+    $('#page-style').textContent = `@page { size: ${page}; margin: 12mm; }`;
     const old = document.title;
     document.title = title;
-    // Give the browser a frame to lay out the print DOM first.
-    setTimeout(() => {
-      window.print();
-      document.title = old;
-    }, 50);
+    // Let images (letterhead) load before the print snapshot.
+    const imgs = $$('#print img');
+    Promise.all(imgs.map((i) => (i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })))).then(() => {
+      setTimeout(() => {
+        window.print();
+        document.title = old;
+      }, 50);
+    });
   }
 
+  // ---------------------------------------------------------------- OT list
+  // Mirrors OT_LIST_UNIT_1_*.docx: landscape, title line, 11 columns, the
+  // Assistant Professor's name bottom-right.
   const OT_COLUMNS = {
-    sno: 'S.No',
-    name: 'Name',
-    agesex: 'Age/Sex',
-    ip: 'IP No',
-    diagnosis: 'Diagnosis',
-    procedure: 'Proposed procedure',
-    anaes: 'Anaesthesia',
-    implants: 'Implants',
-    scheme: 'Scheme',
-    remarks: 'Remarks',
+    sno: ['S.NO', 704],
+    name: ['NAME', 1701],
+    agesex: ['AGE/SEX', 992],
+    ip: ['IPNO:', 709],
+    ward: ['WARD', 851],
+    diagnosis: ['DIAGNOSIS', 2002],
+    procedure: ['PLAN', 2108],
+    level: ['LEVEL', 851],
+    anaes: ['ANAES', 609],
+    implants: ['IMPLANTS', 2300],
+    scheme: ['SCHEME STATUS', 1554],
+    remarks: ['REMARKS', 1300],
   };
 
   function otCell(col, c, i, draft) {
     switch (col) {
       case 'sno': return i + 1;
-      case 'name': return `<b>${esc(c.name)}</b>${c.bed ? `<div class="pr-sub">Bed ${esc(c.bed)}</div>` : ''}`;
-      case 'agesex': return esc(ageSex(c));
+      case 'name': return esc(up(c.name));
+      case 'agesex': return esc(up(ageSex(c)));
       case 'ip': return esc(c.ipNo);
-      case 'diagnosis': return nl([c.side && c.side !== 'N/A' ? c.side : '', c.diagnosis].filter(Boolean).join(' — '));
-      case 'procedure': return nl(c.plan);
-      case 'anaes': return esc(c.anaesthesia);
-      case 'implants': return nl(c.implants);
-      case 'scheme': return esc(c.scheme);
-      case 'remarks': return nl(draft.remarks?.[c.id]);
+      case 'ward': return esc(up(c.ward));
+      case 'diagnosis': return nl(up(c.diagnosis));
+      case 'procedure': return nl(up(c.plan));
+      case 'level': return esc(c.level);
+      case 'anaes': return esc(up(c.anaesthesia));
+      case 'implants': return nl(up(c.implants));
+      case 'scheme': return esc(up(c.scheme));
+      case 'remarks': return nl(up(draft.remarks?.[c.id]));
       default: return '';
     }
   }
 
-  function otList(cases, draft, meta) {
+  function otTitle(draft) {
+    return `OT LIST FOR ORTHO ${up(draft.unit)} ON ${fmtDate(draft.date)} ${up(draft.day)} ${up(draft.chief)}`.replace(/\s+/g, ' ').trim();
+  }
+
+  function otHTML(cases, draft) {
     const cols = Object.keys(OT_COLUMNS).filter((k) => draft.cols[k] !== false);
-    const rows = cases.map((c, i) => `<tr>${cols.map((k) => `<td class="c-${k}">${otCell(k, c, i, draft)}</td>`).join('')}</tr>`).join('');
-    const html = `
-      <div class="pr">
-        ${header(meta, 'OPERATION THEATRE LIST')}
-        <div class="pr-meta">
-          <span><b>Date:</b> ${esc(fmtDate(draft.date))}</span>
-          <span><b>Day:</b> ${esc(draft.day)}</span>
-          ${draft.theatre ? `<span><b>Theatre:</b> ${esc(draft.theatre)}</span>` : ''}
-        </div>
-        <table class="pr-table">
-          <thead><tr>${cols.map((k) => `<th class="c-${k}">${OT_COLUMNS[k]}</th>`).join('')}</tr></thead>
-          <tbody>${rows}</tbody>
+    const total = cols.reduce((a, k) => a + OT_COLUMNS[k][1], 0);
+    return `
+      <div class="pr ot">
+        <div class="ot-title">${esc(otTitle(draft))}</div>
+        <table class="ot-table">
+          <colgroup>${cols.map((k) => `<col style="width:${((OT_COLUMNS[k][1] / total) * 100).toFixed(2)}%">`).join('')}</colgroup>
+          <thead><tr>${cols.map((k) => `<th>${OT_COLUMNS[k][0]}</th>`).join('')}</tr></thead>
+          <tbody>${cases.map((c, i) => `<tr>${cols.map((k) => `<td>${otCell(k, c, i, draft)}</td>`).join('')}</tr>`).join('')}</tbody>
         </table>
-        <div class="pr-sign">
-          <div>
-            <div class="pr-sign-line"></div>
-            <b>${esc(draft.prof || '')}</b><br>Assistant Professor<br>${esc(meta.department || 'Department of Orthopaedics')}${meta.unit ? ', ' + esc(meta.unit) : ''}
-          </div>
-        </div>
+        <div class="ot-sign">${esc(up(draft.prof))}</div>
       </div>`;
-    go(html, { title: `OT List ${fmtDate(draft.date).replace(/\//g, '-')}`, landscape: true });
   }
 
+  function otList(cases, draft) {
+    go(otHTML(cases, draft), { title: `OT LIST ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'letter landscape' });
+  }
+
+  // Same list as an editable Word file, for last-minute changes in MS Word.
+  function otWord(cases, draft) {
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
+      <style>
+        @page WordSection1 { size: 11in 8.5in; mso-page-orientation: landscape; margin: 1in; }
+        div.WordSection1 { page: WordSection1; }
+        .ot-title { font: bold 14pt Arial; text-align: center; margin-bottom: 12pt; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #000; font: bold 8pt "Times New Roman"; padding: 2pt 4pt; vertical-align: top; text-align: left; }
+        th { font-size: 8pt; }
+        .ot-sign { font: bold 8pt "Times New Roman"; text-align: right; margin-top: 30pt; }
+      </style></head><body><div class="WordSection1">${otHTML(cases, draft)}</div></body></html>`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['﻿', html], { type: 'application/msword' }));
+    a.download = `OT_LIST_${(draft.unit || 'UNIT').replace(/\s+/g, '_')}_${fmtDate(draft.date).replace(/\//g, '')}.doc`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  // ---------------------------------------------------------------- Ward board
+  // The ward notebook: S.NO | NAME | DIAGNOSIS | TO DO'S | ASSESSMENT/SCHEME.
   function wardBoard(cases, meta) {
-    const cell = (c, k) => esc(checkSummary(c, CHECKS.find((x) => x.k === k)));
-    const rows = cases.map((c, i) => {
-      const ops = listOf(c.opinions).map((o) => `${o.dept}: ${STATUS[o.s || 'pending']}`).join('; ');
-      const img = ['xray', 'ct', 'mri'].map((k) => {
-        const s = cell(c, k);
-        return s ? `${CHECKS.find((x) => x.k === k).label}: ${s}` : '';
-      }).filter(Boolean).join('<br>');
-      const tasks = listOf(c.tasks).filter((t) => !t.done).map((t) => '• ' + esc(t.text)).join('<br>');
-      return `<tr>
-        <td>${i + 1}</td>
-        <td><b>${esc(c.name)}</b><br>${esc(ageSex(c))} · ${esc(c.ipNo)}${c.bed ? '<br>Bed ' + esc(c.bed) : ''}</td>
-        <td>${esc(fmtDate(c.doa))}</td>
-        <td>${nl(c.diagnosis)}</td>
-        <td>${nl(c.plan)}</td>
-        <td>${cell(c, 'cbc')}</td><td>${cell(c, 'rft')}</td><td>${cell(c, 'lft')}</td>
-        <td>${cell(c, 'vm')}</td><td>${cell(c, 'vctc')}</td><td>${cell(c, 'ecg')}</td><td>${cell(c, 'echo')}</td>
-        <td>${esc(ops)}</td><td>${img}</td><td>${cell(c, 'anaes')}</td>
-        <td>${tasks}</td>
-      </tr>`;
-    }).join('');
+    const rows = cases.map((c, i) => `
+      <tr>
+        <td class="nb-sno">${c.status === 'posted' ? '<span class="nb-bot">BOT</span>' : ''}${i + 1}</td>
+        <td><b>${esc(c.name)}</b><div class="pr-sub">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
+        <td>${nl(c.diagnosis)}${c.plan ? `<div class="pr-sub">▸ ${esc(c.plan)}</div>` : ''}</td>
+        <td class="nb-todo">${todoList(c).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
+        <td>${esc(assessmentScheme(c))}</td>
+      </tr>`).join('');
     const html = `
-      <div class="pr pr-small">
-        ${header(meta, 'PRE-OPERATIVE WARD STATUS')}
-        <div class="pr-meta"><span><b>Date:</b> ${fmtDate(todayISO())}</span><span><b>Cases:</b> ${cases.length}</span></div>
-        <table class="pr-table">
-          <thead><tr><th>#</th><th>Patient</th><th>DOA</th><th>Diagnosis</th><th>Plan</th>
-            <th>CBC<br>Hb/WBC/Plt</th><th>RFT<br>U/C/Na/K</th><th>LFT<br>TB/OT/PT</th>
-            <th>VM</th><th>VCTC</th><th>ECG</th><th>ECHO</th><th>Opinions</th><th>Imaging</th><th>PAC</th><th>Pending works</th></tr></thead>
+      <div class="pr nb">
+        <div class="nb-head"><b>${esc(up(meta.unit))} — PRE-OP WARD</b><span>${fmtDate(todayISO())} · ${cases.length} cases</span></div>
+        <table class="nb-table">
+          <colgroup><col style="width:6%"><col style="width:17%"><col style="width:30%"><col style="width:32%"><col style="width:15%"></colgroup>
+          <thead><tr><th>S.NO</th><th>NAME</th><th>DIAGNOSIS</th><th>TO DO'S</th><th>ASSESSMENT / SCHEME</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
-    go(html, { title: `Ward status ${fmtDate(todayISO()).replace(/\//g, '-')}`, landscape: true });
+    go(html, { title: `Ward status ${fmtDate(todayISO()).replace(/\//g, '-')}`, page: 'A4 landscape' });
   }
 
+  // ---------------------------------------------------------------- Discharge
+  // Mirrors the unit's discharge summary: letterhead + grey patient box on
+  // every page (repeating table header), CAPS underlined section headings.
   function discharge(c, d, meta) {
     const disp = DISPOSITIONS[d.disposition] || DISPOSITIONS.discharge;
-    const sec = (label, val) => (val && String(val).trim() ? `<div class="pr-sec"><h4>${label}</h4><div>${nl(val)}</div></div>` : '');
+    // One table row per section so the header block repeats on every printed page.
+    const row = (inner) => `<tr><td class="dc-body">${inner}</td></tr>`;
+    const sec = (label, val, cls = '') => (val && String(val).trim() ? row(`<div class="dc-sec ${cls}"><h4>${label}</h4><div>${nl(val)}</div></div>`) : '');
+    const box = [
+      ['PATIENT NAME', c.name, 'I.P NO', c.ipNo],
+      ['AGE / GENDER', ageSex(c), 'AR NO', d.arNo],
+      ['DOA', fmtDate(c.doa), d.disposition === 'postop' ? 'DOT' : 'DOD', [fmtDate(d.dod), d.dodTime ? '@ ' + d.dodTime : ''].filter(Boolean).join(' ')],
+      ['CONSULTANT', d.consultant, 'PH.NO', d.phone],
+      ['ATTENDER', d.attender, 'ADDRESS', d.address],
+      ...(d.contact ? [['CONTACT NO', d.contact, '', '']] : []),
+    ];
+    const letterhead = meta.letterhead || 'assets/letterhead.jpg';
     const html = `
-      <div class="pr">
-        ${header(meta, disp.title)}
-        <table class="pr-grid">
-          <tr><th>Name</th><td>${esc(c.name)}</td><th>Age / Sex</th><td>${esc(ageSex(c))}</td></tr>
-          <tr><th>IP No</th><td>${esc(c.ipNo)}</td><th>AR No</th><td>${esc(d.arNo)}</td></tr>
-          <tr><th>Date of admission</th><td>${esc(fmtDate(c.doa))}</td><th>Date of surgery</th><td>${esc(fmtDate(d.dos))}</td></tr>
-          <tr><th>${d.disposition === 'postop' ? 'Date of transfer' : 'Date of discharge'}</th><td>${esc(fmtDate(d.dod))}</td><th>Disposition</th><td>${esc(disp.label)}</td></tr>
-        </table>
-        ${sec('Diagnosis', d.diagnosis)}
-        ${sec('Procedure done', d.procedure)}
-        ${sec('History of injury / illness', d.history)}
-        ${sec('Past history / treatment history', d.past)}
-        ${sec('Examination findings', d.exam)}
-        ${sec('Investigations', d.investigations)}
-        ${sec('Treatment / drugs given', d.treatment)}
-        ${sec('Operative notes', d.opNotes)}
-        ${sec('Course in hospital', d.course)}
-        ${sec('Condition on ' + (d.disposition === 'postop' ? 'transfer' : 'discharge'), d.condition)}
-        ${sec('Discharge medications', d.meds)}
-        ${sec('Advice', d.advice)}
-        ${sec('Review', d.review)}
-        <div class="pr-sign pr-sign-2">
-          <div><div class="pr-sign-line"></div>${esc(d.preparedBy || '')}<br>Postgraduate</div>
-          <div><div class="pr-sign-line"></div>${esc(d.signedBy || '')}<br>Assistant Professor</div>
-        </div>
-      </div>`;
-    go(html, { title: `${disp.title.split(' (')[0]} ${c.name} ${c.ipNo || ''}`.trim(), landscape: false });
+      <table class="pr dc">
+        <thead><tr><td>
+          <div class="dc-lh"><img src="${esc(letterhead)}" alt=""></div>
+          <table class="dc-box">
+            ${box.map(([a, av, b, bv]) => `<tr><th>${a}</th><td>:</td><td>${esc(up(av))}</td><th>${b}${b ? ':' : ''}</th><td>${esc(up(bv))}</td></tr>`).join('')}
+          </table>
+        </td></tr></thead>
+        <tbody>
+          ${disp.title ? row(`<div class="dc-title">${disp.title}</div>`) : ''}
+          ${sec('DIAGNOSIS IN DETAIL', up(d.diagnosis))}
+          ${sec('PROCEDURE IN DETAIL', up(d.procedure))}
+          ${sec('UNIT/CONSULTANTS', up(d.unitLine))}
+          ${sec('H/O INJURY / ILLNESS', up(d.history))}
+          ${sec('PAST HISTORY / TREATMENT HISTORY', up(d.past))}
+          ${sec('EXAMINATION FINDINGS:', d.exam)}
+          ${sec('INVESTIGATIONS', up(d.investigations))}
+          ${sec('OPERATIVE NOTES', up(d.opNotes))}
+          ${sec('TREATMENT GIVEN', up(d.treatment))}
+          ${sec('COURSE IN HOSPITAL:', up(d.course))}
+          ${sec('CONDITION ON ' + (d.disposition === 'postop' ? 'TRANSFER' : 'DISCHARGE'), up(d.condition))}
+          ${sec('DISCHARGE MEDICATIONS', up(d.meds))}
+          ${sec('DISCHARGE ADVICE', up(d.advice), 'dc-advice')}
+          ${d.adviceTa && d.adviceTa.trim() ? row(`<div class="dc-ta">${d.adviceTa.split('\n').filter((l) => l.trim()).map((l) => `<div>* ${esc(l.trim())}</div>`).join('')}</div>`) : ''}
+          ${row(`<div class="dc-end"><div class="dc-doc"><b>DISCHARGING DOCTOR:</b> ${esc(up(d.doctor))}</div><div class="dc-sig">DOCTOR SIGNATURE</div></div>`)}
+        </tbody>
+      </table>`;
+    go(html, { title: `${up(c.name)}_DISCHARGE`, page: 'A4 portrait' });
   }
 
-  return { otList, wardBoard, discharge, OT_COLUMNS };
+  return { otList, otWord, wardBoard, discharge, OT_COLUMNS, otTitle };
 })();
+
+// Shared with the on-screen ward view.
+function todoList(c) {
+  return pendingList(c).map((p) => p.text.replace(' opinion', ' op.'));
+}
+function assessmentScheme(c) {
+  const pac = effStatus(c, CHECKS.find((x) => x.k === 'anaes'));
+  const a = pac === 'done' ? 'Assessed' : pac === 'sent' ? 'Sent for PAC' : pac === 'na' ? '' : 'TBA';
+  return [a, c.scheme].filter(Boolean).join(' / ') || '—';
+}

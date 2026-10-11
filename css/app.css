@@ -226,8 +226,16 @@ label > input, label > select, label > textarea { margin-top: .2rem; color: var(
 .ot-row { border: 1px solid var(--line); border-radius: 8px; padding: .6rem; margin-bottom: 8px; }
 .ot-row-head { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .3rem; }
 .ot-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .5rem; }
-.ot-fields label:nth-child(1), .ot-fields label:nth-child(2) { grid-column: span 1; }
-@media (max-width: 640px) { .ot-fields { grid-template-columns: 1fr; } }
+.ot-fields .span2 { grid-column: span 2; }
+.ot-fields .span3 { grid-column: 1 / -1; }
+@media (max-width: 640px) { .ot-fields { grid-template-columns: 1fr 1fr; } .ot-fields .span2 { grid-column: 1 / -1; } }
+.ot-preview-title { font: bold .85rem Arial, sans-serif; text-align: center; padding: .5rem; background: var(--bg); border-radius: 6px; }
+.review-row { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; font-size: .9rem; }
+.review-row input { width: 4.5rem; }
+.review-row select { width: auto; }
+.lh-preview { background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: .4rem; text-align: center; }
+.lh-preview img { max-width: 100%; max-height: 90px; }
+.nb-screen td:nth-child(4) { max-width: 360px; }
 
 /* ---------- implants / settings ---------- */
 .impl { padding-right: 2.5rem; }
@@ -252,26 +260,51 @@ label > input, label > select, label > textarea { margin-top: .2rem; color: var(
   .top, #view, #modal, #toast { display: none !important; }
   #print { display: block; }
 }
-.pr { font: 11pt/1.35 "Times New Roman", Times, serif; color: #000; }
-.pr-small { font-size: 8.5pt; }
-.pr-head { text-align: center; margin-bottom: 6pt; }
-.pr-inst { font-weight: 700; font-size: 1.15em; text-transform: uppercase; }
-.pr-dept { font-weight: 600; }
-.pr-chief { font-size: .9em; }
-.pr-title { font-weight: 700; font-size: 1.2em; text-decoration: underline; margin-top: 4pt; letter-spacing: .03em; }
-.pr-meta { display: flex; gap: 24pt; margin: 6pt 0; }
-.pr-table { width: 100%; border-collapse: collapse; }
-.pr-table th, .pr-table td { border: 1px solid #000; padding: 3pt 4pt; vertical-align: top; text-align: left; }
-.pr-table th { background: #eee; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-.pr-table tr { page-break-inside: avoid; }
-.pr-table .c-sno { width: 3%; text-align: center; }
-.pr-table .c-implants { width: 22%; }
-.pr-sub { font-size: .85em; }
-.pr-grid { width: 100%; border-collapse: collapse; margin-bottom: 8pt; }
-.pr-grid th, .pr-grid td { border: 1px solid #000; padding: 3pt 5pt; text-align: left; }
-.pr-grid th { width: 18%; font-weight: 600; }
-.pr-sec { margin-bottom: 6pt; page-break-inside: avoid; }
-.pr-sec h4 { margin: 0; font-size: 1em; text-decoration: underline; }
-.pr-sign { display: flex; justify-content: flex-end; margin-top: 36pt; text-align: center; page-break-inside: avoid; }
-.pr-sign-2 { justify-content: space-between; }
-.pr-sign-line { border-top: 1px solid #000; width: 170pt; margin: 0 auto 3pt; }
+.pr { color: #000; font-family: "Times New Roman", Times, serif; }
+.pr-sub { font-size: .85em; font-weight: normal; }
+
+/* OT list — matches the unit's Word template */
+.ot-title { font: bold 14pt Arial, Helvetica, sans-serif; text-align: center; margin: 0 0 14pt; }
+.ot-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ot-table th, .ot-table td {
+  border: 1px solid #000; padding: 2pt 4pt; vertical-align: top; text-align: left;
+  font: bold 8pt "Times New Roman", Times, serif; word-wrap: break-word;
+}
+.ot-table td { height: 38pt; }
+.ot-table tr { page-break-inside: avoid; }
+.ot-sign { font: bold 8pt "Times New Roman", Times, serif; text-align: right; margin: 34pt 40pt 0 0; }
+
+/* Ward notebook */
+.nb-head { display: flex; justify-content: space-between; font-size: 11pt; margin-bottom: 6pt; }
+.nb-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10pt; }
+.nb-table th { background: #d9d9d9; -webkit-print-color-adjust: exact; print-color-adjust: exact; text-align: left; }
+.nb-table th, .nb-table td { border: 1px solid #000; padding: 4pt 5pt; vertical-align: top; }
+.nb-table tr { page-break-inside: avoid; }
+.nb-sno { text-align: center; position: relative; }
+.nb-bot { display: block; font-size: 8pt; font-weight: 700; }
+.nb-todo span { display: inline-block; margin-right: 10pt; }
+
+/* Discharge — letterhead + grey patient box repeat on every page */
+table.dc { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+table.dc > thead { display: table-header-group; }
+.dc-lh { text-align: center; }
+.dc-lh img { height: 24mm; max-width: 80%; object-fit: contain; }
+.dc-box {
+  width: 100%; border-collapse: collapse; background: #e6e6e6; margin: 3pt 0 8pt;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact; font-size: 9pt;
+}
+.dc-box th, .dc-box td { text-align: left; padding: 2.5pt 4pt; vertical-align: top; text-transform: uppercase; }
+.dc-box th { font-weight: 700; white-space: nowrap; width: 15%; padding-left: 10pt; }
+.dc-box td:nth-child(2) { width: 2%; font-weight: 700; }
+.dc-box td:nth-child(3) { width: 33%; font-weight: 700; }
+.dc-box td:nth-child(5) { font-weight: 700; }
+.dc-body { padding: 0 6% ; }
+.dc-title { text-align: center; font-weight: 700; text-decoration: underline; margin-bottom: 8pt; }
+.dc-sec { margin-bottom: 8pt; }
+.dc-end { page-break-inside: avoid; }
+.dc-sec h4 { margin: 0 0 3pt; font-size: 1em; text-decoration: underline; font-weight: 700; }
+.dc-advice > div { padding-left: 30pt; }
+.dc-ta { font-family: "Latha", "Noto Sans Tamil", "Nirmala UI", sans-serif; font-size: 9pt; margin: 6pt 0 0; }
+.dc-doc { margin-top: 26pt; }
+.dc-sig { text-align: right; font-weight: 700; margin: 30pt 10% 0 0; }
+.board.nb-screen { min-width: 640px; }
