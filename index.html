@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#13294b">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pre-op Ward">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png">
   <title>Pre-op Ward</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%2313294b%22/%3E%3Cpath d=%22M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z%22 fill=%22%23fff%22/%3E%3C/svg%3E">
   <link rel="stylesheet" href="css/app.css">
@@ -14,7 +21,7 @@
   <header class="top">
     <a class="brand" href="#/">Pre-op Ward</a>
     <span id="sync" class="sync"></span>
-    <span class="ver" title="App version">v7 · 11 Oct</span>
+    <span class="ver" title="App version">v8 · 11 Oct</span>
     <nav id="nav">
       <a href="#/">Cases</a>
       <a href="#/ward">Ward</a>
@@ -33,5 +40,11 @@
   <script src="js/store.js"></script>
   <script src="js/print.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    // Offline support when served from a web address (not when opened as a file).
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

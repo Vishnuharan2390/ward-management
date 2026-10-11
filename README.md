@@ -21,6 +21,22 @@ no install, no build step.
 PDFs use the browser's print dialog — choose **Save as PDF** as the printer.
 Unit, OPD number and letterhead image are set under Settings.
 
+## Install on iPhone / Android (home-screen app)
+
+The app installs like a native app from its web address — own icon, full
+screen, works offline, updates itself.
+
+1. Host it (once): GitHub repo → **Settings → Pages** → Source **Deploy from
+   a branch** → branch `claude/preop-case-management-eafzbl`, folder `/ (root)`
+   → **Save**. After a minute it is live at
+   `https://vishnuharan2390.github.io/ward-management/`.
+2. On the iPhone open that link in **Safari** → **Share** → **Add to Home
+   Screen** → **Add**. (Android: Chrome → ⋮ → **Install app**.)
+3. Open it from the home-screen icon.
+
+Data typed into a phone stays on that phone until Firebase sharing is set up
+(below). Each installed copy has its own storage, separate from Safari.
+
 ## Try it (local mode)
 
 Open `index.html` through any static server, e.g.
