@@ -373,10 +373,18 @@ table.dc > thead { display: table-header-group; }
 /* ---------- implant database ---------- */
 .impl-table { min-width: 760px; }
 .impl-table td { padding: .3rem; }
-.impl-table td:nth-child(1) { width: 20%; }
-.impl-table td:nth-child(2) { width: 22%; }
-.impl-table td:nth-child(4) { width: 80px; }
-.impl-table td:nth-child(5) { width: 60px; text-align: center; }
+.impl-table { min-width: 560px; }
+.impl-table td:nth-child(1) { width: 30%; }
+.impl-table td:nth-child(3) { width: 64px; text-align: center; }
 .impl-table tfoot td { border-top: 2px solid var(--line); background: var(--bg); }
 .test { margin-top: .75rem; }
 .pr-flag { color: #c8102e; font-weight: 700; margin-right: 10pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: .75rem; }
+.staff-unit { display: grid; gap: .4rem; border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem; }
+.staff-unit b { color: var(--brand); }
+.level-table { min-width: 820px; }
+.level-table td:nth-child(1) { width: 80px; }
+.level-table td:nth-child(2) { width: 16%; }
+.level-table td:nth-child(3) { width: 34%; }
+.level-table td:nth-child(5) { width: 64px; text-align: center; }
+.level-table .lv-head th { background: var(--blue-bg); color: var(--brand); position: static; font-size: .8rem; text-align: left; }

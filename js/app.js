@@ -302,7 +302,7 @@ const App = (() => {
             <fieldset><legend>Diagnosis & plan</legend>
               <label class="span2">Diagnosis<textarea name="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
               <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT">${esc(c.plan)}</textarea></label>
-              <label>Level<select name="level">${levelOpts(c.level)}</select></label>
+              <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
               <label>Scheme status<select name="scheme">${schemeOpts(c.scheme)}</select></label>
               <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}" placeholder="DM, SHTN…"></label>
               <label class="span2">Implants
@@ -331,16 +331,20 @@ const App = (() => {
         const f = $('#case-form', el);
         if (!f) return;
         if (!id) bindLabForm(f, {});
-        // Implants and level follow the plan until someone edits them by hand.
+        // Implants follow the plan until someone edits them by hand.
         const auto = ['implants', 'level'];
         const touched = Object.fromEntries(auto.map((k) => [k, !!f.elements[k].value.trim()]));
         auto.forEach((k) => ['input', 'change'].forEach((ev) => f.elements[k].addEventListener(ev, () => { touched[k] = true; })));
         const hint = () => {
-          const m = matchImplants(f.elements.plan.value, Store.implants);
-          $('#impl-hint', el).textContent = m.length ? 'Matches: ' + m.map((r) => r.name).join(', ') : (Object.keys(Store.implants).length ? 'No implant database match for this plan.' : 'Add procedures under Settings → Implant database to auto-fill implants.');
+          const plan = f.elements.plan.value;
+          const m = matchImplants(plan, Store.implants);
+          const lv = levelFor(plan, Store.levels);
+          $('#impl-hint', el).textContent = m.length ? 'Implants from: ' + m.map((r) => r.name).join(', ') : (Object.keys(Store.implants).length ? 'No implant database match for this plan.' : 'Add procedures under Settings → Implant database to auto-fill implants.');
+          $('#level-hint', el).textContent = lv.rule ? `Level ${lv.level}: ${lv.rule.name}` : (plan.trim() ? 'No level match — pick it manually.' : '');
         };
         const fill = (force) => {
-          const sug = suggestFromPlan(f.elements.plan.value, Store.implants);
+          const plan = f.elements.plan.value;
+          const sug = { implants: suggestFromPlan(plan, Store.implants).implants, level: levelFor(plan, Store.levels).level };
           auto.forEach((k) => { if (force || !touched[k]) f.elements[k].value = sug[k]; });
         };
         f.elements.plan.addEventListener('input', () => {
@@ -649,7 +653,7 @@ const App = (() => {
       const pool = caseList().filter((c) => OT.showAll || d.selected.includes(c.id) || isActive(c)).sort(byWard);
       const sel = d.selected.map((id) => ({ id, ...Store.cases[id] }));
       // Selected unit's staff first, then everyone else.
-      const unitFirst = [unitOf(d.unitId), ...UNITS.filter((u) => u.id !== d.unitId)];
+      const unitFirst = [unitOf(d.unitId), ...allUnits().filter((u) => u.id !== d.unitId)];
       const chiefs = [...new Set(unitFirst.map((u) => u.chief))];
       const apOptions = unitFirst.map((u) => `<optgroup label="Unit ${u.id}">${opts(u.aps, d.prof)}</optgroup>`).join('');
       return `
@@ -702,7 +706,7 @@ const App = (() => {
                   <label>Scheme status<select data-f="scheme">${schemeOpts(c.scheme)}</select></label>
                   <label class="span3">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
                   <label class="span3">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
-                  <label class="span3">Implants <button type="button" class="link small" data-refill>↻ from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
+                  <label class="span3">Implants <button type="button" class="link small" data-refill>↻ implants & level from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
                   ${d.cols.remarks !== false ? `<label class="span3">Remarks (this list only)<input data-remark value="${esc(d.remarks[c.id])}"></label>` : ''}
                 </div>
               </div>`).join('') || '<div class="empty">Tick cases above to add them.</div>'}
@@ -782,10 +786,11 @@ const App = (() => {
           const ta = $('[data-f="implants"]', row);
           ta.value = sug.implants;
           ta.dispatchEvent(new Event('change', { bubbles: true }));
-          if (sug.level) {
-            const lv = $('[data-f="level"]', row);
-            lv.value = sug.level;
-            lv.dispatchEvent(new Event('change', { bubbles: true }));
+          const lv = levelFor($('[data-f="plan"]', row).value, Store.levels).level;
+          if (lv) {
+            const sel = $('[data-f="level"]', row);
+            sel.value = lv;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
           }
         }
       });
@@ -978,25 +983,21 @@ const App = (() => {
     return `
       <div class="card" id="implants">
         <h3>Implant database</h3>
-        <p class="muted small">When a case's plan contains a procedure name (or one of its other names), its implants and level fill in automatically. Matching is by whole word and ignores case.</p>
+        <p class="muted small">When a case's plan contains a procedure name below, its implants fill in automatically. Matching is by whole word and ignores case, so “SHORT PFN” matches “CR/ORIF WITH SHORT PFN LEFT”.</p>
         <div class="table-wrap">
           <table class="board impl-table">
-            <thead><tr><th>Procedure</th><th>Other names in plans</th><th>Implants</th><th>Level</th><th></th></tr></thead>
+            <thead><tr><th>Procedure</th><th>Implants</th><th></th></tr></thead>
             <tbody>
               ${rules.map((r) => `<tr data-rule="${r.id}">
                 <td><input data-k="name" value="${esc(r.name)}" aria-label="Procedure"></td>
-                <td><input data-k="keywords" value="${esc((r.keywords || []).join(', '))}" placeholder="comma separated" aria-label="Other names"></td>
                 <td><textarea data-k="implants" rows="2" aria-label="Implants">${esc(r.implants)}</textarea></td>
-                <td><select data-k="level" aria-label="Level">${levelOpts(r.level)}</select></td>
                 <td><button class="icon" data-del-rule title="Delete">✕</button></td>
-              </tr>`).join('') || '<tr><td colspan="5" class="empty">No procedures yet. Add the first one below.</td></tr>'}
+              </tr>`).join('') || '<tr><td colspan="3" class="empty">No procedures yet. Add the first one below.</td></tr>'}
             </tbody>
             <tfoot>
               <tr id="impl-add">
                 <td><input name="name" placeholder="e.g. SHORT PFN" aria-label="New procedure"></td>
-                <td><input name="keywords" placeholder="e.g. PFN, PFNA" aria-label="New other names"></td>
                 <td><textarea name="implants" rows="2" placeholder="e.g. 9,10,11*250MM SHORT PFN, 6.2MM DEROTATION SCREW…" aria-label="New implants"></textarea></td>
-                <td><select name="level" aria-label="New level">${levelOpts('')}</select></td>
                 <td><button class="btn small primary" id="impl-add-btn">Add</button></td>
               </tr>
             </tfoot>
@@ -1004,6 +1005,60 @@ const App = (() => {
         </div>
         <label class="block test">Test a plan<input id="impl-test" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT"></label>
         <div id="impl-out" class="muted small"></div>
+      </div>`;
+  }
+
+  function levelSection() {
+    const rules = Object.entries(Store.levels).map(([id, r]) => ({ ...r, id }))
+      .sort((a, b) => LEVELS.indexOf(b.level) - LEVELS.indexOf(a.level) || (a.category || '').localeCompare(b.category || '') || (a.name || '').localeCompare(b.name || ''));
+    const byLevel = [...LEVELS].reverse().map((lv) => [lv, rules.filter((r) => r.level === lv)]);
+    const row = (r) => `<tr data-lrule="${r.id}">
+      <td><select data-k="level" aria-label="Level">${levelOpts(r.level)}</select></td>
+      <td><input data-k="category" value="${esc(r.category)}" aria-label="Category"></td>
+      <td><input data-k="name" value="${esc(r.name)}" aria-label="Procedure"></td>
+      <td><input data-k="keywords" value="${esc((r.keywords || []).join(', '))}" aria-label="Match words"></td>
+      <td><button class="icon" data-del-lrule title="Delete">✕</button></td>
+    </tr>`;
+    return `
+      <div class="card" id="levels">
+        <h3>Level of surgery database</h3>
+        <p class="muted small">From the Weighted Orthopaedic Procedure List. When a plan contains a procedure's match words, its level fills in. If several match, the highest level wins; a longer match beats a shorter one inside it (“triple arthrodesis” is level II, not the level III “arthrodesis”).</p>
+        <div class="table-wrap">
+          <table class="board impl-table level-table">
+            <thead><tr><th>Level</th><th>Category</th><th>Procedure</th><th>Match words in plans</th><th></th></tr></thead>
+            ${byLevel.map(([lv, list]) => `<tbody>
+              <tr class="lv-head"><th colspan="5">Level ${lv} — ${esc(LEVEL_INFO[lv].title)} <span class="muted">(weightage ${LEVEL_INFO[lv].weight.toFixed(1)})</span></th></tr>
+              ${list.map(row).join('') || '<tr><td colspan="5" class="muted small">None</td></tr>'}
+            </tbody>`).join('')}
+            <tfoot>
+              <tr id="level-add">
+                <td><select name="level" aria-label="New level">${levelOpts('II')}</select></td>
+                <td><input name="category" placeholder="e.g. Trauma" aria-label="New category"></td>
+                <td><input name="name" placeholder="Procedure" aria-label="New procedure"></td>
+                <td><input name="keywords" placeholder="e.g. tens, elastic nail" aria-label="New match words"></td>
+                <td><button class="btn small primary" id="level-add-btn">Add</button></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <label class="block test">Test a plan<input id="level-test" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT"></label>
+        <div id="level-out" class="muted small"></div>
+      </div>`;
+  }
+
+  function staffSection() {
+    return `
+      <div class="card" id="staff">
+        <h3>Unit staff</h3>
+        <p class="muted small">Used for the OT list header and signature. One Assistant Professor per line.</p>
+        <div class="staff-grid">
+          ${allUnits().map((u) => `
+            <div class="staff-unit" data-unit="${u.id}">
+              <b>UNIT ${u.id}</b>
+              <label>Chief<input data-staff="chief" value="${esc(u.chief)}"></label>
+              <label>Assistant Professors<textarea data-staff="aps" rows="3">${esc(u.aps.join('\n'))}</textarea></label>
+            </div>`).join('')}
+        </div>
       </div>`;
   }
 
@@ -1038,6 +1093,10 @@ const App = (() => {
         </form>
 
         ${implantSection()}
+
+        ${levelSection()}
+
+        ${staffSection()}
 
         <div class="card">
           <h3>Sharing</h3>
@@ -1079,7 +1138,7 @@ const App = (() => {
       const runTest = () => {
         const s = suggestFromPlan(test.value, Store.implants);
         $('#impl-out', el).innerHTML = s.matches.length
-          ? s.matches.map((r) => `<div><b>${esc(r.name)}</b> (level ${esc(r.level || '—')}): ${esc(r.implants)}</div>`).join('')
+          ? s.matches.map((r) => `<div><b>${esc(r.name)}</b>: ${esc(r.implants)}</div>`).join('')
           : (test.value ? 'No match' : '');
       };
       test.oninput = runTest;
@@ -1087,8 +1146,7 @@ const App = (() => {
         const k = e.target.dataset.k;
         const id = e.target.closest('[data-rule]')?.dataset.rule;
         if (!k || !id) return;
-        const v = k === 'keywords' ? e.target.value.split(',').map((s) => s.trim()).filter(Boolean) : e.target.value.trim();
-        Store.patch('implants', id, { [k]: v });
+        Store.patch('implants', id, { [k]: e.target.value.trim() });
       });
       $('#implants', el).addEventListener('click', (e) => {
         const b = e.target.closest('[data-del-rule]');
@@ -1103,12 +1161,56 @@ const App = (() => {
         if (!val('name')) return toast('Type the procedure name first');
         Store.create('implants', uid(), {
           name: val('name'),
-          keywords: val('keywords').split(',').map((s) => s.trim()).filter(Boolean),
           implants: val('implants'),
-          level: val('level'),
         });
         toast('Added');
       };
+
+      // Level database
+      $('#level-test', el).oninput = (e) => {
+        const r = levelFor(e.target.value, Store.levels);
+        $('#level-out', el).innerHTML = r.rule
+          ? `<b>Level ${esc(r.level)}</b> — ${esc(r.rule.name)}${r.matches.length > 1 ? ` <span>(also matched: ${esc(r.matches.filter((x) => x !== r.rule).map((x) => `${x.name} [${x.level}]`).join(', '))})</span>` : ''}`
+          : (e.target.value ? 'No match' : '');
+      };
+      $('#levels', el).addEventListener('change', (e) => {
+        const k = e.target.dataset.k;
+        const id = e.target.closest('[data-lrule]')?.dataset.lrule;
+        if (!k || !id) return;
+        const v = k === 'keywords' ? e.target.value.split(',').map((x) => x.trim()).filter(Boolean) : e.target.value.trim();
+        Store.patch('levels', id, { [k]: v });
+      });
+      $('#levels', el).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-del-lrule]');
+        if (!b) return;
+        const id = b.closest('[data-lrule]').dataset.lrule;
+        if (confirm(`Delete "${Store.levels[id].name}"?`)) Store.remove('levels', id);
+      });
+      $('#level-add-btn', el).onclick = (e) => {
+        e.preventDefault();
+        const row = $('#level-add', el);
+        const val = (n) => $(`[name=${n}]`, row).value.trim();
+        if (!val('name')) return toast('Type the procedure name first');
+        Store.create('levels', uid(), {
+          level: val('level'),
+          category: val('category'),
+          name: val('name'),
+          keywords: (val('keywords') || val('name')).split(',').map((x) => x.trim()).filter(Boolean),
+        });
+        toast('Added');
+      };
+
+      $('#staff', el).addEventListener('change', (e) => {
+        const k = e.target.dataset.staff;
+        const u = e.target.closest('[data-unit]')?.dataset.unit;
+        if (!k || !u) return;
+        const roster = { ...(Store.meta.roster || {}) };
+        const cur = { ...(roster[u] || {}) };
+        cur[k] = k === 'aps' ? e.target.value.split('\n').map((x) => x.trim().toUpperCase()).filter(Boolean) : e.target.value.trim().toUpperCase();
+        roster[u] = cur;
+        Store.setMeta({ roster });
+        toast('Saved');
+      });
 
       const so = $('#signout', el);
       if (so) so.onclick = () => Store.signOut();

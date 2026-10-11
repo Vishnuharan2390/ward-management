@@ -21,7 +21,13 @@ const UNITS = [
   { id: 'V', chief: 'PROF. DR. SENTHIL KUMAR MS ORTHO', aps: ['DR. ALAGURAJESH MS ORTHO', 'DR. MOHAN RAJ MS ORTHO'] },
   { id: 'VI', chief: 'PROF. DR. SINGARAVEL MS ORTHO', aps: ['DR. GOPINATH MS ORTHO', 'DR. GOPI MANOHAR DNB ORTHO'] },
 ];
-const unitOf = (id) => UNITS.find((u) => u.id === id) || UNITS[0];
+// Built-in roster; names edited in Settings (meta.roster) take precedence.
+function unitOf(id) {
+  const base = UNITS.find((u) => u.id === id) || UNITS[0];
+  const o = (typeof Store !== 'undefined' && Store.meta.roster?.[base.id]) || {};
+  return { id: base.id, chief: o.chief || base.chief, aps: o.aps?.length ? o.aps : base.aps };
+}
+const allUnits = () => UNITS.map((u) => unitOf(u.id));
 const unitName = (id) => 'UNIT ' + unitOf(id).id;
 
 // Defaults match the unit's letterhead; editable in Settings.
@@ -195,6 +201,90 @@ function migrateCase(c) {
   return c;
 }
 
+// ---- Level of surgery (Weighted Orthopaedic Procedure List) -------------
+
+const LEVEL_INFO = {
+  IV: { title: 'High complexity / super-specialty', weight: 2.0 },
+  III: { title: 'Major procedures', weight: 1.5 },
+  II: { title: 'Intermediate procedures', weight: 1.0 },
+  I: { title: 'Minor / day-care procedures', weight: 0.5 },
+};
+
+// [level, category, procedure, match words]
+const SEED_LEVELS = [
+  ['IV', 'Arthroplasty', 'Revision total hip / knee arthroplasty', 'revision thr, revision tkr, revision tha, revision tka, revision arthroplasty'],
+  ['IV', 'Arthroplasty', 'Complex primary arthroplasty with bone grafting / augments', 'augment, augments, complex primary'],
+  ['IV', 'Spine', 'Pedicle screw fixation', 'pedicle screw, pedicle screws, psf'],
+  ['IV', 'Spine', 'TLIF / PLIF', 'tlif, plif'],
+  ['IV', 'Spine', 'Scoliosis correction', 'scoliosis'],
+  ['IV', 'Spine', 'Spinal decompression with instrumentation', 'decompression with instrumentation, decompression and fixation, decompression and instrumentation'],
+  ['IV', 'Trauma', 'Pelvic fracture fixation', 'pelvic fracture, pelvic fixation, pelvic ring, si screw, symphysis plating'],
+  ['IV', 'Trauma', 'Acetabular fracture fixation', 'acetabulum, acetabular fracture, acetabular fixation'],
+  ['IV', 'Trauma', 'Neglected / malunited intra-articular fractures', 'neglected, malunited, malunion'],
+  ['IV', 'Oncology', 'Limb salvage surgery (megaprosthesis)', 'megaprosthesis, limb salvage'],
+  ['IV', 'Oncology', 'Resection of bone tumours', 'tumour resection, tumor resection, wide resection, en bloc resection'],
+  ['IV', 'Microvascular', 'Free tissue transfer / microvascular flaps', 'free flap, free fibula, microvascular, free tissue transfer'],
+  ['III', 'Joint replacement', 'Primary total knee arthroplasty (TKA)', 'tkr, tka, total knee'],
+  ['III', 'Joint replacement', 'Total hip arthroplasty (THA)', 'thr, tha, total hip'],
+  ['III', 'Sports medicine', 'Multi-ligament knee reconstruction (ACL + PCL/MCL)', 'multiligament, multi-ligament, multi ligament, pcl, mcl reconstruction'],
+  ['III', 'Sports medicine', 'Shoulder arthroscopy (Bankart / rotator cuff repair)', 'bankart, rotator cuff, cuff repair, shoulder arthroscopy'],
+  ['III', 'Trauma', 'Proximal femoral nailing (PFN)', 'pfn, pfna, proximal femoral nail, proximal femoral nailing'],
+  ['III', 'Trauma', 'Hemiarthroplasty', 'hemiarthroplasty, bipolar, austin moore'],
+  ['III', 'Trauma', 'Complex distal radius / pilon fractures', 'pilon, complex distal radius, intra-articular distal radius'],
+  ['III', 'Trauma', 'Arthrodesis', 'arthrodesis'],
+  ['III', 'Trauma', 'Hip, knee, shoulder disarticulation', 'disarticulation'],
+  ['III', 'Pediatric', 'Corrective osteotomies for deformities (CTEV, DDH)', 'ctev, ddh, corrective osteotomy'],
+  ['III', 'Pediatric', 'Pelvic osteotomies', 'pelvic osteotomy, salter, pemberton, dega'],
+  ['III', 'Infection', 'Ilizarov ring fixator for non-union / bone transport', 'ilizarov, ring fixator, bone transport'],
+  ['II', 'Basic trauma', 'Intramedullary nailing of femur / tibia / humerus', 'iln, ilin, interlocking nail, interlocking nailing, intramedullary nail, intramedullary nailing, im nail, im nailing, nailing'],
+  ['II', 'Basic trauma', 'Plating of long bones', 'plating, lcp, dcp, lc-dcp, locking plate, mipo, plate osteosynthesis'],
+  ['II', 'Arthroscopy', 'Diagnostic arthroscopy', 'diagnostic arthroscopy, arthroscopy'],
+  ['II', 'Arthroscopy', 'Simple meniscectomy', 'meniscectomy'],
+  ['II', 'Hand / foot', 'Tendon repairs', 'tendon repair, flexor tendon, extensor tendon, tendo achilles repair, ta repair'],
+  ['II', 'Hand / foot', 'Triple arthrodesis', 'triple arthrodesis'],
+  ['II', 'Hand / foot', 'Hallux valgus correction', 'hallux valgus, bunion'],
+  ['II', 'General', 'Sequestrectomy for chronic osteomyelitis', 'sequestrectomy, saucerisation, saucerization'],
+  ['II', 'General', 'Dynamic hip screw (DHS) fixation', 'dhs, dynamic hip screw'],
+  ['II', 'General', 'External fixation', 'external fixator, external fixation, ex-fix, exfix, spanning fixator'],
+  ['I', 'Trauma', 'K-wiring of small bones', 'k wire, k-wire, kwire, k wiring, k-wiring, crpp'],
+  ['I', 'Trauma', 'Closed reduction and internal fixation (CRIF)', 'crif'],
+  ['I', 'General', 'Implant removal', 'implant removal, implant exit, hardware removal'],
+  ['I', 'General', 'Debridement of open fractures', 'debridement, wound debridement'],
+  ['I', 'General', 'Biopsies', 'biopsy'],
+  ['I', 'Soft tissue', 'Carpal tunnel release', 'carpal tunnel, ctr'],
+  ['I', 'Soft tissue', 'Trigger finger', 'trigger finger, a1 pulley'],
+  ['I', 'Soft tissue', 'Excision of lipoma / ganglion', 'lipoma, ganglion'],
+].map(([level, category, name, kw], i) => ({
+  id: 'wopl' + i,
+  level,
+  category,
+  name,
+  keywords: kw.split(',').map((x) => x.trim()).filter(Boolean),
+}));
+
+// Every match word found in the plan, as text spans. A match that sits inside
+// a longer one is dropped ("arthrodesis" inside "triple arthrodesis").
+function levelFor(plan, rules) {
+  const hits = [];
+  for (const r of Object.values(rules || {})) {
+    for (const k of r.keywords || []) {
+      if (!k) continue;
+      const re = new RegExp(keywordRegex(k).source, 'gi');
+      let m;
+      while ((m = re.exec(plan || ''))) {
+        const start = m.index + m[1].length;
+        const end = m.index + m[0].length - m[2].length;
+        hits.push({ r, start, end });
+        re.lastIndex = Math.max(end, m.index + 1);
+      }
+    }
+  }
+  const kept = hits.filter((h) => !hits.some((o) => o !== h && o.start <= h.start && o.end >= h.end && o.end - o.start > h.end - h.start));
+  const rules2 = [...new Set(kept.map((h) => h.r))];
+  const best = rules2.reduce((a, r) => (LEVELS.indexOf(r.level) > LEVELS.indexOf(a?.level) ? r : a), null);
+  return { level: best?.level || '', rule: best, matches: rules2 };
+}
+
 // ---- Implant matching ---------------------------------------------------
 
 function keywordRegex(k) {
@@ -202,7 +292,7 @@ function keywordRegex(k) {
   return new RegExp(`(^|[^a-z0-9])${e}([^a-z0-9]|$)`, 'i');
 }
 
-// A rule matches on its procedure name or any of its other names.
+// A procedure matches when its name appears in the plan (whole words, any case).
 function matchImplants(text, rules) {
   if (!text) return [];
   return Object.values(rules || {})
@@ -212,11 +302,9 @@ function matchImplants(text, rules) {
 
 function suggestFromPlan(plan, rules) {
   const m = matchImplants(plan, rules);
-  const levels = m.map((r) => LEVELS.indexOf(r.level)).filter((i) => i >= 0);
   return {
     matches: m,
     implants: m.map((r) => r.implants).filter((x) => x && x.toUpperCase() !== 'NIL').join(', '),
-    level: levels.length ? LEVELS[Math.max(...levels)] : '',
   };
 }
 

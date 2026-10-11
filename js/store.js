@@ -6,8 +6,8 @@
 const Store = (() => {
   const CFG = window.WARD_CONFIG || {};
   const LS = 'wm.v1.';
-  const COLLS = ['cases', 'implants', 'meta'];
-  const state = { cases: {}, implants: {}, meta: {}, members: {} };
+  const COLLS = ['cases', 'implants', 'levels', 'meta'];
+  const state = { cases: {}, implants: {}, levels: {}, meta: {}, members: {} };
   const subs = new Set();
   const imgCache = new Map();
   let fb = null;
@@ -62,6 +62,10 @@ const Store = (() => {
     for (const id of Object.keys(state.implants)) if (id.startsWith('seed')) delete state.implants[id];
     saveLocal('cases');
     saveLocal('implants');
+    if (localStorage.getItem(LS + 'levels') === null) {
+      state.levels = Object.fromEntries(SEED_LEVELS.map((r) => [r.id, { ...r }]));
+      saveLocal('levels');
+    }
   }
   function saveLocal(k) {
     if (mode !== 'local') return;
@@ -126,12 +130,18 @@ const Store = (() => {
 
   function listen() {
     status = 'connecting';
+    let seededLevels = false;
     for (const coll of [...COLLS, 'members']) {
       unsubs.push(fb.fsM.onSnapshot(collRef(coll), { includeMetadataChanges: false }, (snap) => {
         const m = {};
         snap.forEach((d) => { m[d.id] = coll === 'cases' ? migrateCase(d.data()) : d.data(); });
         state[coll] = m;
         status = 'ok';
+        // First connection for the unit: load the WOPL level list once.
+        if (coll === 'levels' && snap.empty && !snap.metadata.fromCache && !seededLevels) {
+          seededLevels = true;
+          SEED_LEVELS.forEach((r) => fb.fsM.setDoc(ref('levels', r.id), r));
+        }
         emit();
       }, (err) => {
         status = err.code === 'permission-denied' ? 'denied' : 'error: ' + err.code;
@@ -231,7 +241,7 @@ const Store = (() => {
   // ---- backup ----
   async function exportAll() {
     const images = fb ? [] : await idbDo('getAll');
-    return { app: 'ward-management', version: 1, exportedAt: new Date().toISOString(), cases: state.cases, implants: state.implants, meta: state.meta, images };
+    return { app: 'ward-management', version: 1, exportedAt: new Date().toISOString(), cases: state.cases, implants: state.implants, levels: state.levels, meta: state.meta, images };
   }
   async function importAll(data) {
     for (const coll of COLLS) {
@@ -272,6 +282,7 @@ const Store = (() => {
     get user() { return user; },
     get cases() { return state.cases; },
     get implants() { return state.implants; },
+    get levels() { return state.levels; },
     get meta() { return { ...DEFAULT_META, ...(state.meta.main || {}) }; },
     get members() { return state.members; },
     setMeta: (changes) => (state.meta.main ? patch('meta', 'main', changes) : create('meta', 'main', changes)),
