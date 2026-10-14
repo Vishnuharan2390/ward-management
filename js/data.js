@@ -208,6 +208,12 @@ const CHART_TEMPLATES = {
     match: /\b(ckd|aki|kidney|renal|nephro)/i,
     cols: [P('urea'), P('creat'), P('na'), P('k'), { k: 'uo', label: 'Urine output', unit: 'mL/24 h', range: '> 400' }, { k: 'note', label: 'Remarks', text: true }],
   },
+  inflam: {
+    title: 'ESR / CRP chart',
+    why: 'Wound / infection',
+    match: /\b(wound|compound|open (fracture|#)|infect|osteomyelitis|cellulitis|abscess|pus|debridement|sequestrectomy|ssi)/i,
+    cols: [P('esr'), P('crp'), P('wbc'), { k: 'wound', label: 'Wound status', text: true }, { k: 'note', label: 'Remarks', text: true }],
+  },
   dm: {
     title: 'Diabetic chart',
     why: 'Diabetes',
@@ -237,7 +243,7 @@ function chartRows(c, ch) {
 
 function suggestedCharts(c) {
   const have = new Set(Object.values(c.charts || {}).map((ch) => ch.type));
-  return Object.entries(CHART_TEMPLATES).filter(([t, tpl]) => !have.has(t) && tpl.match.test(`${c.comorbid || ''} ${c.diagnosis || ''}`)).map(([t]) => t);
+  return Object.entries(CHART_TEMPLATES).filter(([t, tpl]) => !have.has(t) && tpl.match.test(`${c.comorbid || ''} ${c.diagnosis || ''} ${c.plan || ''}`)).map(([t]) => t);
 }
 
 function readiness(c) {
