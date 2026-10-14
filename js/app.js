@@ -15,6 +15,7 @@ const App = (() => {
   const isActive = (c) => ['preop', 'posted', undefined, ''].includes(c.status);
   const byWard = (a, b) => String(a.ward || '').localeCompare(String(b.ward || ''), undefined, { numeric: true }) || (a.doa || '').localeCompare(b.doa || '');
   const flagged = (text, f) => (f ? `<b class="flag">${esc(text)}${FLAG_MARK[f]}</b>` : esc(text));
+  const metaLine = (c) => [ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · ');
   const tagHTML = (p) => `<span class="tag ${p.kind}">${esc(p.text)}</span>`;
 
   // ---------------------------------------------------------------- Lab entry
@@ -209,12 +210,13 @@ const App = (() => {
   // ---------------------------------------------------------------- Ward board
   const activeCases = () => caseList().filter(isActive).sort(byWard);
 
-  function groupCell(c, g) {
-    const parts = g.params.map((p) => {
-      const l = latest(c, p.k);
-      return l ? `${p.label} ${flagged(l.value, flagOf(l.value, p))}` : `<span class="miss">${p.label} –</span>`;
-    });
-    return `<td>${parts.join('<br>')}</td>`;
+  // Latest value of one parameter, flagged; the date shows on hover.
+  function paramCell(c, p) {
+    const l = latest(c, p.k);
+    if (!l) return `<td class="v ${p.group?.optional ? 'muted' : 'miss'}">–</td>`;
+    const f = flagOf(l.value, p);
+    const shown = p.scale ? fmtVal(l.value, { ...p, unit: '' }) : l.value;
+    return `<td class="v${f ? ' flag' : ''}" title="${esc(fmtDate(l.date))}">${esc(shown)}${FLAG_MARK[f]}</td>`;
   }
 
   const Ward = {
@@ -229,26 +231,38 @@ const App = (() => {
           <tbody>
             ${list.map((c, i) => `<tr data-go="${c.id}">
               <td>${c.status === 'posted' ? '<span class="tag task">BOT</span><br>' : ''}${i + 1}</td>
-              <td><b>${esc(c.name)}</b><div class="muted small">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
+              <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
               <td>${[...abnormalList(c), ...pendingList(c)].map(tagHTML).join('') || '<span class="muted">—</span>'}</td>
               <td>${esc(assessmentScheme(c))}</td>
             </tr>`).join('') || '<tr><td colspan="5" class="empty">No active pre-op cases.</td></tr>'}
           </tbody>
         </table>`;
-      const groups = LAB_GROUPS;
       const detailed = `
-        <table class="board">
-          <thead><tr><th>Patient</th><th>Diagnosis / Plan</th>${groups.map((g) => `<th>${esc(g.k === 'inflam' ? 'ESR / qCRP' : g.label)}</th>`).join('')}${WORKUP.map((w) => `<th>${esc(w.label)}</th>`).join('')}<th>Opinions</th><th>Pending works</th></tr></thead>
+        <table class="board detail">
+          <thead>
+            <tr>
+              <th rowspan="2">Patient</th><th rowspan="2">Diagnosis / Plan</th>
+              ${LAB_GROUPS.map((g) => `<th colspan="${g.params.length}" class="grp-h">${esc(g.k === 'inflam' ? 'ESR / qCRP' : g.label)}</th>`).join('')}
+              <th rowspan="2">Other</th>
+              ${WORKUP.map((w) => `<th rowspan="2">${esc(w.label)}</th>`).join('')}
+              <th rowspan="2">Opinions</th><th rowspan="2">Pending works</th>
+            </tr>
+            <tr>${ALL_PARAMS.map((p) => `<th class="ph">${esc(p.label)}${p.unit ? `<span>${esc(p.unit)}</span>` : ''}</th>`).join('')}</tr>
+          </thead>
           <tbody>
             ${list.map((c) => `<tr data-go="${c.id}">
-              <td><b>${esc(c.name)}</b><div class="muted small">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
+              <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}<div class="muted small">▸ ${esc(c.plan)}</div></td>
-              ${groups.map((g) => groupCell(c, g)).join('')}
+              ${ALL_PARAMS.map((p) => paramCell(c, p)).join('')}
+              <td>${customParams(c).map((p) => {
+                const l = latest(c, p.k);
+                return l ? `<div>${esc(p.label)} ${flagged(fmtVal(l.value, p), flagOf(l.value, p))}</div>` : `<div class="miss">${esc(p.label)} –</div>`;
+              }).join('')}</td>
               ${WORKUP.map((w) => work(c, w.k)).join('')}
               <td>${listOf(c.opinions).map((o) => `<div class="${hasText(o.note) ? '' : 'miss'}">${esc(o.dept)}${hasText(o.note) ? ': ' + esc(o.note) : ''}</div>`).join('')}</td>
               <td>${listOf(c.tasks).filter((t) => !t.done).map((t) => `<div>• ${esc(t.text)}</div>`).join('')}</td>
-            </tr>`).join('') || '<tr><td colspan="20" class="empty">No active pre-op cases.</td></tr>'}
+            </tr>`).join('') || `<tr><td colspan="${ALL_PARAMS.length + WORKUP.length + 5}" class="empty">No active pre-op cases.</td></tr>`}
           </tbody>
         </table>`;
       return `
@@ -261,7 +275,7 @@ const App = (() => {
           <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>
-        <p class="muted small">Tap a row to open the case. BOT = posted for OT. Red bold = outside the normal range. Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
+        <p class="muted small">Tap a row to open the case. BOT = posted for OT. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
       $('#print-ward', el).onclick = () => Print.wardBoard(activeCases(), Store.meta);
@@ -415,7 +429,7 @@ const App = (() => {
         ${sets.map((s) => {
           const v = s.v?.[p.k];
           const f = flagOf(v, p);
-          return `<td class="v${f ? ' flag' : ''}">${hasText(v) ? esc(v) + FLAG_MARK[f] : ''}</td>`;
+          return `<td class="v${f ? ' flag' : ''}">${hasText(v) ? esc(fmtVal(v, p)) + FLAG_MARK[f] : ''}</td>`;
         }).join('')}
       </tr>`;
     };
@@ -891,15 +905,13 @@ const App = (() => {
     for (const g of LAB_GROUPS) {
       const vals = g.params.map((p) => {
         const l = latest(c, p.k);
-        // Shorthand like PLT 2.4 (lakhs) or WBC 8.4 (thousands) reads wrong with the full unit.
-        const shorthand = p.scale && parseFloat(String(l?.value).replace(/,/g, '')) < 100;
-        return l ? `${p.label} ${l.value}${p.unit && !p.options && !shorthand ? ' ' + p.unit : ''}` : '';
+        return l ? `${p.label} ${fmtVal(l.value, p)}` : '';
       }).filter(Boolean);
       if (vals.length) lines.push(`${g.k === 'inflam' ? '' : g.label + ': '}${vals.join(', ')}`);
     }
     const cust = customParams(c).map((p) => {
       const l = latest(c, p.k);
-      return l ? `${p.label} ${l.value}${p.unit ? ' ' + p.unit : ''}` : '';
+      return l ? `${p.label} ${fmtVal(l.value, p)}` : '';
     }).filter(Boolean);
     if (cust.length) lines.push(cust.join(', '));
     if (hasText(c.pus?.organism)) lines.push(`PUS C/S: ${c.pus.organism}${hasText(c.pus.sensitive) ? ' — SENSITIVE TO ' + c.pus.sensitive : ''}`);

@@ -122,7 +122,20 @@ function flagOf(value, p) {
   if (r.lo != null && n < r.lo) return 'low';
   return '';
 }
-const FLAG_MARK = { high: ' ↑', low: ' ↓', abn: '' };
+const FLAG_MARK = { high: ' ↑', low: ' ↓', abn: '', '': '' };
+
+// Value as shown to people: with its unit, and shorthand counts written out
+// (PLT 2.4 → 2,40,000 cells/µL).
+function fmtVal(v, p) {
+  const raw = String(v ?? '').trim();
+  if (!raw || p.options) return raw;
+  let shown = raw;
+  if (p.scale && /^\d*\.?\d+\s*(l|lakhs?|lacs?|k)?$/i.test(raw.replace(/,/g, ''))) {
+    const n = parseNum(raw, p);
+    if (!isNaN(n)) shown = Math.round(n).toLocaleString('en-IN');
+  }
+  return p.unit ? `${shown} ${p.unit}` : shown;
+}
 
 const listOf = (map) => Object.entries(map || {})
   .map(([id, v]) => ({ id, ...v }))
@@ -167,7 +180,7 @@ function abnormalList(c) {
   for (const p of [...ALL_PARAMS, ...customParams(c)]) {
     const l = latest(c, p.k);
     const f = l && flagOf(l.value, p);
-    if (f) out.push({ kind: 'flag', text: `${p.label} ${l.value}${FLAG_MARK[f]}` });
+    if (f) out.push({ kind: 'flag', text: `${p.label} ${fmtVal(l.value, p)}${FLAG_MARK[f]}` });
   }
   return out;
 }

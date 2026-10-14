@@ -442,3 +442,11 @@ a.btn[aria-disabled="true"] { opacity: .45; }
 .ot-half .ot-table td { height: auto; }
 .ot-half .ot-sign { margin-top: 14pt; }
 .ot-cut { border-top: 1px dashed #000; }
+
+/* Ward → Detailed: one column per investigation */
+.board.detail { min-width: 1700px; font-variant-numeric: tabular-nums; }
+.board.detail thead tr:first-child th { position: static; }
+.board.detail th.grp-h { text-align: center; border-left: 2px solid rgba(255,255,255,.35); }
+.board.detail th.ph { font-weight: 600; text-align: center; background: var(--brand-2); }
+.board.detail th.ph span { display: block; font-weight: normal; font-size: .65rem; opacity: .85; }
+.board.detail td.v { text-align: center; white-space: nowrap; }
