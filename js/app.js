@@ -448,6 +448,105 @@ const App = (() => {
       </div>`;
   }
 
+  // ---------------------------------------------------------------- Charts
+  function chartHTML(c, chId) {
+    const ch = c.charts[chId];
+    const cols = ch.cols || [];
+    const rows = chartRows(c, ch);
+    const editing = Charts.editing[chId];
+    const editRow = editing ? ch.rows?.[editing] : null;
+    const input = (col) => {
+      const v = editRow?.v?.[col.k] ?? '';
+      const f = col.text ? '' : flagOf(v, col);
+      return `<label class="${col.text ? 'wide' : ''}">${esc(col.label)}${col.unit ? ` <span class="muted">${esc(col.unit)}</span>` : ''}
+        <input data-cin="${col.k}" value="${esc(v)}" class="${f ? 'is-flag' : ''}" ${col.text ? '' : 'inputmode="decimal"'}></label>`;
+    };
+    return `
+      <div class="chart" data-chart="${chId}">
+        <div class="row-between chart-head">
+          <h4>${esc(ch.title)}</h4>
+          <span class="chart-acts">
+            <button class="btn small" data-chart-print="${chId}">Print / PDF</button>
+            <button class="icon" data-chart-del="${chId}" title="Delete chart">✕</button>
+          </span>
+        </div>
+        <div class="table-wrap">
+          <table class="flow chart-table">
+            <thead><tr><th>Date</th><th>Time</th>${cols.map((col) => `<th class="d">${esc(col.label)}${col.unit ? `<span class="rng">${esc(col.unit)}</span>` : ''}${col.range ? `<span class="rng">${esc(col.range)}</span>` : ''}</th>`).join('')}<th></th></tr></thead>
+            <tbody>
+              ${rows.map((r) => `<tr class="${r.src === 'inv' ? 'from-inv' : ''}${editing === r.id ? ' editing' : ''}">
+                <td class="nowrap">${esc(fmtDate(r.date))}</td><td class="nowrap">${esc(r.time || '')}</td>
+                ${cols.map((col) => {
+                  const v = r.v?.[col.k];
+                  const f = col.text ? '' : flagOf(v, col);
+                  return `<td class="${col.text ? 'txt' : 'v'}${f ? ' flag' : ''}">${hasText(v) ? esc(col.text ? v : fmtVal(v, { ...col, unit: '' })) + FLAG_MARK[f] : ''}</td>`;
+                }).join('')}
+                <td class="nowrap">${r.src === 'inv' ? '<span class="muted small" title="Entered under Investigations">Inv.</span>' : `<button class="icon" data-row-edit="${r.id}" title="Edit">✎</button><button class="icon" data-row-del="${r.id}" title="Delete">✕</button>`}</td>
+              </tr>`).join('') || `<tr><td colspan="${cols.length + 3}" class="muted small">No entries yet — add the first below.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <div class="chart-form${editing ? ' editing' : ''}">
+          <label>Date<input type="date" data-cin="_date" value="${esc(editRow?.date || todayISO())}"></label>
+          <label>Time<input type="time" data-cin="_time" value="${esc(editRow?.time || '')}"></label>
+          ${cols.map(input).join('')}
+          <div class="chart-form-acts">
+            <button class="btn small primary" data-row-save>${editing ? 'Update entry' : 'Add entry'}</button>
+            ${editing ? '<button class="btn small" data-row-cancel>Cancel</button>' : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  const Charts = { editing: {} };
+
+  function openCustomChartModal(caseId) {
+    const m = $('#modal');
+    const colRow = () => `<div class="custom-row cc-row">
+      <input data-cc="label" placeholder="Column, e.g. INR">
+      <input data-cc="unit" placeholder="Unit">
+      <input data-cc="range" placeholder="Normal range, e.g. 0.8 – 1.2">
+      <label class="small nowrap"><input type="checkbox" data-cc="text"> text</label>
+      <button type="button" class="icon" data-rm-custom title="Remove">✕</button>
+    </div>`;
+    m.innerHTML = `
+      <form class="sheet card form" id="chart-modal" autocomplete="off">
+        <div class="row-between"><h3>New chart</h3><button type="button" class="icon" data-close>✕</button></div>
+        <label>Chart name<input name="title" required placeholder="e.g. INR chart, Hb chart, Vitals"></label>
+        <p class="muted small">Columns to record each time. Tick “text” for words rather than numbers.</p>
+        <div class="cc-cols">${colRow()}${colRow()}</div>
+        <button type="button" class="btn small" data-add-col>+ Add column</button>
+        <div class="form-actions"><button class="btn primary">Create chart</button><button type="button" class="btn" data-close>Cancel</button></div>
+      </form>`;
+    m.hidden = false;
+    m.classList.add('sheet-wrap');
+    const f = $('#chart-modal', m);
+    const close = () => {
+      m.hidden = true;
+      m.classList.remove('sheet-wrap');
+      m.innerHTML = '';
+    };
+    m.onclick = (e) => {
+      if (e.target === m || e.target.closest('[data-close]')) return close();
+      if (e.target.closest('[data-add-col]')) $('.cc-cols', f).insertAdjacentHTML('beforeend', colRow());
+      const rm = e.target.closest('[data-rm-custom]');
+      if (rm) rm.closest('.cc-row').remove();
+    };
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      const cols = $$('.cc-row', f).map((r) => ({
+        k: 'c_' + uid(),
+        label: $('[data-cc=label]', r).value.trim(),
+        unit: $('[data-cc=unit]', r).value.trim(),
+        range: $('[data-cc=range]', r).value.trim(),
+        ...($('[data-cc=text]', r).checked ? { text: true } : {}),
+      })).filter((x) => x.label);
+      if (!cols.length) return toast('Add at least one column');
+      Store.patch('cases', caseId, { ['charts.' + uid()]: { type: 'custom', title: f.elements.title.value.trim(), cols, at: Date.now(), rows: {} } });
+      close();
+    };
+  }
+
   function CaseDetail(id) {
     return {
       live: true,
@@ -490,6 +589,15 @@ const App = (() => {
             <div class="pus">
               <label>Pus C/S — organism<input class="italic" data-bind="pus.organism" value="${esc(c.pus?.organism)}" placeholder="if sent"></label>
               <label>Sensitive to<input data-bind="pus.sensitive" value="${esc(c.pus?.sensitive)}" placeholder="antibiotics"></label>
+            </div>
+          </section>
+
+          <section class="card" id="charts">
+            <h3>Monitoring charts</h3>
+            ${Object.keys(c.charts || {}).sort((a, b) => (c.charts[a].at || 0) - (c.charts[b].at || 0)).map((chId) => chartHTML(c, chId)).join('') || '<p class="muted small">For patients followed with repeated values — RFT for CKD, sugars and insulin for diabetics, or any chart you define.</p>'}
+            <div class="actions">
+              ${Object.entries(CHART_TEMPLATES).map(([t, tpl]) => `<button class="btn small${suggestedCharts(c).includes(t) ? ' suggest' : ''}" data-chart-new="${t}">+ ${esc(tpl.title)}${suggestedCharts(c).includes(t) ? ` <span class="pill">${esc(tpl.why)}</span>` : ''}</button>`).join('')}
+              <button class="btn small" data-chart-new="custom">+ Custom chart</button>
             </div>
           </section>
 
@@ -554,6 +662,19 @@ const App = (() => {
           Store.getImage(img.dataset.img).then((src) => { if (src) img.src = src; });
         });
         $('#case-status', el).onchange = (e) => Store.patch('cases', id, { status: e.target.value });
+        el.addEventListener('input', (e) => {
+          const k = e.target.dataset.cin;
+          const box = e.target.closest('[data-chart]');
+          if (!k || !box) return;
+          const col = (Store.cases[id].charts[box.dataset.chart].cols || []).find((x) => x.k === k);
+          if (col && !col.text) e.target.classList.toggle('is-flag', !!flagOf(e.target.value, col));
+        });
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.target.dataset.cin) {
+            e.preventDefault();
+            $('[data-row-save]', e.target.closest('[data-chart]'))?.click();
+          }
+        });
         $('#add-set', el).onclick = () => openLabModal(id);
 
         el.addEventListener('change', async (e) => {
@@ -592,6 +713,43 @@ const App = (() => {
           } else if (b.dataset.delSet) {
             const s = Store.cases[id].labs[b.dataset.delSet];
             if (confirm(`Delete the investigations dated ${fmtDate(s.date) || '(no date)'}?`)) Store.patch('cases', id, { ['labs.' + b.dataset.delSet]: DELETE });
+          } else if (b.dataset.chartNew) {
+            const t = b.dataset.chartNew;
+            if (t === 'custom') return openCustomChartModal(id);
+            const tpl = CHART_TEMPLATES[t];
+            Store.patch('cases', id, { ['charts.' + uid()]: { type: t, title: tpl.title, cols: tpl.cols.map(chartCol), at: Date.now(), rows: {} } });
+          } else if (b.dataset.chartDel) {
+            const ch = Store.cases[id].charts[b.dataset.chartDel];
+            if (confirm(`Delete the ${ch.title} and all its entries?`)) Store.patch('cases', id, { ['charts.' + b.dataset.chartDel]: DELETE });
+          } else if (b.dataset.chartPrint) {
+            Print.chart(Store.cases[id], b.dataset.chartPrint, Store.meta);
+          } else if (b.dataset.rowEdit || b.dataset.rowCancel !== undefined) {
+            const chId = b.closest('[data-chart]').dataset.chart;
+            Charts.editing[chId] = b.dataset.rowEdit || null;
+            render();
+          } else if (b.dataset.rowDel) {
+            const chId = b.closest('[data-chart]').dataset.chart;
+            if (confirm('Delete this entry?')) Store.patch('cases', id, { [`charts.${chId}.rows.${b.dataset.rowDel}`]: DELETE });
+          } else if (b.dataset.rowSave !== undefined) {
+            const box = b.closest('[data-chart]');
+            const chId = box.dataset.chart;
+            const v = {};
+            $$('.chart-form [data-cin]', box).forEach((inp) => {
+              if (!inp.dataset.cin.startsWith('_') && inp.value.trim()) v[inp.dataset.cin] = inp.value.trim();
+            });
+            if (!Object.keys(v).length) return toast('Type at least one value');
+            const rowId = Charts.editing[chId] || uid();
+            const prev = Store.cases[id].charts[chId].rows?.[rowId];
+            Store.patch('cases', id, { [`charts.${chId}.rows.${rowId}`]: {
+              date: $('[data-cin=_date]', box).value, time: $('[data-cin=_time]', box).value,
+              v, at: prev?.at || Date.now(), by: Store.who(),
+            } });
+            Charts.editing[chId] = null;
+            // Redraw now (a save made with Enter keeps focus in the form, which
+            // would otherwise postpone it) and put the cursor back for the next entry.
+            render();
+            $(`[data-chart="${chId}"] .chart-form [data-cin]:not([data-cin^="_"])`, App.el)?.focus();
+            toast('Saved');
           } else if (b.dataset.gallery) {
             const first = listOf(Store.cases[id].images).find((i) => i.kind === b.dataset.gallery);
             if (first) openViewer(id, first.id, b.dataset.gallery);

@@ -149,11 +149,20 @@ function labSets(c) {
   return listOf(c.labs).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.at || 0) - (b.at || 0));
 }
 
+// Every dated result for the case: investigation sets and chart entries.
+function allEntries(c) {
+  const out = labSets(c).map((s) => ({ date: s.date || '', time: '', at: s.at || 0, v: s.v || {} }));
+  for (const ch of Object.values(c.charts || {})) {
+    for (const r of Object.values(ch.rows || {})) out.push({ date: r.date || '', time: r.time || '', at: r.at || 0, v: r.v || {} });
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time) || a.at - b.at);
+}
+
 function latest(c, key) {
-  const sets = labSets(c);
-  for (let i = sets.length - 1; i >= 0; i--) {
-    const v = sets[i].v?.[key];
-    if (v != null && String(v).trim() !== '') return { value: String(v).trim(), date: sets[i].date };
+  const all = allEntries(c);
+  for (let i = all.length - 1; i >= 0; i--) {
+    const v = all[i].v[key];
+    if (v != null && String(v).trim() !== '') return { value: String(v).trim(), date: all[i].date };
   }
   return null;
 }
@@ -177,12 +186,58 @@ function pendingList(c) {
 
 function abnormalList(c) {
   const out = [];
-  for (const p of [...ALL_PARAMS, ...customParams(c)]) {
+  const seen = new Set();
+  const check = (p) => {
+    if (seen.has(p.k) || p.text) return;
+    seen.add(p.k);
     const l = latest(c, p.k);
     const f = l && flagOf(l.value, p);
     if (f) out.push({ kind: 'flag', text: `${p.label} ${fmtVal(l.value, p)}${FLAG_MARK[f]}` });
-  }
+  };
+  [...ALL_PARAMS, ...customParams(c)].forEach(check);
+  Object.values(c.charts || {}).forEach((ch) => (ch.cols || []).forEach(check));
   return out;
+}
+
+// ---- Monitoring charts ---------------------------------------------------
+const P = (k) => ALL_PARAMS.find((p) => p.k === k);
+const CHART_TEMPLATES = {
+  rft: {
+    title: 'RFT chart',
+    why: 'CKD / AKI',
+    match: /\b(ckd|aki|kidney|renal|nephro)/i,
+    cols: [P('urea'), P('creat'), P('na'), P('k'), { k: 'uo', label: 'Urine output', unit: 'mL/24 h', range: '> 400' }, { k: 'note', label: 'Remarks', text: true }],
+  },
+  dm: {
+    title: 'Diabetic chart',
+    why: 'Diabetes',
+    match: /\b(dm|t1dm|t2dm|diabet|niddm|iddm)/i,
+    cols: [
+      { k: 'fbs', label: 'FBS', unit: 'mg/dL', range: '70 – 100' },
+      { k: 'ppbs', label: 'PPBS', unit: 'mg/dL', range: '< 140' },
+      P('rbs'),
+      { k: 'ins_m', label: 'Insulin M', unit: 'U' },
+      { k: 'ins_a', label: 'Insulin A', unit: 'U' },
+      { k: 'ins_n', label: 'Insulin N', unit: 'U' },
+      { k: 'ins_type', label: 'Insulin type', text: true },
+      { k: 'note', label: 'Remarks', text: true },
+    ],
+  },
+};
+const chartCol = (col) => ({ k: col.k, label: col.label, unit: col.unit || '', range: col.range || '', ...(col.scale ? { scale: col.scale } : {}), ...(col.text ? { text: true } : {}) });
+
+// A chart's rows, plus investigation sets that carry any of its columns
+// (so an RFT chart shows the RFTs entered under Investigations too).
+function chartRows(c, ch) {
+  const keys = (ch.cols || []).filter((x) => !x.text).map((x) => x.k);
+  const own = listOf(ch.rows).map((r) => ({ ...r, src: 'chart' }));
+  const inv = labSets(c).filter((s) => keys.some((k) => hasText(s.v?.[k]))).map((s) => ({ id: s.id, date: s.date || '', time: '', at: s.at || 0, v: s.v, src: 'inv' }));
+  return [...own, ...inv].sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || (a.at || 0) - (b.at || 0));
+}
+
+function suggestedCharts(c) {
+  const have = new Set(Object.values(c.charts || {}).map((ch) => ch.type));
+  return Object.entries(CHART_TEMPLATES).filter(([t, tpl]) => !have.has(t) && tpl.match.test(`${c.comorbid || ''} ${c.diagnosis || ''}`)).map(([t]) => t);
 }
 
 function readiness(c) {

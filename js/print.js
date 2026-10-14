@@ -193,7 +193,32 @@ const Print = (() => {
     go(html, { title: `${up(c.name)}_DISCHARGE`, page: 'A4 portrait' });
   }
 
-  return { otList, wardBoard, discharge, OT_COLUMNS, otTitle };
+  // ---------------------------------------------------------------- Chart
+  function chart(c, chId, meta) {
+    const ch = c.charts[chId];
+    const cols = ch.cols || [];
+    const rows = chartRows(c, ch);
+    const html = `
+      <div class="pr chart-pr">
+        <div class="chart-pr-head">
+          <div><b>${esc(up(ch.title))}</b> — ${esc(unitName(meta.unitId))}</div>
+          <div>${esc(up(c.name))} · ${esc(ageSex(c))} · IP ${esc(c.ipNo || '')}${c.ward ? ' · WARD ' + esc(c.ward) : ''}</div>
+          <div class="pr-sub">${esc(up(c.diagnosis))}${c.comorbid ? ' · ' + esc(up(c.comorbid)) : ''}</div>
+        </div>
+        <table class="nb-table chart-pr-table">
+          <thead><tr><th>DATE</th><th>TIME</th>${cols.map((col) => `<th>${esc(up(col.label))}${col.unit ? `<div class="pr-sub">${esc(col.unit)}</div>` : ''}${col.range ? `<div class="pr-sub">${esc(col.range)}</div>` : ''}</th>`).join('')}</tr></thead>
+          <tbody>${rows.map((r) => `<tr><td>${esc(fmtDate(r.date))}</td><td>${esc(r.time || '')}</td>${cols.map((col) => {
+            const v = r.v?.[col.k];
+            const f = col.text ? '' : flagOf(v, col);
+            const shown = hasText(v) ? (col.text ? v : fmtVal(v, { ...col, unit: '' })) + FLAG_MARK[f] : '';
+            return `<td>${f ? `<b class="pr-flag">${esc(shown)}</b>` : esc(shown)}</td>`;
+          }).join('')}</tr>`).join('')}</tbody>
+        </table>
+      </div>`;
+    go(html, { title: `${ch.title} ${c.name}`, page: cols.length > 7 ? 'A4 landscape' : 'A4 portrait' });
+  }
+
+  return { otList, wardBoard, discharge, chart, OT_COLUMNS, otTitle };
 })();
 
 // Shared with the on-screen ward view.
