@@ -49,30 +49,39 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 Out of the box it runs in **local mode**: data stays in that one browser.
 Fine for a test drive; use Settings → Backup to export/import.
 
-## Share it with your team (≈10 minutes, free)
+## Share it with your team (≈15 minutes, free)
 
-Sharing needs a small database. The app uses Google Firebase (free Spark
-plan is plenty for one ward).
+Sharing needs a small online database. The app uses Google Firebase (the
+free Spark plan is plenty for one ward). Until it is connected the app runs in
+**local mode**: each phone or laptop keeps its own separate data.
 
-1. Go to <https://console.firebase.google.com> → **Add project**.
-2. **Build → Authentication → Get started → Sign-in method → Google → Enable.**
-3. **Build → Firestore Database → Create database** (production mode, region
-   `asia-south1` / Mumbai).
+1. <https://console.firebase.google.com> → **Create a project** (any name,
+   e.g. `ortho-ward`; Google Analytics not needed).
+2. **Build → Authentication → Get started → Sign-in method**: enable
+   **Email/Password** (and **Google** if you like). Then **Settings →
+   Authorized domains → Add domain** → `vishnuharan2390.github.io`.
+3. **Build → Firestore Database → Create database** → location
+   **asia-south1 (Mumbai)** → **Start in production mode**.
 4. **Firestore → Rules**: paste `firestore.rules` from this repo, replace
-   `you@gmail.com` with your Gmail, **Publish**.
-5. **Project settings → General → Your apps → Web (`</>`)** → register the
-   app → copy the `firebaseConfig` object into `config.js` (`firebase: {...}`)
-   and add your Gmail to `ownerEmails`.
-6. Host the folder. Easiest: GitHub repo → **Settings → Pages → Deploy from
-   branch** (root). Then in Firebase **Authentication → Settings → Authorized
-   domains** add `<your-username>.github.io`.
-7. Open the site, sign in with Google, go to **Settings → Team** and add the
-   Gmail IDs of your house surgeon and senior PGs. They sign in with the same
-   link and see everything live.
+   `you@gmail.com` with your own email, **Publish**.
+5. **Project settings (⚙) → General → Your apps → Web (`</>`)** → register
+   the app (no hosting) → copy the `firebaseConfig` block.
+6. Put that block in `config.js` (`firebase: {...}`) and your email in
+   `ownerEmails` — or send both to whoever maintains the app.
 
-Everyone's edits sync instantly. Updates are saved field by field, so two
-people editing different parts of the same case don't overwrite each other.
-The app keeps working offline and syncs when the network returns.
+Then:
+
+* Open the app, **Create account** with that email, confirm the link sent to
+  your inbox, sign in.
+* **Settings → Sharing**: if this device has cases from local mode, tap
+  **Copy them to the shared database**.
+* **Settings → Team**: add the emails of your HS and PGs. They open the same
+  link, **Create account** with that email, confirm it, and see everything.
+
+Edits sync live, field by field, so two people editing the same case don't
+overwrite each other. The app keeps working offline and syncs when the network
+returns. Email + password works everywhere, including the iPhone home-screen
+app; Google sign-in may not open from the home-screen app on iOS.
 
 ## Patient data
 

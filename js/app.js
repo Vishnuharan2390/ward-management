@@ -1346,6 +1346,7 @@ const App = (() => {
           ${Store.mode === 'local'
             ? '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and senior PGs, connect Firebase — see <b>README.md</b>.</p>'
             : `<p>Signed in as <b>${esc(Store.user?.email)}</b> · sync: ${esc(Store.status)} <button class="btn small" id="signout">Sign out</button></p>
+               ${Store.localCaseCount() ? `<p class="notice">This device has <b>${Store.localCaseCount()}</b> case(s) saved before sharing was switched on. <button class="btn small primary" id="upload-local">Copy them to the shared database</button></p>` : ''}
                <h4>Team</h4>
                <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> <span class="muted">${esc(x.role)} · ${esc(x.email)}</span>${Store.isOwner() ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">Only owners so far.</li>'}</ul>
                ${Store.isOwner() ? `<form class="inline-add" id="add-member">
@@ -1457,6 +1458,19 @@ const App = (() => {
 
       const so = $('#signout', el);
       if (so) so.onclick = () => Store.signOut();
+      const ul = $('#upload-local', el);
+      if (ul) {
+        ul.onclick = async () => {
+          ul.disabled = true;
+          try {
+            toast(`Copied ${await Store.uploadLocal()} case(s) to the shared database`, 3500);
+          } catch (err) {
+            ul.disabled = false;
+            toast('Copy failed: ' + (err.code || err.message), 4000);
+          }
+          render();
+        };
+      }
       const am = $('#add-member', el);
       if (am) {
         am.onsubmit = (e) => {
@@ -1502,22 +1516,90 @@ const App = (() => {
 
   const Gate = {
     live: true,
+    mode: 'in', // 'in' | 'up' | 'reset'
     render() {
       const s = Store.status;
       if (s === 'denied') {
-        return `<div class="card gate"><h2>No access yet</h2><p>You're signed in as <b>${esc(Store.user?.email)}</b>, but this email isn't on the team list. Ask the unit owner to add you under Settings → Team.</p><button class="btn" id="signout">Sign out</button></div>`;
+        return `<div class="card gate"><h2>No access yet</h2><p>You're signed in as <b>${esc(Store.user?.email)}</b>, but this email isn't on the team list. Ask the unit owner to add it under Settings → Team, then tap Try again.</p>
+          <div class="actions center"><button class="btn primary" id="retry">Try again</button><button class="btn" id="signout">Sign out</button></div></div>`;
+      }
+      if (s === 'unverified') {
+        return `<div class="card gate"><h2>Confirm your email</h2><p>We sent a link to <b>${esc(Store.user?.email)}</b>. Open it (check spam too), then come back and tap the button below.</p>
+          <div class="actions center"><button class="btn primary" id="verified">I've confirmed it</button><button class="btn" id="resend">Send the link again</button><button class="btn" id="signout">Sign out</button></div></div>`;
       }
       if (s.startsWith('error')) return `<div class="card gate"><h2>Connection problem</h2><p>${esc(s)}</p><button class="btn" onclick="location.reload()">Retry</button></div>`;
       if (s === 'signed-out') {
-        return '<div class="card gate"><h2>Pre-op Ward</h2><p>Sign in with the Google account your unit added to the team.</p><button class="btn primary" id="signin">Sign in with Google</button></div>';
+        const m = Gate.mode;
+        return `<div class="card gate">
+          <h2>Pre-op Ward</h2>
+          <p class="muted">${m === 'up' ? 'Create your account with the email your unit added to the team.' : m === 'reset' ? 'We will email you a link to set a new password.' : 'Sign in with the email your unit added to the team.'}</p>
+          <form id="email-form" class="gate-form" autocomplete="on">
+            <label>Email<input name="email" type="email" autocomplete="username" required></label>
+            ${m === 'reset' ? '' : `<label>Password<input name="password" type="password" autocomplete="${m === 'up' ? 'new-password' : 'current-password'}" minlength="6" required></label>`}
+            <button class="btn primary">${m === 'up' ? 'Create account' : m === 'reset' ? 'Send reset link' : 'Sign in'}</button>
+          </form>
+          <div class="gate-links">
+            ${m !== 'in' ? '<button class="link" data-mode="in">Sign in</button>' : '<button class="link" data-mode="up">New here? Create account</button><button class="link" data-mode="reset">Forgot password</button>'}
+          </div>
+          <div class="gate-or"><span>or</span></div>
+          <button class="btn" id="signin">Sign in with Google</button>
+        </div>`;
       }
       return '<div class="empty">Connecting…</div>';
     },
     mount(el) {
+      const fail = (e) => toast(({
+        'auth/invalid-credential': 'Email or password is wrong.',
+        'auth/wrong-password': 'Email or password is wrong.',
+        'auth/user-not-found': 'No account with that email yet — tap “Create account”.',
+        'auth/email-already-in-use': 'That email already has an account — sign in instead.',
+        'auth/weak-password': 'Use at least 6 characters for the password.',
+        'auth/too-many-requests': 'Too many tries. Wait a minute and try again.',
+        'auth/popup-blocked': 'The Google window was blocked. Use email and password instead.',
+      })[e.code] || 'Sign-in failed: ' + (e.code || e.message), 4000);
       const si = $('#signin', el);
-      if (si) si.onclick = () => Store.signIn().catch((e) => toast('Sign-in failed: ' + (e.code || e.message)));
+      if (si) si.onclick = () => Store.signIn().catch(fail);
       const so = $('#signout', el);
       if (so) so.onclick = () => Store.signOut();
+      const re = $('#retry', el);
+      if (re) re.onclick = () => Store.recheckVerified();
+      const ve = $('#verified', el);
+      if (ve) {
+        ve.onclick = async () => {
+          await Store.recheckVerified();
+          if (Store.status === 'unverified') toast('Not confirmed yet — open the link in the email first.', 3500);
+        };
+      }
+      const rs = $('#resend', el);
+      if (rs) rs.onclick = () => Store.resendVerification().then(() => toast('Link sent')).catch(fail);
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-mode]');
+        if (b) {
+          Gate.mode = b.dataset.mode;
+          render();
+        }
+      });
+      const f = $('#email-form', el);
+      if (f) {
+        f.onsubmit = async (e) => {
+          e.preventDefault();
+          const mail = f.elements.email.value;
+          try {
+            if (Gate.mode === 'reset') {
+              await Store.resetPassword(mail);
+              toast('Reset link sent — check your inbox.', 3500);
+              Gate.mode = 'in';
+              render();
+            } else if (Gate.mode === 'up') {
+              await Store.signUpEmail(mail, f.elements.password.value);
+            } else {
+              await Store.signInEmail(mail, f.elements.password.value);
+            }
+          } catch (err) {
+            fail(err);
+          }
+        };
+      }
     },
   };
 

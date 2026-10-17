@@ -116,11 +116,19 @@ const Store = (() => {
       db = fsM.getFirestore(app);
     }
     fb = { authM, fsM, auth: authM.getAuth(app), db, unit: CFG.unitId || 'ortho-unit-1' };
+    if (CFG.emulators) {
+      // Local test setup only (firebase emulators:start).
+      authM.connectAuthEmulator(fb.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+      fsM.connectFirestoreEmulator(db, '127.0.0.1', 8080);
+    }
     authM.onAuthStateChanged(fb.auth, (u) => {
       user = u;
       stopListening();
-      if (u) listen();
-      else status = 'signed-out';
+      if (!u) status = 'signed-out';
+      // Password accounts must confirm their email first (the database rules
+      // only admit verified addresses, so nobody can borrow a colleague's).
+      else if (!u.emailVerified) status = 'unverified';
+      else listen();
       emit();
     });
   }
@@ -166,6 +174,55 @@ const Store = (() => {
         throw e;
       }
     }
+  }
+
+  async function signInEmail(mail, password) {
+    await fb.authM.signInWithEmailAndPassword(fb.auth, mail.trim(), password);
+  }
+  async function signUpEmail(mail, password) {
+    const cred = await fb.authM.createUserWithEmailAndPassword(fb.auth, mail.trim(), password);
+    await fb.authM.sendEmailVerification(cred.user);
+  }
+  async function resendVerification() {
+    if (fb.auth.currentUser) await fb.authM.sendEmailVerification(fb.auth.currentUser);
+  }
+  async function resetPassword(mail) {
+    await fb.authM.sendPasswordResetEmail(fb.auth, mail.trim());
+  }
+  // After the person clicks the link in their inbox.
+  async function recheckVerified() {
+    const u = fb.auth.currentUser;
+    if (!u) return;
+    await u.reload();
+    await u.getIdToken(true); // fresh token carries email_verified for the rules
+    user = fb.auth.currentUser;
+    if (user.emailVerified) {
+      stopListening();
+      listen();
+    }
+    emit();
+  }
+
+  // Cases typed on this device before sharing was switched on.
+  function localLeftovers() {
+    const out = {};
+    for (const k of COLLS) {
+      try { out[k] = JSON.parse(localStorage.getItem(LS + k)) || {}; } catch { out[k] = {}; }
+    }
+    return out;
+  }
+  async function uploadLocal() {
+    const data = localLeftovers();
+    Object.values(data.cases).forEach(migrateCase);
+    let images = [];
+    try { images = await idbDo('getAll'); } catch { /* no local images */ }
+    for (const coll of COLLS) {
+      for (const [id, doc] of Object.entries(data[coll])) await fb.fsM.setDoc(ref(coll, id), doc, { merge: true });
+    }
+    for (const img of images) await fb.fsM.setDoc(ref('images', img.id), img);
+    for (const k of ['cases', 'implants', 'levels']) localStorage.setItem(LS + k + '.uploaded', localStorage.getItem(LS + k) || '{}');
+    for (const k of ['cases', 'implants', 'levels', 'meta']) localStorage.removeItem(LS + k);
+    return Object.keys(data.cases).length;
   }
 
   function remoteFail(e) {
@@ -287,6 +344,9 @@ const Store = (() => {
     get members() { return state.members; },
     setMeta: (changes) => (state.meta.main ? patch('meta', 'main', changes) : create('meta', 'main', changes)),
     who, isOwner, profile, setProfile, signIn,
+    signInEmail, signUpEmail, resendVerification, resetPassword, recheckVerified,
+    localCaseCount: () => Object.keys(localLeftovers().cases).length,
+    uploadLocal,
     signOut: () => fb && fb.authM.signOut(fb.auth),
     create, patch, remove,
     addImage, getImage, deleteImage,
