@@ -305,7 +305,7 @@ const App = (() => {
             <a class="chip" href="#sec-patient" data-jump>Patient</a>
             <a class="chip" href="#sec-plan" data-jump>Diagnosis & plan</a>
             <a class="chip on" href="#sec-inv" data-jump>Investigations</a>
-            ${id ? '' : '<a class="chip" href="#sec-work" data-jump>Work-up</a>'}
+            ${id ? '' : '<a class="chip" href="#sec-img" data-jump>Images</a><a class="chip" href="#sec-work" data-jump>Work-up</a>'}
           </nav>
           <form id="case-form" class="form" autocomplete="off">
             <fieldset class="card" id="sec-patient"><legend>Patient</legend>
@@ -325,6 +325,9 @@ const App = (() => {
               <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
               <label>Scheme status<select name="scheme">${schemeOpts(c.scheme)}</select></label>
               <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}" placeholder="DM, SHTN…"></label>
+              <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}" placeholder="MLC/RTA"></label>
+              <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(id ? c.writtenBy : (c.writtenBy || Store.meta.lastPg || ''))}" placeholder="DR.NAME PG"></label>
+              <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3" placeholder="e.g. ABOVE KNEE POP SLAB&#10;INJ. ANALGESICS">${esc(c.treatment)}</textarea></label>
               <label class="span2">Implants
                 <textarea name="implants" rows="2" placeholder="Filled from the implant database when the plan matches">${esc(c.implants)}</textarea>
                 <span class="hint" id="impl-hint"></span>
@@ -341,6 +344,11 @@ const App = (() => {
               <label>Pus C/S — organism<input name="pusOrganism" class="italic" placeholder="if sent"></label>
               <label>Sensitive to<input name="pusSensitive" placeholder="antibiotics"></label>
             </fieldset>
+            <fieldset class="card" id="sec-img"><legend>Radiographs & wound pictures</legend>
+              <p class="span2 muted small">Uploaded once here — they appear on the case page, in the OT list viewer and in the admission-day deck.</p>
+              <div class="span2 img-adders">${IMAGE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-pending="${k.k}" hidden></label>`).join('')}</div>
+              <div class="span2 pending-imgs" id="pending-imgs"></div>
+            </fieldset>
             <fieldset class="card" id="sec-work"><legend>Work-up</legend>
               ${WORKUP.map((w) => `<label>${esc(w.long || w.label)}<input name="w_${w.k}" placeholder="Result / remarks"></label>`).join('')}
             </fieldset>`}
@@ -349,7 +357,8 @@ const App = (() => {
               <a class="btn" href="${id ? '#/case/' + id : '#/'}">Cancel</a>
               ${id ? '<button class="btn danger right" type="button" id="del">Delete case</button>' : ''}
             </div>
-          </form>`;
+          </form>
+          ${datalist('dl-mode', MODES)}${datalist('dl-pg', Store.meta.pgs || [])}`;
       },
       mount(el) {
         const f = $('#case-form', el);
@@ -387,10 +396,45 @@ const App = (() => {
         $('#impl-fill', el).onclick = () => fill(true);
         hint();
 
-        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'scheme', 'comorbid', 'implants'];
-        f.onsubmit = (e) => {
+        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'scheme', 'comorbid', 'implants', 'mode', 'treatment', 'writtenBy'];
+
+        // Images picked before the case exists are held here and saved with it.
+        const pending = [];
+        const drawPending = () => {
+          const box = $('#pending-imgs', el);
+          if (!box) return;
+          box.innerHTML = pending.map((p, i) => `<div class="pthumb"><img src="${p.data}" alt=""><span>${esc(imageKind(p.kind).label)}</span><button type="button" class="icon" data-unpend="${i}" title="Remove">✕</button></div>`).join('');
+        };
+        f.addEventListener('change', async (e) => {
+          const kind = e.target.dataset.pending;
+          if (!kind) return;
+          const files = [...e.target.files];
+          e.target.value = '';
+          for (const file of files) {
+            try {
+              pending.push({ kind, data: await compressImage(file), name: file.name.replace(/\.[^.]+$/, '') });
+            } catch {
+              toast(`"${file.name}" couldn't be opened as an image. Use JPG or PNG (on iPhone: Settings → Camera → Formats → Most Compatible).`, 5000);
+            }
+          }
+          drawPending();
+        });
+        f.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-unpend]');
+          if (!b) return;
+          pending.splice(+b.dataset.unpend, 1);
+          drawPending();
+        });
+        const rememberPg = (name) => {
+          name = (name || '').trim().toUpperCase();
+          if (!name) return;
+          const pgs = [name, ...(Store.meta.pgs || []).filter((x) => x !== name)].slice(0, 15);
+          Store.setMeta({ pgs, lastPg: name });
+        };
+        f.onsubmit = async (e) => {
           e.preventDefault();
           const data = Object.fromEntries(BASIC.map((k) => [k, f.elements[k].value.trim()]));
+          rememberPg(data.writtenBy);
           if (id) {
             const before = Store.cases[id];
             const changed = BASIC.filter((k) => (before[k] || '') !== data[k]);
@@ -403,6 +447,11 @@ const App = (() => {
           const doc = { ...data, status: 'preop', work, pus: { organism: f.elements.pusOrganism.value.trim(), sensitive: f.elements.pusSensitive.value.trim() } };
           for (const [path, val] of Object.entries(readLabForm(f) || {})) setPath(doc, path, val);
           Store.create('cases', nid, doc);
+          if (pending.length) {
+            toast(`Saving ${pending.length} image(s)…`, 8000);
+            for (const p of pending) await Store.addImage(nid, p.kind, p.data, p.name);
+            toast('Saved');
+          }
           location.hash = '#/case/' + nid;
         };
         const del = $('#del', el);
@@ -575,6 +624,9 @@ const App = (() => {
               <dt>Level</dt><dd>${esc(c.level) || '—'}</dd>
               <dt>Implants</dt><dd class="pre">${esc(c.implants) || '—'}</dd>
               <dt>Scheme</dt><dd>${esc(c.scheme) || '—'}</dd>
+              ${c.mode ? `<dt>Mode</dt><dd>${esc(c.mode)}</dd>` : ''}
+              ${c.treatment ? `<dt>Treatment</dt><dd class="pre">${esc(c.treatment)}</dd>` : ''}
+              ${c.writtenBy ? `<dt>Case sheet</dt><dd>${esc(c.writtenBy)}</dd>` : ''}
             </dl>
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
@@ -649,12 +701,13 @@ const App = (() => {
             </form>
           </section>
 
-          ${images.length ? `<section class="card">
-            <h3>Imaging</h3>
+          <section class="card">
+            <h3>Radiographs & wound pictures</h3>
+            <div class="img-adders">${IMAGE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-upload="${k.k}" hidden></label>`).join('')}</div>
             <div class="gallery">
-              ${images.map((im) => `<button class="thumb" data-open="${im.id}"><img data-img="${im.id}" alt=""><span>${esc(im.kind.toUpperCase())}${im.caption ? ' · ' + esc(im.caption) : ''}</span></button>`).join('')}
+              ${caseImages(id).map((im) => `<button class="thumb" data-open="${im.id}"><img data-img="${im.id}" alt=""><span>${esc(imageKind(im.kind).label)}${im.caption ? ' · ' + esc(im.caption) : ''}</span></button>`).join('') || '<div class="muted small">None yet.</div>'}
             </div>
-          </section>` : ''}
+          </section>
           ${datalist('dl-depts', OPINION_DEPTS)}`;
       },
       mount(el) {
@@ -781,7 +834,7 @@ const App = (() => {
 
   // Full-screen image viewer. Without `kind` it walks every image of the
   // case in order X-ray → CT → MRI, oldest first within each.
-  const IMG_ORDER = ['xray', 'ct', 'mri'];
+  const IMG_ORDER = IMAGE_KINDS.map((k) => k.k);
   const caseImages = (caseId, kind) => listOf(Store.cases[caseId]?.images)
     .filter((i) => !kind || i.kind === kind)
     .sort((a, b) => IMG_ORDER.indexOf(a.kind) - IMG_ORDER.indexOf(b.kind) || (a.at || 0) - (b.at || 0));
@@ -814,7 +867,7 @@ const App = (() => {
       m.innerHTML = `
         <div class="viewer">
           <div class="viewer-bar">
-            <span><b>${esc(c?.name || '')}</b> · ${esc(im.kind === 'xray' ? 'X-RAY' : im.kind.toUpperCase())} · ${idx + 1} of ${all.length}${im.caption ? ' · ' + esc(im.caption) : ''}</span>
+            <span><b>${esc(c?.name || '')}</b> · ${esc(imageKind(im.kind).deck)} · ${idx + 1} of ${all.length}${im.caption ? ' · ' + esc(im.caption) : ''}</span>
             <span>
               <button class="btn small danger" data-v="del">Delete</button>
               <button class="btn small" data-v="close">Close</button>
@@ -825,7 +878,7 @@ const App = (() => {
             <img alt="">
             <button class="v-nav v-next" data-v="next" ${idx < all.length - 1 ? '' : 'disabled'} aria-label="Next image">›</button>
           </div>
-          <div class="viewer-strip">${all.map((x, i) => `<button class="v-dot${i === idx ? ' on' : ''}" data-go-img="${x.id}">${esc(x.kind === 'xray' ? 'X-ray' : x.kind.toUpperCase())} ${all.filter((y, j) => y.kind === x.kind && j <= i).length}</button>`).join('')}</div>
+          <div class="viewer-strip">${all.map((x, i) => `<button class="v-dot${i === idx ? ' on' : ''}" data-go-img="${x.id}">${esc(imageKind(x.kind).label)} ${all.filter((y, j) => y.kind === x.kind && j <= i).length}</button>`).join('')}</div>
         </div>`;
       $('img', m).src = (await Store.getImage(im.id)) || '';
       // Swipe on phones.
@@ -1087,6 +1140,285 @@ const App = (() => {
       $('#ot-go2', el).onclick = () => generate(true);
     },
   };
+
+  // ---------------------------------------------------------------- Admission deck
+  // Builds the unit's admission-day PowerPoint from the cases already in the
+  // app (details + radiographs + wound pictures), using the admission-deck
+  // tool's own slide engine so the slides look the same.
+  const deckImgs = new Map(); // image id -> { data, w, h, url }
+  const DECK_KEY = (date) => 'deck_' + date;
+
+  function deckCfg(date) {
+    return { cons: {}, extra: [], skip: [], order: [], split: {}, labels: {}, skipImg: {}, ...(Store.meta[DECK_KEY(date)] || {}) };
+  }
+  const saveDeckCfg = (date, cfg) => Store.setMeta({ [DECK_KEY(date)]: cfg });
+  const stripProf = (s) => String(s || '').replace(/^PROF\.?\s*/i, '');
+
+  function deckCases(date, cfg) {
+    const all = caseList();
+    const ids = new Set([...all.filter((c) => c.doa === date).map((c) => c.id), ...cfg.extra.filter((id) => Store.cases[id])]);
+    cfg.skip.forEach((id) => ids.delete(id));
+    const rank = (id) => { const i = cfg.order.indexOf(id); return i < 0 ? 1e9 : i; };
+    return [...ids].map((id) => ({ id, ...Store.cases[id] }))
+      .sort((a, b) => rank(a.id) - rank(b.id) || (a.createdAt || 0) - (b.createdAt || 0));
+  }
+
+  // Image slides for a case: one slide per image type with the pictures side
+  // by side, unless split into separate slides.
+  function deckSlides(c, cfg) {
+    const out = [];
+    for (const k of IMAGE_KINDS) {
+      const imgs = caseImages(c.id, k.k).filter((im) => !cfg.skipImg[im.id]);
+      if (!imgs.length) continue;
+      const key = c.id + ':' + k.k;
+      const label = cfg.labels[key] || k.deck;
+      if (cfg.split[key]) imgs.forEach((im) => out.push({ id: key + ':' + im.id, label, images: [im.id] }));
+      else out.push({ id: key, label, images: imgs.map((im) => im.id) });
+    }
+    return out;
+  }
+
+  function deckState(date, cfg) {
+    const m = Store.meta;
+    return {
+      unit: unitOf(m.unitId).id,
+      date,
+      professor: stripProf(cfg.professor ?? unitOf(m.unitId).chief),
+      daos: cfg.daos || '',
+      cons: cfg.cons,
+      cases: deckCases(date, cfg).map((c) => ({
+        id: c.id, status: c.deckStatus || '', name: c.name, ageSex: ageSex(c), mode: c.mode, diagnosis: c.diagnosis,
+        treatment: c.treatment, writtenBy: c.writtenBy, slides: deckSlides(c, cfg),
+      })),
+    };
+  }
+
+  async function loadDeckImages(st) {
+    const ids = st.cases.flatMap((c) => c.slides.flatMap((s) => s.images)).filter((id) => !deckImgs.has(id));
+    for (const id of ids) {
+      const data = await Store.getImage(id);
+      if (!data) continue;
+      const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = data; });
+      if (img) deckImgs.set(id, { data, w: img.naturalWidth, h: img.naturalHeight, url: data });
+    }
+    return ids.length > 0;
+  }
+
+  function countCons(st) {
+    const cs = st.cases;
+    const S = DeckEngine.caseStatus;
+    const n = (re) => { const x = cs.filter((c) => re.test(DeckEngine.up(c.mode))).length; return x ? String(x) : ''; };
+    const st1 = (v) => cs.filter((c) => S(c) === v).length;
+    const nil = (x) => (x ? String(x) : 'NIL');
+    const op = st1('OPERATED');
+    return {
+      admissions: String(cs.length), major: String(op), minor: String(cs.length - op),
+      deaths: st.cons.deaths || 'NIL', ama: nil(st1('AMA')), abscond: nil(st1('ABSCOND')), transfer: nil(st1('NEUROSURGERY T/O')),
+      rta: n(/RTA/), tta: n(/TTA/), fall: n(/FALL/), assault: n(/ASSAULT/), accidental: n(/ACCIDENT/),
+      self: n(/SELF/), electro: n(/ELECTR/), nmlc: n(/^\s*NMLC/),
+    };
+  }
+
+  const CONS_UI = { admissions: 'Total admissions', major: 'Major procedures', minor: 'Minor procedures', deaths: 'Deaths', ama: 'AMA',
+    abscond: 'Abscond', transfer: 'Transfer out to NS', rta: 'RTA', tta: 'TTA', fall: 'Fall injuries', assault: 'Assault',
+    accidental: 'Accidental injury', self: 'Self inflicted', electro: 'Electrocution', nmlc: 'NMLC' };
+
+  const Deck = {
+    live: false,
+    date: null,
+    showPreview: false,
+    render() {
+      const date = Deck.date ||= todayISO();
+      const cfg = deckCfg(date);
+      const st = deckState(date, cfg);
+      const chiefs = [...new Set(allUnits().map((u) => stripProf(u.chief)))];
+      const aps = [...new Set(allUnits().flatMap((u) => u.aps))];
+      const others = caseList().filter((c) => !st.cases.some((x) => x.id === c.id) && isActive(c)).sort(byWard);
+      const thumbs = (c, k) => caseImages(c.id, k.k).map((im) => `
+        <label class="dthumb${cfg.skipImg[im.id] ? ' off' : ''}"><img data-img="${im.id}" alt="">
+          <input type="checkbox" data-skipimg="${im.id}" ${cfg.skipImg[im.id] ? '' : 'checked'} aria-label="Include in deck"></label>`).join('');
+      return `
+        <div class="toolbar">
+          <h2>Admission-day deck</h2>
+          <button class="btn primary" id="deck-dl" ${st.cases.length ? '' : 'disabled'}>Download PowerPoint</button>
+        </div>
+        <div class="card form">
+          <fieldset><legend>Title slide</legend>
+            <label>Date<input type="date" id="deck-date" value="${esc(date)}"></label>
+            <label>Unit<input value="UNIT ${esc(st.unit)}" disabled></label>
+            <label class="span2">Professor<input id="deck-prof" list="dl-chiefs" value="${esc(st.professor)}"></label>
+            <label class="span2">DAOS<input id="deck-daos" list="dl-aps" value="${esc(st.daos)}" placeholder="DR. NAME MS ORTHO"></label>
+          </fieldset>
+        </div>
+
+        <div class="card">
+          <div class="row-between"><h3>Cases (${st.cases.length})</h3>
+            <span class="muted small">Admitted on ${esc(fmtDate(date))}${cfg.extra.length ? ' + added' : ''}</span></div>
+          ${st.cases.map((c, i) => {
+            const cc = Store.cases[c.id];
+            return `
+            <div class="deck-case" data-dcase="${c.id}">
+              <div class="row-between">
+                <b>Case ${i + 1} · ${esc(c.name)} <span class="muted">${esc(c.ageSex)}</span></b>
+                <span class="nowrap">
+                  <button class="icon" data-dmove="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
+                  <button class="icon" data-dmove="1" ${i < st.cases.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
+                  <button class="icon" data-dskip title="Leave out of this deck">✕</button>
+                </span>
+              </div>
+              <div class="deck-fields">
+                <label>Status<select data-cf="deckStatus"><option value="">No status</option>${opts(DeckEngine.STATUSES, cc.deckStatus || '')}</select></label>
+                <label>Mode<input data-cf="mode" list="dl-mode" value="${esc(cc.mode)}" placeholder="MLC/RTA"></label>
+                <label class="span2">Diagnosis<textarea data-cf="diagnosis" rows="2">${esc(cc.diagnosis)}</textarea></label>
+                <label class="span2">Treatment <span class="hint">one item per line</span><textarea data-cf="treatment" rows="3" placeholder="${esc(cc.plan || '')}">${esc(cc.treatment)}</textarea></label>
+                <label class="span2">Case sheet written by<input data-cf="writtenBy" list="dl-pg" value="${esc(cc.writtenBy)}"></label>
+              </div>
+              ${IMAGE_KINDS.filter((k) => caseImages(c.id, k.k).length).map((k) => {
+                const key = c.id + ':' + k.k;
+                return `<div class="deck-imgs">
+                  <div class="row-between"><input class="deck-label" data-dlabel="${key}" value="${esc(cfg.labels[key] || k.deck)}" aria-label="Slide title">
+                    <label class="small nowrap"><input type="checkbox" data-dsplit="${key}" ${cfg.split[key] ? 'checked' : ''}> separate slides</label></div>
+                  <div class="dthumbs">${thumbs(c, k)}</div></div>`;
+              }).join('') || `<p class="muted small">No radiographs or wound pictures. <a href="#/case/${c.id}">Add on the case page</a>.</p>`}
+            </div>`;
+          }).join('') || '<div class="empty">No cases admitted on this date. Pick another date or add a case below.</div>'}
+          ${others.length ? `<div class="inline-add"><select id="deck-add"><option value="">+ Add another case to this deck…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select></div>` : ''}
+          ${cfg.skip.length ? `<p class="small"><button class="link" id="deck-unskip">Bring back ${cfg.skip.length} left-out case(s)</button></p>` : ''}
+        </div>
+
+        <div class="card">
+          <div class="row-between"><h3>Consolidation</h3><button class="btn small" id="deck-count">Count from cases</button></div>
+          <div class="cons-grid">
+            ${[DeckEngine.CONS_LEFT, DeckEngine.CONS_RIGHT].map((col) => `<div>${col.map(([k]) => `<label class="cons-row">${CONS_UI[k]}<input data-cons="${k}" value="${esc(cfg.cons[k] ?? '')}"></label>`).join('')}</div>`).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row-between"><h3>Slides</h3><button class="btn small" id="deck-pv">${Deck.showPreview ? 'Hide preview' : 'Show preview'}</button></div>
+          <div id="deck-previews" class="deck-previews"${Deck.showPreview ? '' : ' hidden'}></div>
+        </div>
+        ${datalist('dl-chiefs', chiefs)}${datalist('dl-aps', aps)}${datalist('dl-mode', MODES)}${datalist('dl-pg', Store.meta.pgs || [])}`;
+    },
+    mount(el) {
+      const date = Deck.date;
+      const cfg = deckCfg(date);
+      const save = (fn, rerender = true) => { fn(cfg); saveDeckCfg(date, cfg); if (rerender) render(); else drawPreview(); };
+      $$('img[data-img]', el).forEach((img) => Store.getImage(img.dataset.img).then((src) => { if (src) img.src = src; }));
+
+      const drawPreview = async () => {
+        const box = $('#deck-previews', el);
+        if (!box || box.hidden) return;
+        const st = deckState(date, deckCfg(date));
+        const paint = () => {
+          const models = DeckEngine.buildModels(st, Object.fromEntries(deckImgs));
+          let n = 0;
+          box.innerHTML = models.filter((m) => !(m.kind === 'image' && !m.imgs.length)).map((m) => `
+            <div class="pslide"><div class="meta"><b>Slide ${++n}</b></div><div class="slide">${DeckEngine.slideHTML(m)}</div></div>`).join('');
+        };
+        paint();
+        if (await loadDeckImages(st)) paint();
+      };
+      drawPreview();
+
+      $('#deck-date', el).onchange = (e) => { Deck.date = e.target.value || todayISO(); render(); };
+      $('#deck-prof', el).onchange = (e) => save((x) => { x.professor = e.target.value.trim().toUpperCase(); }, false);
+      $('#deck-daos', el).onchange = (e) => save((x) => { x.daos = e.target.value.trim().toUpperCase(); }, false);
+      $('#deck-pv', el).onclick = () => { Deck.showPreview = !Deck.showPreview; render(); };
+      $('#deck-count', el).onclick = () => save((x) => { x.cons = countCons(deckState(date, x)); });
+      const add = $('#deck-add', el);
+      if (add) add.onchange = () => save((x) => { x.extra = [...new Set([...x.extra, add.value])]; x.skip = x.skip.filter((i) => i !== add.value); });
+      const uns = $('#deck-unskip', el);
+      if (uns) uns.onclick = () => save((x) => { x.skip = []; });
+
+      el.addEventListener('change', (e) => {
+        const t = e.target;
+        const cid = t.closest('[data-dcase]')?.dataset.dcase;
+        if (t.dataset.cf && cid) {
+          const v = t.value.trim();
+          Store.patch('cases', cid, { [t.dataset.cf]: v });
+          if (t.dataset.cf === 'deckStatus') render(); else drawPreview();
+        } else if (t.dataset.skipimg) {
+          save((x) => { if (t.checked) delete x.skipImg[t.dataset.skipimg]; else x.skipImg[t.dataset.skipimg] = true; }, false);
+          t.closest('.dthumb').classList.toggle('off', !t.checked);
+        } else if (t.dataset.dsplit) {
+          save((x) => { x.split[t.dataset.dsplit] = t.checked; }, false);
+        } else if (t.dataset.dlabel) {
+          save((x) => { x.labels[t.dataset.dlabel] = t.value.trim().toUpperCase(); }, false);
+        } else if (t.dataset.cons) {
+          save((x) => { x.cons[t.dataset.cons] = t.value.trim().toUpperCase(); }, false);
+        }
+      });
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        const cid = b?.closest('[data-dcase]')?.dataset.dcase;
+        if (!b || !cid) return;
+        if (b.dataset.dmove) {
+          save((x) => {
+            const ids = deckCases(date, x).map((c) => c.id);
+            const i = ids.indexOf(cid);
+            const j = i + Number(b.dataset.dmove);
+            [ids[i], ids[j]] = [ids[j], ids[i]];
+            x.order = ids;
+          });
+        } else if (b.dataset.dskip !== undefined) {
+          save((x) => { x.skip = [...new Set([...x.skip, cid])]; x.extra = x.extra.filter((i) => i !== cid); });
+        }
+      });
+
+      $('#deck-dl', el).onclick = async (e) => {
+        const btn = e.currentTarget;
+        document.activeElement?.blur();
+        btn.disabled = true;
+        btn.textContent = 'Building…';
+        try {
+          const st = deckState(date, deckCfg(date));
+          await loadDeckImages(st);
+          const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
+          const blob = await pres.write({ outputType: 'blob' });
+          const name = `ORTHO_UNIT_${st.unit}_${fmtDate(date).replace(/\//g, '_')}.pptx`;
+          const file = new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+          offerFile(file);
+        } catch (err) {
+          console.error(err);
+          toast('Could not build the PowerPoint: ' + err.message, 5000);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Download PowerPoint';
+        }
+      };
+    },
+  };
+
+  // Phones need a fresh tap for Save / Share, so ask in a small sheet.
+  function offerFile(file) {
+    const saveIt = () => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(file);
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+    };
+    const canShare = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch { return false; } })();
+    if (!matchMedia('(pointer: coarse)').matches) {
+      saveIt();
+      toast('Downloaded ' + file.name);
+      return;
+    }
+    const m = $('#modal');
+    m.innerHTML = `<div class="sheet card"><h3>PowerPoint is ready</h3><p class="muted small">${esc(file.name)} (${(file.size / 1048576).toFixed(1)} MB)</p>
+      <div class="actions"><button class="btn primary" data-f="save">Save to device</button>${canShare ? '<button class="btn" data-f="share">Share (WhatsApp, Drive, Files…)</button>' : ''}<button class="btn" data-f="close">Close</button></div></div>`;
+    m.classList.add('sheet-wrap');
+    m.hidden = false;
+    const close = () => { m.hidden = true; m.classList.remove('sheet-wrap'); m.innerHTML = ''; };
+    m.onclick = async (e) => {
+      const f = e.target.closest('[data-f]')?.dataset.f;
+      if (f === 'save') saveIt();
+      if (f === 'share') { try { await navigator.share({ files: [file], title: file.name }); close(); } catch (err) { if (err.name !== 'AbortError') toast('Sharing did not work here. Try Save to device.'); } }
+      if (f === 'close' || e.target === m) close();
+    };
+  }
 
   // ---------------------------------------------------------------- Discharge
   function investigationsText(c) {
@@ -1643,6 +1975,7 @@ const App = (() => {
     [/^#\/ot(\/list)?$/, () => OT],
     [/^#\/discharge\/(\w+)$/, (id) => Discharge(id)],
     [/^#\/(settings|implants)$/, () => Settings],
+    [/^#\/deck$/, () => Deck],
   ];
 
   function resolve() {
@@ -1656,7 +1989,7 @@ const App = (() => {
   }
 
   function section() {
-    const m = (location.hash || '#/').match(/^#\/(ward|ot|settings)\b/);
+    const m = (location.hash || '#/').match(/^#\/(ward|ot|deck|settings)\b/);
     return m ? '#/' + m[1] : '#/';
   }
 

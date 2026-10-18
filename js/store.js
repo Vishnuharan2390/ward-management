@@ -342,7 +342,10 @@ const Store = (() => {
     get levels() { return state.levels; },
     get meta() { return { ...DEFAULT_META, ...(state.meta.main || {}) }; },
     get members() { return state.members; },
-    setMeta: (changes) => (state.meta.main ? patch('meta', 'main', changes) : create('meta', 'main', changes)),
+    setMeta: (changes) => {
+      if (!state.meta.main) create('meta', 'main', {});
+      return patch('meta', 'main', changes);
+    },
     who, isOwner, profile, setProfile, signIn,
     signInEmail, signUpEmail, resendVerification, resetPassword, recheckVerified,
     localCaseCount: () => Object.keys(localLeftovers().cases).length,

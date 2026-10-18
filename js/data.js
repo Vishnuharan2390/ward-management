@@ -86,6 +86,18 @@ const WORKUP = [
   { k: 'anaes', label: 'PAC', long: 'Anaesthesia assessment (PAC)' },
 ];
 
+// Image types. `deck` is the slide title used in the admission-day deck.
+const IMAGE_KINDS = [
+  { k: 'xray', label: 'X-ray', deck: 'X-RAY' },
+  { k: 'ct', label: 'CT', deck: 'CT' },
+  { k: 'mri', label: 'MRI', deck: 'MRI' },
+  { k: 'wound', label: 'Wound pic', deck: 'WOUND PIC' },
+];
+const imageKind = (k) => IMAGE_KINDS.find((x) => x.k === k) || { k, label: k, deck: String(k).toUpperCase() };
+
+// Admission-day deck (same lists as the unit's admission-deck tool).
+const MODES = ['MLC/RTA', 'MLC/OLD RTA', 'MLC/TTA', 'NMLC/FALL', 'MLC/FALL FROM HEIGHT', 'MLC/ASSAULT', 'NMLC/ACCIDENTAL INJURY', 'MLC/WORKSPOT INJURY', 'MLC/SELF INFLICTED', 'MLC/ELECTROCUTION'];
+
 const OPINION_DEPTS = [
   'General Medicine', 'Cardiology', 'Pulmonology', 'Nephrology', 'Neurology',
   'Endocrinology', 'Diabetology', 'ENT', 'Dental', 'Psychiatry',
