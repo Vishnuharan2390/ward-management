@@ -483,3 +483,14 @@ a.btn[aria-disabled="true"] { opacity: .45; }
 .gate-or::before, .gate-or::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .actions.center { justify-content: center; }
 .notice { background: var(--warn-bg); color: var(--ink); border-radius: var(--radius); padding: .6rem .75rem; }
+
+/* Hide / add back in the OT picker */
+.hide-btn { color: var(--muted); }
+.hidden-cases { margin-top: .75rem; }
+.hidden-cases summary { cursor: pointer; color: var(--brand); font-weight: 600; padding: .3rem 0; }
+.hidden-cases ul { list-style: none; margin: .4rem 0 0; padding: 0; }
+.hidden-cases li { display: flex; justify-content: space-between; align-items: center; gap: .5rem; padding: .45rem 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 640px) {
+  .picker tr[data-row] { grid-template-columns: 30px 1fr auto auto; grid-template-areas: "cb name age hide" "cb dx dx dx" "cb plan plan plan" "cb doa img img"; }
+  .picker td:nth-child(8) { grid-area: hide; }
+}

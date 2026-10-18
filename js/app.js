@@ -579,6 +579,7 @@ const App = (() => {
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
+              <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
             </div>
           </div>
 
@@ -676,6 +677,11 @@ const App = (() => {
           }
         });
         $('#add-set', el).onclick = () => openLabModal(id);
+        $('#ot-toggle', el).onclick = () => {
+          const hide = !Store.cases[id].otHidden;
+          Store.patch('cases', id, { otHidden: hide });
+          toast(hide ? 'Hidden from the OT list builder' : 'Back in the OT list builder');
+        };
 
         el.addEventListener('change', async (e) => {
           const t = e.target;
@@ -877,7 +883,8 @@ const App = (() => {
     render() {
       const d = otDraft();
       d.selected = d.selected.filter((id) => Store.cases[id]);
-      const pool = caseList().filter((c) => OT.showAll || d.selected.includes(c.id) || isActive(c)).sort(byWard);
+      const pool = caseList().filter((c) => !c.otHidden && (OT.showAll || d.selected.includes(c.id) || isActive(c))).sort(byWard);
+      const hidden = caseList().filter((c) => c.otHidden && (OT.showAll || isActive(c))).sort(byWard);
       const sel = d.selected.map((id) => ({ id, ...Store.cases[id] }));
       // Selected unit's staff first, then everyone else.
       const unitFirst = [unitOf(d.unitId), ...allUnits().filter((u) => u.id !== d.unitId)];
@@ -894,7 +901,7 @@ const App = (() => {
             <label class="small nowrap"><input type="checkbox" id="ot-all" ${OT.showAll ? 'checked' : ''}> show all statuses</label></div>
           <div class="table-wrap">
             <table class="board picker">
-              <thead><tr><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Radiographs</th></tr></thead>
+              <thead><tr><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Radiographs</th><th></th></tr></thead>
               <tbody>
                 ${pool.map((c) => {
                   const n = listOf(c.images).length;
@@ -904,11 +911,18 @@ const App = (() => {
                   <td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
                   <td class="nowrap">${esc(fmtDate(c.doa))}</td>
                   <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
+                  <td><button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button></td>
                 </tr>`;
-                }).join('') || '<tr><td colspan="7" class="empty">No pre-op cases.</td></tr>'}
+                }).join('') || `<tr><td colspan="8" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
               </tbody>
             </table>
           </div>
+          ${hidden.length ? `
+          <details class="hidden-cases"${OT.openHidden ? ' open' : ''}>
+            <summary>Hidden from OT list (${hidden.length})</summary>
+            <ul>${hidden.map((c) => `<li><span><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))} · ${esc(c.diagnosis)}</span></span>
+              <button class="btn small" data-ot-show="${c.id}">Add back</button></li>`).join('')}</ul>
+          </details>` : ''}
         </div>
         <div class="form-actions"><a class="btn primary" href="#/ot/list" ${sel.length ? '' : 'aria-disabled="true"'}>Next (${sel.length} selected) →</a></div>`;
       }
@@ -994,6 +1008,23 @@ const App = (() => {
       });
 
       el.addEventListener('click', (e) => {
+        const hideB = e.target.closest('[data-ot-hide]');
+        if (hideB) {
+          const cid = hideB.dataset.otHide;
+          d.selected = d.selected.filter((i) => i !== cid);
+          saveDraft(d);
+          Store.patch('cases', cid, { otHidden: true });
+          render();
+          toast('Hidden — find it under “Hidden from OT list” at the bottom');
+          return;
+        }
+        const showB = e.target.closest('[data-ot-show]');
+        if (showB) {
+          OT.openHidden = true;
+          Store.patch('cases', showB.dataset.otShow, { otHidden: false });
+          render();
+          return;
+        }
         const img = e.target.closest('[data-imaging]');
         if (img) {
           e.preventDefault();
