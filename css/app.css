@@ -561,3 +561,5 @@ a.btn[aria-disabled="true"] { opacity: .45; }
 .dc-imgs .kindbox.missing b { color: var(--red); }
 .dc-imgs .mini { display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: .3rem; }
 .dc-imgs .mini img { width: 48px; height: 40px; object-fit: cover; border-radius: 3px; background: #000; }
+.deck-add-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-top: .5rem; }
+.deck-add-row select { flex: 1; min-width: 200px; width: auto; }

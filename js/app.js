@@ -293,14 +293,15 @@ const App = (() => {
   };
 
   // ---------------------------------------------------------------- Case form
-  function CaseForm(id) {
+  // `deckDate`: opened from the admission day PPT — preset the DOA and go back there after saving.
+  function CaseForm(id, deckDate) {
     return {
       live: false,
       render() {
-        const c = id ? Store.cases[id] : { doa: todayISO() };
+        const c = id ? Store.cases[id] : { doa: deckDate || todayISO() };
         if (!c) return notFound();
         return `
-          <h2>${id ? 'Edit case' : 'New case'}</h2>
+          <h2>${id ? 'Edit case' : 'New case'}${deckDate ? ` <span class="muted small">for the admission day PPT of ${esc(fmtDate(deckDate))}</span>` : ''}</h2>
           <nav class="chips jump" aria-label="Sections">
             <a class="chip" href="#sec-patient" data-jump>Patient</a>
             <a class="chip" href="#sec-plan" data-jump>Diagnosis & plan</a>
@@ -354,7 +355,7 @@ const App = (() => {
             </fieldset>`}
             <div class="form-actions">
               <button class="btn primary" type="submit">${id ? 'Save' : 'Add case'}</button>
-              <a class="btn" href="${id ? '#/case/' + id : '#/'}">Cancel</a>
+              <a class="btn" href="${id ? '#/case/' + id : deckDate ? '#/deck' : '#/'}">Cancel</a>
               ${id ? '<button class="btn danger right" type="button" id="del">Delete case</button>' : ''}
             </div>
           </form>
@@ -451,6 +452,11 @@ const App = (() => {
             toast(`Saving ${pending.length} image(s)…`, 8000);
             for (const p of pending) await Store.addImage(nid, p.kind, p.data, p.name);
             toast('Saved');
+          }
+          if (deckDate) {
+            Deck.date = f.elements.doa.value || deckDate;
+            location.hash = '#/deck';
+            return;
           }
           location.hash = '#/case/' + nid;
         };
@@ -1233,13 +1239,14 @@ const App = (() => {
       const st = deckState(date, cfg);
       const chiefs = [...new Set(allUnits().map((u) => stripProf(u.chief)))];
       const aps = [...new Set(allUnits().flatMap((u) => u.aps))];
-      const others = caseList().filter((c) => !st.cases.some((x) => x.id === c.id) && isActive(c)).sort(byWard);
+      const others = caseList().filter((c) => !st.cases.some((x) => x.id === c.id))
+        .sort((a, b) => (b.doa || '').localeCompare(a.doa || '') || (a.name || '').localeCompare(b.name || ''));
       const thumbs = (c, k) => caseImages(c.id, k.k).map((im) => `
         <label class="dthumb${cfg.skipImg[im.id] ? ' off' : ''}"><img data-img="${im.id}" alt="">
           <input type="checkbox" data-skipimg="${im.id}" ${cfg.skipImg[im.id] ? '' : 'checked'} aria-label="Include in deck"></label>`).join('');
       return `
         <div class="toolbar">
-          <h2>Admission-day deck</h2>
+          <h2>Admission day PPT</h2>
           <button class="btn primary" id="deck-dl" ${st.cases.length ? '' : 'disabled'}>Download PowerPoint</button>
         </div>
         <div class="card form">
@@ -1256,6 +1263,7 @@ const App = (() => {
             <span class="muted small">Admitted on ${esc(fmtDate(date))}${cfg.extra.length ? ' + added' : ''}</span></div>
           ${st.cases.map((c, i) => {
             const cc = Store.cases[c.id];
+            if (!cc) return '';
             return `
             <div class="deck-case" data-dcase="${c.id}">
               <div class="row-between">
@@ -1281,8 +1289,11 @@ const App = (() => {
                   <div class="dthumbs">${thumbs(c, k)}</div></div>`;
               }).join('') || `<p class="muted small">No radiographs or wound pictures. <a href="#/case/${c.id}">Add on the case page</a>.</p>`}
             </div>`;
-          }).join('') || '<div class="empty">No cases admitted on this date. Pick another date or add a case below.</div>'}
-          ${others.length ? `<div class="inline-add"><select id="deck-add"><option value="">+ Add another case to this deck…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select></div>` : ''}
+          }).join('') || '<div class="empty">No cases admitted on this date yet. Tap “+ Add new case” below.</div>'}
+          <div class="deck-add-row">
+            <a class="btn primary" href="#/new/deck/${esc(date)}">+ Add new case</a>
+            ${others.length ? `<select id="deck-add" aria-label="Add an existing case"><option value="">or add an existing case…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select>` : ''}
+          </div>
           ${cfg.skip.length ? `<p class="small"><button class="link" id="deck-unskip">Bring back ${cfg.skip.length} left-out case(s)</button></p>` : ''}
         </div>
 
@@ -2093,6 +2104,7 @@ const App = (() => {
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
     [/^#\/new$/, () => CaseForm()],
+    [/^#\/new\/deck\/([\d-]+)$/, (d) => CaseForm(null, d)],
     [/^#\/case\/(\w+)$/, (id) => CaseDetail(id)],
     [/^#\/case\/(\w+)\/edit$/, (id) => CaseForm(id)],
     [/^#\/ot(\/list)?$/, () => OT],
