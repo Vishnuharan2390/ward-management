@@ -538,3 +538,26 @@ a.btn[aria-disabled="true"] { opacity: .45; }
 .slide .noimg{border:2px dashed #B9C2CA;display:flex;align-items:center;justify-content:center;color:#8592A0;font-family:var(--font);font-size:2.2cqw;text-align:center;padding:2cqw}
 .slide .lbl-chip{border:0;border-radius:0;background:rgba(0,0,0,.65);color:#fff;padding:0 .45cqw;display:flex;align-items:center;font-weight:300;cursor:inherit;white-space:nowrap}
 .slide .plain{display:flex;align-items:center;white-space:nowrap;padding:0 .45cqw}
+
+/* Radiographs PDF */
+.ip-page { page-break-after: always; break-after: page; display: flex; flex-direction: column; height: 272mm; }
+.ip-page:last-child { page-break-after: auto; break-after: auto; }
+.ip-strip { border-bottom: 1.5px solid #000; padding-bottom: 4pt; font-size: 10.5pt; line-height: 1.35; }
+.ip-title { font: bold 16pt "Times New Roman", serif; text-decoration: underline; text-align: center; margin: 8pt 0; }
+.ip-imgs { flex: 1; display: flex; gap: 4mm; align-items: center; justify-content: center; min-height: 0; }
+.ip-imgs img { max-height: 225mm; max-width: 100%; object-fit: contain; min-width: 0; }
+.ip-imgs.n2 img { max-width: calc(50% - 2mm); }
+.ip-imgs.n3 img { max-width: calc(33.3% - 3mm); }
+/* Discharge helpers */
+.drug-btns { display: flex; flex-wrap: wrap; gap: .35rem; }
+.drug-btns .chip { font-size: .78rem; }
+.drug-btns .chip.suggest { border-color: var(--red); color: var(--red); }
+.dc-out { display: grid; gap: .75rem; }
+.dc-out .out-row { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; justify-content: space-between; border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem; }
+.dc-out .out-row > div { flex: 1; min-width: 200px; }
+.dc-imgs { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dc-imgs .kindbox { border: 1px solid var(--line); border-radius: 6px; padding: .4rem; min-width: 140px; }
+.dc-imgs .kindbox b { font-size: .8rem; display: block; margin-bottom: .25rem; }
+.dc-imgs .kindbox.missing b { color: var(--red); }
+.dc-imgs .mini { display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: .3rem; }
+.dc-imgs .mini img { width: 48px; height: 40px; object-fit: cover; border-radius: 3px; background: #000; }

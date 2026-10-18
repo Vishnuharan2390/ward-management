@@ -346,7 +346,7 @@ const App = (() => {
             </fieldset>
             <fieldset class="card" id="sec-img"><legend>Radiographs & wound pictures</legend>
               <p class="span2 muted small">Uploaded once here — they appear on the case page, in the OT list viewer and in the admission-day deck.</p>
-              <div class="span2 img-adders">${IMAGE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-pending="${k.k}" hidden></label>`).join('')}</div>
+              <div class="span2 img-adders">${ADMISSION_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-pending="${k.k}" hidden></label>`).join('')}</div>
               <div class="span2 pending-imgs" id="pending-imgs"></div>
             </fieldset>
             <fieldset class="card" id="sec-work"><legend>Work-up</legend>
@@ -1167,7 +1167,7 @@ const App = (() => {
   // by side, unless split into separate slides.
   function deckSlides(c, cfg) {
     const out = [];
-    for (const k of IMAGE_KINDS) {
+    for (const k of ADMISSION_KINDS) {
       const imgs = caseImages(c.id, k.k).filter((im) => !cfg.skipImg[im.id]);
       if (!imgs.length) continue;
       const key = c.id + ':' + k.k;
@@ -1273,7 +1273,7 @@ const App = (() => {
                 <label class="span2">Treatment <span class="hint">one item per line</span><textarea data-cf="treatment" rows="3" placeholder="${esc(cc.plan || '')}">${esc(cc.treatment)}</textarea></label>
                 <label class="span2">Case sheet written by<input data-cf="writtenBy" list="dl-pg" value="${esc(cc.writtenBy)}"></label>
               </div>
-              ${IMAGE_KINDS.filter((k) => caseImages(c.id, k.k).length).map((k) => {
+              ${ADMISSION_KINDS.filter((k) => caseImages(c.id, k.k).length).map((k) => {
                 const key = c.id + ':' + k.k;
                 return `<div class="deck-imgs">
                   <div class="row-between"><input class="deck-label" data-dlabel="${key}" value="${esc(cfg.labels[key] || k.deck)}" aria-label="Slide title">
@@ -1440,6 +1440,20 @@ const App = (() => {
     return lines.join('\n');
   }
 
+  // Kinds used for the discharge files, in slide/page order.
+  const DC_KINDS = ['wound', 'xray', 'poxray', 'powound'];
+  function dcImgsHTML(id) {
+    return DC_KINDS.map((k) => {
+      const kind = imageKind(k);
+      const imgs = caseImages(id, k);
+      const pre = k === 'xray' ? 'Pre-op X-ray' : k === 'wound' ? 'Pre-op wound pic' : kind.label;
+      return `<div class="kindbox${imgs.length ? '' : ' missing'}"><b>${esc(pre)} (${imgs.length})</b>
+        <div class="mini">${imgs.map((im) => `<img data-img="${im.id}" alt="">`).join('')}</div>
+        <label class="btn small">+ Add<input type="file" accept="image/*" multiple data-dcup="${k}" hidden></label></div>`;
+    }).join('');
+  }
+  const loadThumbs = (root) => $$('img[data-img]', root).forEach((img) => Store.getImage(img.dataset.img).then((src) => { if (src) img.src = src; }));
+
   function Discharge(id) {
     // [key, label, rows, helper button]
     const FIELDS = [
@@ -1477,12 +1491,19 @@ const App = (() => {
           procedure: c.plan,
           past: pastTemplate(c),
           exam: EXAM_TEMPLATE,
+          treatment: [...DRUGS_ALL, ...(isSpinePelvis(c) ? DRUGS_SPINE_PELVIS : [])].join('\n'),
           condition: 'PATIENT VITALS STABLE',
           ...(c.discharge || {}),
         };
         if (d.disposition === 'lama') d.disposition = 'ama';
         if (!d.course) d.course = courseTemplate(c, d);
-        const field = ([k, l, rows, btn]) => `<label class="span2">${l}${btn ? ` <button type="button" class="link small" data-tpl="${btn[0]}">${btn[1]}</button>` : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>`;
+        const sp = isSpinePelvis(c);
+        const drugBtns = `<div class="span2 drug-btns">
+            <button type="button" class="chip" data-drugset="all">+ All-case drugs</button>
+            <button type="button" class="chip${sp ? ' suggest' : ''}" data-drugset="spine">+ Spine / pelvis set${sp ? ' (suggested)' : ''}</button>
+          </div>
+          <div class="span2 drug-btns"><span class="muted small">Antibiotics:</span>${ANTIBIOTICS.map((a, i) => `<button type="button" class="chip" data-abx="${i}">+ ${esc(a)}</button>`).join('')}</div>`;
+        const field = ([k, l, rows, btn]) => `<label class="span2">${l}${btn ? ` <button type="button" class="link small" data-tpl="${btn[0]}">${btn[1]}</button>` : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>${k === 'treatment' ? drugBtns : ''}`;
         return `
           <h2>Discharge / transfer — ${esc(c.name)} <span class="muted small">${esc(ageSex(c))} · IP ${esc(c.ipNo)}</span></h2>
           <form id="dc-form" class="card form" autocomplete="off">
@@ -1523,7 +1544,21 @@ const App = (() => {
               <a class="btn" href="#/case/${id}">Back</a>
             </div>
             <label class="small"><input type="checkbox" id="dc-status" checked> Update case status (Transfer → Post-op, others → Discharged)</label>
-          </form>`;
+          </form>
+
+          <div class="card">
+            <h3>Discharge files</h3>
+            <div class="dc-imgs" id="dc-imgs">${dcImgsHTML(id)}</div>
+            <div class="dc-out">
+              <div class="out-row"><div><b>1 · Discharge summary PDF</b><div class="muted small">The summary above, in the unit's format.</div></div>
+                <button type="button" class="btn primary" id="out-summary">Generate PDF</button></div>
+              <div class="out-row"><div><b>2 · Radiographs PDF</b><div class="muted small">Pre-op X-ray, post-op X-ray and post-op wound pic, one page each.</div></div>
+                <button type="button" class="btn primary" id="out-imgs">Generate PDF</button></div>
+              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Discharge summary slide, then pre-op X-ray and post-op X-ray.</div>
+                <label class="small"><input type="checkbox" id="ppt-wound" ${isCompound(c) ? 'checked' : ''}> Include pre-op wound pic${isCompound(c) ? ' (compound fracture)' : ''}</label></div>
+                <button type="button" class="btn primary" id="out-ppt">Download PowerPoint</button></div>
+            </div>
+          </div>`;
       },
       mount(el) {
         const f = $('#dc-form', el);
@@ -1542,7 +1577,14 @@ const App = (() => {
           const hit = Object.values(DISPOSITIONS).map((x) => x.course).find((x) => course.value.trim().endsWith(x));
           if (hit) course.value = course.value.trim().slice(0, -hit.length) + DISPOSITIONS[e.target.value].course;
         });
+        loadThumbs(el);
         f.addEventListener('click', (e) => {
+          const ds = e.target.closest('[data-drugset],[data-abx]');
+          if (ds) {
+            const lines = ds.dataset.abx !== undefined ? [ANTIBIOTICS[ds.dataset.abx]] : ds.dataset.drugset === 'spine' ? DRUGS_SPINE_PELVIS : DRUGS_ALL;
+            lines.forEach((l) => addLine('treatment', l));
+            return;
+          }
           const t = e.target.closest('[data-tpl],[data-phrase]');
           if (!t) return;
           if (t.dataset.phrase) {
@@ -1578,6 +1620,87 @@ const App = (() => {
             if (c().status !== st) Store.patch('cases', id, { status: st });
           }
           Print.discharge(c(), d, Store.meta);
+        };
+        $('#out-summary', el).onclick = () => f.requestSubmit();
+
+        // Post-op pictures can be added right here.
+        el.addEventListener('change', async (e) => {
+          const k = e.target.dataset.dcup;
+          if (!k) return;
+          const files = [...e.target.files];
+          e.target.value = '';
+          for (const file of files) {
+            try {
+              toast(`Uploading ${file.name}…`, 6000);
+              await Store.addImage(id, k, await compressImage(file), file.name.replace(/\.[^.]+$/, ''));
+            } catch (err) {
+              toast('Upload failed: ' + (err.code || err.message), 5000);
+            }
+          }
+          toast('Uploaded');
+          $('#dc-imgs', el).innerHTML = dcImgsHTML(id);
+          loadThumbs($('#dc-imgs', el));
+        });
+
+        const imageData = async (k) => (await Promise.all(caseImages(id, k).map((im) => Store.getImage(im.id)))).filter(Boolean);
+        $('#out-imgs', el).onclick = async () => {
+          const d = save();
+          const sections = [];
+          for (const [k, title] of [['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY'], ['powound', 'POST-OP WOUND PIC']]) {
+            const images = await imageData(k);
+            if (images.length) sections.push({ title, images });
+          }
+          if (!sections.length) return toast('No pre-op X-ray, post-op X-ray or post-op wound pic uploaded yet.', 4000);
+          const missing = ['PRE-OP X-RAY', 'POST-OP X-RAY', 'POST-OP WOUND PIC'].filter((t) => !sections.some((x) => x.title === t));
+          if (missing.length) toast('Not uploaded, left out: ' + missing.join(', '), 4000);
+          Print.imagesPdf(c(), d, sections, Store.meta);
+        };
+
+        $('#out-ppt', el).onclick = async (e) => {
+          const btn = e.currentTarget;
+          const d = save();
+          const cc = c();
+          const fd = (iso) => (iso ? fmtDate(iso).replace(/\//g, '.') : '—');
+          const statusOf = { dar: 'DISCHARGED AT REQUEST', ama: 'AMA', absconded: 'ABSCOND', postop: 'TRANSFERRED TO POST-OP WARD' };
+          const want = [...($('#ppt-wound', el).checked ? [['wound', 'PRE-OP WOUND PIC']] : []), ['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY']];
+          const slides = want.map(([k, label]) => ({ id: 'dc-' + k, label, images: caseImages(id, k).map((im) => im.id) })).filter((x) => x.images.length);
+          const st = {
+            noCover: true,
+            unit: unitOf(Store.meta.unitId).id,
+            date: d.dod || todayISO(),
+            cons: {},
+            cases: [{
+              id,
+              title: 'DISCHARGE SUMMARY',
+              status: statusOf[d.disposition] || '',
+              rows: [
+                { k: 'NAME', v: DeckEngine.up(cc.name), kb: true, vb: true },
+                { k: 'AGE/SEX', v: DeckEngine.up(ageSex(cc)), vb: true },
+                { k: 'IP NO', v: DeckEngine.up(cc.ipNo) },
+                { k: 'DOA / DOS / DOD', v: `${fd(cc.doa)} / ${fd(d.dos)} / ${fd(d.dod)}` },
+                { k: 'DIAGNOSIS', v: DeckEngine.up(d.diagnosis), vb: true, diag: true },
+                { k: 'PROCEDURE', v: DeckEngine.up(d.procedure) },
+                { k: 'CONDITION AT DISCHARGE', v: DeckEngine.up(d.condition) },
+              ],
+              slides,
+            }],
+          };
+          btn.disabled = true;
+          btn.textContent = 'Building…';
+          try {
+            await loadDeckImages(st);
+            const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
+            const blob = await pres.write({ outputType: 'blob' });
+            const name = `${DeckEngine.up(cc.name).replace(/[^A-Z0-9]+/g, '_')}_${(cc.ipNo || '').replace(/[^A-Za-z0-9]+/g, '')}_DISCHARGE.pptx`.replace(/__+/g, '_');
+            offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+            if (!slides.length) toast('No X-rays uploaded yet — the PowerPoint has only the summary slide.', 4000);
+          } catch (err) {
+            console.error(err);
+            toast('Could not build the PowerPoint: ' + err.message, 5000);
+          } finally {
+            btn.disabled = false;
+            btn.textContent = 'Download PowerPoint';
+          }
         };
       },
     };

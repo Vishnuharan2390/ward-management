@@ -24,7 +24,8 @@ const CONS_RIGHT = [['rta', 'RTA'], ['tta', 'TTA'], ['fall', 'FALL INJURIES'], [
 
 const STATUSES = ['OPERATED', 'AMA', 'ABSCOND', 'NEUROSURGERY T/O', 'PLASTIC T/O', 'VASCULAR T/O', 'SURGERY T/O'];
 const caseStatus = c => up(c.status || (c.operated ? 'OPERATED' : ''));   // older saves used a tick box
-const titleSize = (n, st) => Math.min(96, Math.floor(21.5 * 72 / (0.6 * (`CASE ${n}`.length + (st ? st.length + 3 : 0)))));
+// Ward app: `n` may be a custom title string (e.g. DISCHARGE SUMMARY).
+const titleSize = (n, st) => Math.min(96, Math.floor(21.5 * 72 / (0.6 * ((typeof n === 'string' ? n : `CASE ${n}`).length + (st ? st.length + 3 : 0)))));
 const up = s => String(s == null ? '' : s).toUpperCase().replace(/\r/g, '').trim();
 function fmtDate(iso) { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}`; }
 function weekday(iso) { if (!iso) return ''; const [y, m, d] = iso.split('-').map(Number); return WEEKDAYS[new Date(y, m - 1, d).getDay()]; }
@@ -39,6 +40,7 @@ function textWidth(text, pt) { return text.length * pt * 0.6 / 72; }
 
 /* ---- case table: shrink fonts uniformly until it fits above the footer ---- */
 function caseRows(c) {
+  if (c.rows) return c.rows; // ward app: custom rows (discharge deck)
   return [
     { k: 'NAME', v: up(c.name), kb: true, vb: true },
     { k: 'AGE/SEX', v: up(c.ageSex), vb: true },
@@ -98,10 +100,10 @@ function consModel(st) {
 }
 
 function buildModels(st, images) {
-  const out = [coverModel(st), consModel(st)];
+  const out = st.noCover ? [] : [coverModel(st), consModel(st)]; // ward app: discharge deck has no cover
   (st.cases || []).forEach((c, i) => {
     const rows = caseRows(c);
-    out.push({ kind: 'case', target: 'case-' + c.id, caseNo: i + 1, status: caseStatus(c), rows, ...tableLayout(rows) });
+    out.push({ kind: 'case', target: 'case-' + c.id, caseNo: i + 1, title: c.title, status: caseStatus(c), rows, ...tableLayout(rows) });
     (c.slides || []).forEach(s => {
       const imgs = s.images.map(id => images[id]).filter(Boolean);
       const label = up(s.label) || 'IMAGE';
@@ -150,9 +152,9 @@ function buildPptx(PptxGenJS, st, images) {
         valign: 'top', paraSpaceAfter: 14, margin: 0, fit: 'shrink', objectName: 'Mode of injury' });
     } else if (m.kind === 'case') {
       const s = pres.addSlide({ masterName: 'RULED' });
-      const title = [{ text: `CASE ${m.caseNo}` }];
+      const title = [{ text: m.title || `CASE ${m.caseNo}` }];
       if (m.status) title.push({ text: ` (${m.status})`, options: { color: COL.red } });
-      s.addText(title, { x: 2.4, y: 0.63, w: 22, h: 3.1, isTextBox: true, fontFace: 'Calibri Light', fontSize: titleSize(m.caseNo, m.status),
+      s.addText(title, { x: 2.4, y: 0.63, w: 22, h: 3.1, isTextBox: true, fontFace: 'Calibri Light', fontSize: titleSize(m.title || m.caseNo, m.status),
         color: COL.title, valign: 'bottom', margin: 0, objectName: 'Case title' });
       const k = m.scale;
       const border = [{ type: 'solid', pt: 1, color: COL.ink }, { type: 'solid', pt: 1, color: COL.ink },
@@ -201,7 +203,7 @@ function slideHTML(m) {
       + `<div class="abs" style="${P(3.23, 4.25, 10.2, 8.6)};${F(40)};color:#404040">${m.left.map((t, i) => `<div style="margin-bottom:.4em;${i === 1 || i === 2 ? 'font-style:italic' : ''}">${esc(t)}</div>`).join('')}</div>`
       + `<div class="abs" style="${P(13.9, 4.1, 11, 8.9)};${F(44)};color:#080808">${m.right.map(t => `<div style="margin-bottom:.32em">&bull;&nbsp; ${esc(t)}</div>`).join('')}</div>`;
   } else if (m.kind === 'case') {
-    h += `<div class="abs light" style="${P(2.4, 0.63, 22, 3.1)};${F(titleSize(m.caseNo, m.status))};display:flex;align-items:flex-end;white-space:nowrap">CASE ${m.caseNo}${m.status ? `&nbsp;<span style="color:#FF0000">(${esc(m.status)})</span>` : ''}</div>` + ruleAt(3.8)
+    h += `<div class="abs light" style="${P(2.4, 0.63, 22, 3.1)};${F(titleSize(m.title || m.caseNo, m.status))};display:flex;align-items:flex-end;white-space:nowrap">${esc(m.title || 'CASE ' + m.caseNo)}${m.status ? `&nbsp;<span style="color:#FF0000">(${esc(m.status)})</span>` : ''}</div>` + ruleAt(3.8)
       + `<div class="abs" style="${P(2.72, 3.8, 20.44, 9.75)}"><table><colgroup><col style="width:${pct(4.13, 20.44)}"><col></colgroup>`
       + m.rows.map((r, i) => {
         const bg = r.diag ? 'background:#FBE4D5;' : '';

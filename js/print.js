@@ -218,7 +218,23 @@ const Print = (() => {
     go(html, { title: `${ch.title} ${c.name}`, page: cols.length > 7 ? 'A4 landscape' : 'A4 portrait' });
   }
 
-  return { otList, wardBoard, discharge, chart, OT_COLUMNS, otTitle };
+  // ---------------------------------------------------------------- Radiographs PDF
+  // One page per section (pre-op X-ray, post-op X-ray, post-op wound pic),
+  // pictures side by side under a patient strip.
+  function imagesPdf(c, d, sections, meta) {
+    const strip = `<div class="ip-strip"><b>${esc(up(c.name))}</b> · ${esc(ageSex(c))} · IP ${esc(c.ipNo || '')}${d.arNo ? ' · AR ' + esc(d.arNo) : ''}
+      <div>${esc(up(d.diagnosis || c.diagnosis))}</div>
+      <div class="pr-sub">${esc(up(d.procedure || c.plan))}${d.dos ? ' · DOS ' + esc(fmtDate(d.dos)) : ''} · ${esc(unitName(meta.unitId))}</div></div>`;
+    const html = `<div class="pr ip">${sections.map((sec) => `
+      <section class="ip-page">
+        ${strip}
+        <h2 class="ip-title">${esc(sec.title)}</h2>
+        <div class="ip-imgs n${Math.min(sec.images.length, 3)}">${sec.images.map((src) => `<img src="${src}" alt="">`).join('')}</div>
+      </section>`).join('')}</div>`;
+    go(html, { title: `${up(c.name)}_RADIOGRAPHS`, page: 'A4 portrait', margin: '10mm' });
+  }
+
+  return { otList, wardBoard, discharge, chart, imagesPdf, OT_COLUMNS, otTitle };
 })();
 
 // Shared with the on-screen ward view.

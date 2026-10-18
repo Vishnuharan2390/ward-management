@@ -87,12 +87,16 @@ const WORKUP = [
 ];
 
 // Image types. `deck` is the slide title used in the admission-day deck.
+// `admission` = taken at admission (add-case page, admission-day deck).
 const IMAGE_KINDS = [
-  { k: 'xray', label: 'X-ray', deck: 'X-RAY' },
-  { k: 'ct', label: 'CT', deck: 'CT' },
-  { k: 'mri', label: 'MRI', deck: 'MRI' },
-  { k: 'wound', label: 'Wound pic', deck: 'WOUND PIC' },
+  { k: 'xray', label: 'X-ray', deck: 'X-RAY', admission: true },
+  { k: 'ct', label: 'CT', deck: 'CT', admission: true },
+  { k: 'mri', label: 'MRI', deck: 'MRI', admission: true },
+  { k: 'wound', label: 'Wound pic', deck: 'WOUND PIC', admission: true },
+  { k: 'poxray', label: 'Post-op X-ray', deck: 'POST-OP X-RAY' },
+  { k: 'powound', label: 'Post-op wound pic', deck: 'POST-OP WOUND PIC' },
 ];
+const ADMISSION_KINDS = IMAGE_KINDS.filter((k) => k.admission);
 const imageKind = (k) => IMAGE_KINDS.find((x) => x.k === k) || { k, label: k, deck: String(k).toUpperCase() };
 
 // Admission-day deck (same lists as the unit's admission-deck tool).
@@ -410,17 +414,56 @@ const EN_DAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY
 
 // Common advice lines with the Tamil line printed for the patient.
 const ADVICE_PHRASES = [
+  ['CONTINUE ANALGESICS AND ANTIBIOTICS', 'வலி நிவாரண மருந்துகளையும் ஆன்டிபயாடிக் மருந்துகளையும் தொடர்ந்து எடுத்துக் கொள்ளவும்.'],
+  ['CONTINUE POP', 'மாவுக்கட்டைத் தொடர்ந்து அணிந்து கொள்ளவும்; ஈரமாக்க வேண்டாம்.'],
+  ['CONTINUE LIMB ELEVATION', 'அடிபட்ட கை / காலை உயர்த்தி வைப்பதைத் தொடரவும்.'],
+  ['ALTERNATE DAY CLEANING AND DRESSING AT NEARBY GH OR PHC', 'ஒரு நாள் விட்டு ஒரு நாள் அருகிலுள்ள அரசு மருத்துவமனை அல்லது ஆரம்ப சுகாதார நிலையத்தில் காயத்தைச் சுத்தம் செய்து கட்டுப் போட்டுக் கொள்ளவும்.'],
+  ['NON-WEIGHT BEARING WALK WITH WALKER SUPPORT', 'வாக்கர் உதவியுடன், அடிபட்ட காலில் எடை போடாமல் நடக்கவும்.'],
   ['CONTINUE ANALGESICS', 'வலி நிவாரண மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'],
   ['CONTINUE CUFF & COLLAR', 'கட்டை தொடர்ந்து கட்டிக்கொள்ளவும்.'],
-  ['CONTINUE SLAB / POP', 'மாவுக்கட்டை தொடர்ந்து அணிந்து கொள்ளவும்; ஈரமாக்க வேண்டாம்.'],
-  ['LIMB ELEVATION', 'அடிபட்ட கை / காலை உயர்த்தி வைக்கவும்.'],
   ['ACTIVE TOE / FINGER MOVEMENTS', 'விரல்களை அடிக்கடி அசைத்துக் கொண்டே இருக்கவும்.'],
-  ['NON WEIGHT BEARING', 'அடிபட்ட காலில் எடை போட வேண்டாம்.'],
   ['KEEP WOUND DRY', 'காயத்தை ஈரமில்லாமல் சுத்தமாக வைக்கவும்.'],
   ['SUTURE REMOVAL ON POD 12', 'அறுவை சிகிச்சைக்குப் பின் 12-ஆம் நாள் தையல் பிரிக்க வரவும்.'],
   ['CONTINUE DIABETIC / ANTIHYPERTENSIVE MEDICATIONS', 'சர்க்கரை / இரத்த அழுத்த மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'],
   ['REPORT IMMEDIATELY IF PAIN, SWELLING, NUMBNESS OR DISCOLOURATION', 'வலி, வீக்கம், மரத்துப்போதல் அல்லது நிறமாற்றம் இருந்தால் உடனே மருத்துவமனைக்கு வரவும்.'],
 ];
+
+// Treatment given — quick-add drug lists.
+const DRUGS_ALL = [
+  'INJ. HEPARIN 5000 IU SC BD',
+  'INJ. PARACETAMOL 1G IV BD',
+  'INJ. RANITIDINE 50MG IV BD',
+  'INJ. TRAMADOL 100MG IV BD',
+];
+const DRUGS_SPINE_PELVIS = [
+  'INJ. DEXAMETHASONE 8MG IV BD',
+  'INJ. DERIPHYLLINE 220MG IV BD',
+  'NEB. SALBUTAMOL Q8H',
+  'NEB. BUDESONIDE Q12H',
+  'INCENTIVE SPIROMETRY',
+  'CHEST PHYSIOTHERAPY',
+  'ACTIVE AND PASSIVE MOBILISATION OF ALL FOUR LIMBS',
+  'LOG ROLL Q2H',
+  'ALPHA BED, BBB CARE',
+];
+const ANTIBIOTICS = [
+  'INJ. PIPTAZ 4.5G IV TDS',
+  'INJ. GENTAMICIN 80MG IV BD',
+  'INJ. CEFTRIAXONE 1G IV BD',
+  'INJ. MEROPENEM 1G IV BD',
+  'INJ. CEFOPERAZONE SULBACTAM 1.5G IV BD',
+  'INJ. CLINDAMYCIN 600MG IV BD',
+  'INJ. AMIKACIN 500MG IV OD',
+  'INJ. VANCOMYCIN 1G IV BD',
+  'T. SEPTRAN 2 BD',
+  'C. DOXY BD',
+  'T. CEFIXIME BD',
+  'C. CEPHALEXIN BD',
+  'T. PENICILLIN BD',
+];
+const isSpinePelvis = (c) => /\b(spine|spinal|vertebra|vertebral|cervical spine|dorsal|lumbar|thoracolumbar|[CDTL]\d{1,2}\b|pelvi[sc]|acetabul|sacr|ilium|iliac|pubic|rami|si joint)/i.test(`${c.diagnosis || ''} ${c.plan || ''}`);
+const isCompound = (c) => /\b(compound|open (fracture|#)|gustilo|grade\s*(i{1,3}|[1-3])[abc]?\b)/i.test(c.diagnosis || '');
+
 
 function reviewPhrase(weeks, day, opd, time = '8AM') {
   const w = Number(weeks) || 2;
