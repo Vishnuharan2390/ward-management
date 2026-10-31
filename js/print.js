@@ -242,6 +242,7 @@ function todoList(c) {
   return pendingList(c).map((p) => p.text);
 }
 function assessmentScheme(c) {
-  const a = hasText(c.work?.anaes) ? 'Assessed' : 'TBA';
+  const v = c.work?.anaes;
+  const a = v === 'Assessed' ? 'Assessed' : v === 'Provisionally assessed' ? 'Prov. assessed' : 'TBA';
   return [a, c.scheme].filter(Boolean).join(' / ');
 }

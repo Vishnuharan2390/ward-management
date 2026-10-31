@@ -744,3 +744,12 @@ main { padding-top: 12px; }
 .lab-in.from-photo input, .lab-in.from-photo select { background: #ffffcc; outline: 2px solid #000080; outline-offset: -2px; }
 .lab-in.photo-unsure input { background: #ffd8a8; outline-color: #c00000; }
 .lab-in.photo-unsure .lab-name::after { content: " ?"; color: #c00000; font-weight: 700; }
+
+/* ECG / ECHO / PAC in the investigations section */
+.workup { display: grid; grid-template-columns: auto 1fr; gap: .6rem .9rem; align-items: end; margin-top: .75rem; padding-top: .6rem; border-top: 1px solid var(--lo); }
+.workup > label:nth-child(3) { grid-column: 1 / -1; max-width: 420px; } /* PAC on its own line */
+.workup .pac-pending { grid-column: 1 / -1; }
+.workup .pac-pending[hidden] { display: none; }
+.ecg-check { display: flex; align-items: center; gap: .45rem; font-weight: 700; white-space: nowrap; padding-bottom: .5rem; }
+.ecg-check input { transform: scale(1.3); }
+@media (max-width: 640px) { .workup { grid-template-columns: 1fr; } }

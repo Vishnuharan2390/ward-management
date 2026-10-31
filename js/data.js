@@ -76,15 +76,29 @@ const LAB_GROUPS = [
 ];
 const ALL_PARAMS = LAB_GROUPS.flatMap((g) => g.params.map((p) => ({ ...p, group: g })));
 
-// Work-up items recorded as text. Empty = pending.
+// Work-up items shown with the investigations. ECG is a tick; ECHO is text;
+// PAC is a status with a note of the work pending before assessment.
+const PAC_OPTIONS = ['Assessed', 'Provisionally assessed', 'Not assessed'];
 const WORKUP = [
-  { k: 'ecg', label: 'ECG' },
+  { k: 'ecg', label: 'ECG', type: 'check' },
   { k: 'echo', label: 'ECHO', long: 'ECHO & cardio opinion' },
-  { k: 'xray', label: 'X-ray', img: true },
-  { k: 'ct', label: 'CT', img: true },
-  { k: 'mri', label: 'MRI', img: true },
-  { k: 'anaes', label: 'PAC', long: 'Anaesthesia assessment (PAC)' },
+  { k: 'anaes', label: 'PAC', long: 'Anaesthesia assessment', type: 'pac' },
 ];
+function workDone(c, w) {
+  const v = c.work?.[w.k];
+  return w.type === 'pac' ? v === 'Assessed' : hasText(v);
+}
+function workText(c, w) {
+  const v = c.work?.[w.k];
+  if (w.type === 'check') return v ? 'Taken' : '';
+  if (w.type === 'pac') {
+    if (!v) return '';
+    const p = c.work?.anaesPending;
+    return v !== 'Assessed' && hasText(p) ? `${v} — pending: ${p}` : v;
+  }
+  return v || '';
+}
+const hasPreopXray = (c) => Object.values(c.images || {}).some((i) => i.kind === 'xray');
 
 // Image types. `deck` is the slide title used in the admission-day deck.
 // `admission` = taken at admission (add-case page, admission-day deck).
@@ -196,7 +210,12 @@ function pendingList(c) {
     else if (missing.length) out.push({ kind: 'inv', text: `${g.label}: ${missing.map((p) => p.label).join(', ')}` });
   }
   for (const p of customParams(c)) if (!latest(c, p.k)) out.push({ kind: 'inv', text: p.label });
-  for (const w of WORKUP) if (!hasText(c.work?.[w.k])) out.push({ kind: 'inv', text: w.label });
+  if (!hasPreopXray(c)) out.push({ kind: 'inv', text: 'X-ray' });
+  for (const w of WORKUP) {
+    if (workDone(c, w)) continue;
+    const p = w.type === 'pac' && c.work?.anaesPending;
+    out.push({ kind: 'inv', text: hasText(p) ? `PAC: ${p}` : w.label });
+  }
   for (const o of listOf(c.opinions)) if (!hasText(o.note)) out.push({ kind: 'inv', text: o.dept + ' op.' });
   for (const t of listOf(c.tasks)) if (!t.done) out.push({ kind: 'task', text: t.text + (t.to ? ` → ${t.to}` : '') });
   return out;
@@ -270,7 +289,8 @@ function readiness(c) {
   const tick = (ok) => { total++; if (ok) done++; };
   for (const g of LAB_GROUPS) if (!g.optional) g.params.forEach((p) => tick(latest(c, p.k)));
   customParams(c).forEach((p) => tick(latest(c, p.k)));
-  WORKUP.forEach((w) => tick(hasText(c.work?.[w.k])));
+  WORKUP.forEach((w) => tick(workDone(c, w)));
+  tick(hasPreopXray(c));
   listOf(c.opinions).forEach((o) => tick(hasText(o.note)));
   return { done, total, ready: total > 0 && done === total };
 }
@@ -281,13 +301,20 @@ function ageSex(c) {
 
 // Older saves stored labs as inv.cbc.hb etc.; fold them into one dated set.
 function migrateCase(c) {
+  // Earlier versions kept PAC as free text: map it onto the dropdown.
+  const a = c.work?.anaes;
+  if (hasText(a) && !PAC_OPTIONS.includes(a)) {
+    const fit = /\b(fit|assessed|asa)\b/i.test(a) && !/\b(unfit|not|pending|provision)/i.test(a);
+    c.work.anaes = fit ? 'Assessed' : 'Not assessed';
+    if (!fit && !hasText(c.work.anaesPending)) c.work.anaesPending = a;
+  }
   if (!c.inv || c.labs) return c;
   const map = { cbc: { hb: 'hb', wbc: 'wbc', plt: 'plt' }, rft: { u: 'urea', c: 'creat', na: 'na', k: 'k' }, lft: { tbili: 'tbili', sgot: 'sgot', sgpt: 'sgpt' }, esr: { v: 'esr' }, crp: { v: 'crp' } };
   const v = {};
   for (const [g, fields] of Object.entries(map)) for (const [f, k] of Object.entries(fields)) if (hasText(c.inv[g]?.[f])) v[k] = c.inv[g][f];
   if (Object.keys(v).length) c.labs = { m0: { date: c.doa || '', at: c.createdAt || 0, v } };
   c.work ||= {};
-  for (const w of WORKUP) if (hasText(c.inv[w.k]?.note) && !hasText(c.work[w.k])) c.work[w.k] = c.inv[w.k].note;
+  for (const k of ['ecg', 'echo', 'anaes']) if (hasText(c.inv[k]?.note) && !hasText(c.work[k])) c.work[k] = c.inv[k].note;
   if (hasText(c.inv.pus?.note) && !c.pus) c.pus = { organism: c.inv.pus.note };
   delete c.inv;
   return c;

@@ -171,6 +171,22 @@ const App = (() => {
     };
   }
 
+  // ECG tick, ECHO text and PAC status (+ work pending) — on the add-case
+  // form (`form` true: named fields) and on the case page (bound fields).
+  function workupHTML(work = {}, form = false) {
+    const pend = work.anaes && work.anaes !== 'Assessed';
+    const attr = (k) => (form ? `name="w_${k}"` : `data-bind="work.${k}"`);
+    return `
+      <div class="workup">
+        <label class="ecg-check"><input type="checkbox" ${form ? 'name="w_ecg"' : 'data-check="work.ecg"'} ${work.ecg ? 'checked' : ''}> ECG taken</label>
+        <label>ECHO &amp; cardio opinion<input ${attr('echo')} value="${esc(work.echo)}"></label>
+        <label>Anaesthesia assessment
+          <select ${attr('anaes')} data-pac><option value="">—</option>${opts(PAC_OPTIONS, work.anaes || '')}</select></label>
+        <label class="pac-pending"${pend ? '' : ' hidden'}>Work pending to get assessment
+          <textarea ${attr('anaesPending')} rows="2">${esc(work.anaesPending)}</textarea></label>
+      </div>`;
+  }
+
   // ---------------------------------------------------------------- Dashboard
   let dashFilter = sessionStorage.getItem('wm.filter') || 'active';
   let dashQuery = '';
@@ -272,7 +288,7 @@ const App = (() => {
     detailed: sessionStorage.getItem('wm.wardDetailed') === '1',
     render() {
       const list = activeCases();
-      const work = (c, k) => (hasText(c.work?.[k]) ? `<td>${esc(c.work[k])}</td>` : '<td class="miss">Pending</td>');
+      const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>` : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
       const notebook = `
         <table class="board nb-screen">
           <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
@@ -307,7 +323,7 @@ const App = (() => {
                 const l = latest(c, p.k);
                 return l ? `<div>${esc(p.label)} ${flagged(fmtVal(l.value, p), flagOf(l.value, p))}</div>` : `<div class="miss">${esc(p.label)} –</div>`;
               }).join('')}</td>
-              ${WORKUP.map((w) => work(c, w.k)).join('')}
+              ${WORKUP.map((w) => work(c, w)).join('')}
               <td>${listOf(c.opinions).map((o) => `<div class="${hasText(o.note) ? '' : 'miss'}">${esc(o.dept)}${hasText(o.note) ? ': ' + esc(o.note) : ''}</div>`).join('')}</td>
               <td>${listOf(c.tasks).filter((t) => !t.done).map((t) => `<div>• ${esc(t.text)}</div>`).join('')}</td>
             </tr>`).join('') || `<tr><td colspan="${ALL_PARAMS.length + WORKUP.length + 5}" class="empty">No active pre-op cases.</td></tr>`}
@@ -354,7 +370,7 @@ const App = (() => {
             <a class="chip" href="#sec-patient" data-jump>Patient</a>
             <a class="chip" href="#sec-plan" data-jump>Diagnosis & plan</a>
             <a class="chip on" href="#sec-inv" data-jump>Investigations</a>
-            ${id ? '' : '<a class="chip" href="#sec-img" data-jump>Images</a><a class="chip" href="#sec-work" data-jump>Work-up</a>'}
+            ${id ? '' : '<a class="chip" href="#sec-img" data-jump>Images</a>'}
           </nav>
           <form id="case-form" class="form" autocomplete="off">
             <fieldset class="card" id="sec-patient"><legend>Patient</legend>
@@ -392,15 +408,14 @@ const App = (() => {
               <div class="span2">${labFormHTML(c)}</div>
               <label>Pus C/S — organism<input name="pusOrganism" class="italic"></label>
               <label>Sensitive to<input name="pusSensitive"></label>
+              <div class="span2">${workupHTML({}, true)}</div>
             </fieldset>
             <fieldset class="card" id="sec-img"><legend>Radiographs & wound pictures</legend>
               <p class="span2 muted small">Uploaded once here — they appear on the case page, in the OT list viewer and in the PowerPoints.</p>
               <div class="span2 img-adders">${ADD_CASE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-pending="${k.k}" hidden></label>`).join('')}</div>
               <div class="span2 pending-imgs" id="pending-imgs"></div>
             </fieldset>
-            <fieldset class="card" id="sec-work"><legend>Work-up</legend>
-              ${WORKUP.map((w) => `<label>${esc(w.long || w.label)}<input name="w_${w.k}"></label>`).join('')}
-            </fieldset>`}
+`}
             <div class="form-actions">
               <button class="btn primary" type="submit">${id ? 'Save' : 'Add case'}</button>
               <a class="btn" href="${id ? '#/case/' + id : deckDate ? '#/deck' : '#/'}">Cancel</a>
@@ -492,7 +507,12 @@ const App = (() => {
             return;
           }
           const nid = uid();
-          const work = Object.fromEntries(WORKUP.map((w) => [w.k, f.elements['w_' + w.k].value.trim()]).filter(([, v]) => v));
+          const work = {
+            ecg: f.elements.w_ecg.checked ? 'Taken' : '',
+            echo: f.elements.w_echo.value.trim(),
+            anaes: f.elements.w_anaes.value,
+            anaesPending: f.elements.w_anaes.value && f.elements.w_anaes.value !== 'Assessed' ? f.elements.w_anaesPending.value.trim() : '',
+          };
           const doc = { ...data, status: 'preop', work, pus: { organism: f.elements.pusOrganism.value.trim(), sensitive: f.elements.pusSensitive.value.trim() } };
           for (const [path, val] of Object.entries(readLabForm(f) || {})) setPath(doc, path, val);
           Store.create('cases', nid, doc);
@@ -659,7 +679,6 @@ const App = (() => {
         const r = readiness(c);
         const d = daysSince(c.doa);
         const images = listOf(c.images);
-        const imgCount = (k) => images.filter((i) => i.kind === k).length;
         const opinions = listOf(c.opinions);
         const tasks = listOf(c.tasks);
         return `
@@ -697,6 +716,7 @@ const App = (() => {
               <label>Pus C/S — organism<input class="italic" data-bind="pus.organism" value="${esc(c.pus?.organism)}"></label>
               <label>Sensitive to<input data-bind="pus.sensitive" value="${esc(c.pus?.sensitive)}"></label>
             </div>
+            ${workupHTML(c.work || {})}
           </section>
 
           <section class="card" id="charts">
@@ -708,19 +728,6 @@ const App = (() => {
             </div>
           </section>
 
-          <section class="card">
-            <h3>Work-up</h3>
-            <div class="work">
-              ${WORKUP.map((w) => `
-                <div class="work-row ${hasText(c.work?.[w.k]) ? '' : 'missing'}">
-                  <label>${esc(w.long || w.label)}<input data-bind="work.${w.k}" value="${esc(c.work?.[w.k])}" placeholder="Pending — type result"></label>
-                  ${w.img ? `<div class="work-img">
-                    <button class="btn small" data-gallery="${w.k}" ${imgCount(w.k) ? '' : 'disabled'}>View${imgCount(w.k) ? ` (${imgCount(w.k)})` : ''}</button>
-                    <label class="btn small">+ Image<input type="file" accept="image/*" multiple data-upload="${w.k}" hidden></label>
-                  </div>` : ''}
-                </div>`).join('')}
-            </div>
-          </section>
 
           <section class="card">
             <h3>Opinions</h3>
@@ -813,7 +820,9 @@ const App = (() => {
 
         el.addEventListener('change', async (e) => {
           const t = e.target;
-          if (t.dataset.bind === 'opNotes') {
+          if (t.dataset.check) {
+            Store.patch('cases', id, { [t.dataset.check]: t.checked ? 'Taken' : '' });
+          } else if (t.dataset.bind === 'opNotes') {
             // Fill "Implants used" from the notes unless someone has edited it by hand.
             const cur = Store.cases[id];
             const found = extractImplants(t.value);
@@ -1666,7 +1675,7 @@ const App = (() => {
     }).filter(Boolean);
     if (cust.length) lines.push(cust.join(', '));
     if (hasText(c.pus?.organism)) lines.push(`PUS C/S: ${c.pus.organism}${hasText(c.pus.sensitive) ? ' — SENSITIVE TO ' + c.pus.sensitive : ''}`);
-    for (const w of WORKUP) if (hasText(c.work?.[w.k])) lines.push(`${w.label}: ${c.work[w.k]}`);
+    for (const w of WORKUP) if (workText(c, w)) lines.push(`${w.label}: ${workText(c, w)}`);
     return lines.join('\n');
   }
 
@@ -2348,6 +2357,13 @@ const App = (() => {
     const m = (location.hash || '#/').match(/^#\/(ward|ot|deck|postop|settings)\b/);
     return m ? '#/' + m[1] : '#/';
   }
+
+  // PAC: show "work pending" only for provisionally / not assessed.
+  document.addEventListener('change', (e) => {
+    if (e.target.dataset.pac === undefined) return;
+    const box = e.target.closest('.workup')?.querySelector('.pac-pending');
+    if (box) box.hidden = !e.target.value || e.target.value === 'Assessed';
+  });
 
   function render() {
     deferred = false;
