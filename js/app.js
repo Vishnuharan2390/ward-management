@@ -2110,7 +2110,7 @@ const App = (() => {
           <h3>Look</h3>
           <p class="muted small">How the app looks on this device. Printouts and PowerPoints are not affected.</p>
           <p class="small"><b>Modern</b></p>
-          <div class="chips">${[['modern', 'Modern clinical'], ['midnight', 'Midnight (dark)'], ['glass', 'Glass'], ['material', 'Material']]
+          <div class="chips">${[['crimson', 'Navy & Crimson (gradient)'], ['aurora', 'Aurora (gradient)'], ['modern', 'Modern clinical'], ['midnight', 'Midnight (dark)'], ['glass', 'Glass'], ['material', 'Material']]
             .map(([k, l]) => `<button class="chip${(document.documentElement.dataset.ui || 'win98') === k ? ' on' : ''}" data-ui-pick="${k}">${l}</button>`).join('')}</div>
           <p class="small"><b>Retro</b></p>
           <div class="chips">${[['win98', 'Windows 98'], ['xp', 'Windows XP'], ['mac', 'Classic Mac'], ['dos', 'DOS terminal']]
@@ -2170,7 +2170,7 @@ const App = (() => {
         if (!k) return;
         if (k === 'win98') delete document.documentElement.dataset.ui;
         else document.documentElement.dataset.ui = k;
-        document.documentElement.classList.toggle('flat', ['modern', 'midnight', 'glass', 'material'].includes(k));
+        document.documentElement.classList.toggle('flat', ['modern', 'midnight', 'glass', 'material', 'crimson', 'aurora'].includes(k));
         try { localStorage.setItem('wm.ui', k); } catch { /* private mode */ }
         render();
       });

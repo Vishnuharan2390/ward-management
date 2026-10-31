@@ -945,3 +945,68 @@ html[data-ui="material"] input, html[data-ui="material"] select, html[data-ui="m
 html[data-ui="material"] .stats div { background: #eaddff; box-shadow: none; }
 html[data-ui="material"] .hosp { background: #eaddff; box-shadow: none; }
 html.flat .flow .set-acts .icon { color: var(--th-ink); opacity: .85; }
+
+/* ---- Gradient looks (flat base + gradients on chrome, buttons, tiles, headings) ---- */
+html[data-ui="crimson"], html[data-ui="aurora"] {
+  --card: #fff; --field: #fff; --ink: #141a2c; --muted: #5d6680; --line: #e3e7f0; --hi: #fff; --lo: #e3e7f0; --face: #fff;
+  --rc: 14px; --rb: 10px; --th-ink: #fff; --top-ink: #fff; --top-muted: rgba(255,255,255,.78); --top-accent: transparent;
+  --font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --field-font: var(--font);
+  --window: 0 1px 2px rgba(20,26,44,.05), 0 6px 18px rgba(20,26,44,.07);
+}
+html[data-ui="crimson"] {
+  --g1: #13294b; --g2: #8a1538; --g3: #c8102e; --brand: #13294b; --brand-2: #13294b; --red: #c8102e; --ok: #1d7a46;
+  --bg: #f4f2f6; --head-ink: #13294b; --nav-on-ink: #13294b; --primary-ink: #fff;
+  --body-bg: radial-gradient(1000px 500px at 100% 0%, rgba(200,16,46,.10), transparent 60%), radial-gradient(900px 500px at 0% 100%, rgba(19,41,75,.10), transparent 60%), #f6f4f8;
+}
+html[data-ui="aurora"] {
+  --g1: #5b3df5; --g2: #2f80ed; --g3: #14b8a6; --brand: #4338ca; --brand-2: #4338ca; --red: #e11d48; --ok: #0f9d6e;
+  --bg: #f3f4fb; --head-ink: #3730a3; --nav-on-ink: #4338ca; --primary-ink: #fff;
+  --body-bg: radial-gradient(1100px 600px at -10% -10%, rgba(91,61,245,.16), transparent 60%), radial-gradient(900px 600px at 110% 20%, rgba(20,184,166,.16), transparent 55%), radial-gradient(900px 600px at 50% 120%, rgba(47,128,237,.14), transparent 60%), #f5f6fc;
+}
+html[data-ui="crimson"] body, html[data-ui="aurora"] body { background-attachment: fixed; }
+html[data-ui="crimson"] .top, html[data-ui="aurora"] .top { background: linear-gradient(110deg, var(--g1) 0%, var(--g2) 55%, var(--g3) 100%); }
+html[data-ui="crimson"] #nav a.on, html[data-ui="aurora"] #nav a.on { background: var(--bg); }
+/* buttons */
+html[data-ui="crimson"] .btn.primary, html[data-ui="crimson"] .chip.on,
+html[data-ui="aurora"] .btn.primary, html[data-ui="aurora"] .chip.on {
+  background: linear-gradient(120deg, var(--g1), var(--g2) 60%, var(--g3)); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--g2) 35%, transparent);
+}
+html[data-ui="crimson"] .btn, html[data-ui="aurora"] .btn { transition: transform .08s, box-shadow .15s; }
+html[data-ui="crimson"] .btn:active:not(:disabled), html[data-ui="aurora"] .btn:active:not(:disabled) { transform: translateY(1px); }
+/* hospital heading + stat tiles */
+html[data-ui="crimson"] .hosp, html[data-ui="aurora"] .hosp {
+  background: linear-gradient(135deg, var(--g1) 0%, var(--g2) 60%, var(--g3) 100%); color: #fff; box-shadow: 0 10px 28px color-mix(in srgb, var(--g1) 30%, transparent);
+}
+html[data-ui="crimson"] .hosp *, html[data-ui="aurora"] .hosp * { color: #fff !important; }
+html[data-ui="crimson"] .hosp-l3, html[data-ui="aurora"] .hosp-l3 { opacity: .95; letter-spacing: .02em; }
+html[data-ui="crimson"] .hosp-l4, html[data-ui="aurora"] .hosp-l4 { opacity: .8; }
+html[data-ui="crimson"] .stats div, html[data-ui="aurora"] .stats div { position: relative; overflow: hidden; }
+html[data-ui="crimson"] .stats div::before, html[data-ui="aurora"] .stats div::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, var(--g1), var(--g2), var(--g3));
+}
+html[data-ui="crimson"] .stats b, html[data-ui="aurora"] .stats b {
+  background: linear-gradient(120deg, var(--g1), var(--g3)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+/* gradient headings */
+html[data-ui="crimson"] .card > h3:first-child, html[data-ui="crimson"] .card > .row-between:first-child > h3, html[data-ui="crimson"] .form > fieldset.card > legend, html[data-ui="crimson"] .toolbar h2,
+html[data-ui="aurora"] .card > h3:first-child, html[data-ui="aurora"] .card > .row-between:first-child > h3, html[data-ui="aurora"] .form > fieldset.card > legend, html[data-ui="aurora"] .toolbar h2 {
+  background: linear-gradient(100deg, var(--g1), var(--g3)); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+/* case cards: gradient edge */
+html[data-ui="crimson"] .case-card, html[data-ui="aurora"] .case-card { border-left: 0; position: relative; }
+html[data-ui="crimson"] .case-card::before, html[data-ui="aurora"] .case-card::before {
+  content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, var(--g1), var(--g2), var(--g3));
+}
+html[data-ui="crimson"] .progress i, html[data-ui="aurora"] .progress i { background: linear-gradient(90deg, var(--g3), #f59e0b); }
+html[data-ui="crimson"] .progress i.ok, html[data-ui="aurora"] .progress i.ok { background: linear-gradient(90deg, #10b981, #22c55e); }
+/* tables */
+html[data-ui="crimson"] .board th, html[data-ui="crimson"] .flow thead th,
+html[data-ui="aurora"] .board th, html[data-ui="aurora"] .flow thead th { background: linear-gradient(110deg, var(--g1), var(--g2)); color: #fff; }
+html[data-ui="crimson"] .flow tr.grp th, html[data-ui="aurora"] .flow tr.grp th { background: color-mix(in srgb, var(--g2) 8%, #fff); }
+html[data-ui="crimson"] .picker tr.picked, html[data-ui="aurora"] .picker tr.picked { background: linear-gradient(110deg, var(--g1), var(--g2)); }
+html[data-ui="crimson"] .deck-previews, html[data-ui="aurora"] .deck-previews { background: linear-gradient(135deg, #1b2236, #2b2140); }
+/* one continuous gradient across a table's header row */
+html[data-ui="crimson"] .board thead tr, html[data-ui="crimson"] .flow thead tr,
+html[data-ui="aurora"] .board thead tr, html[data-ui="aurora"] .flow thead tr { background: linear-gradient(110deg, var(--g1), var(--g2) 70%, var(--g3)); }
+html[data-ui="crimson"] .board thead th, html[data-ui="crimson"] .flow thead th,
+html[data-ui="aurora"] .board thead th, html[data-ui="aurora"] .flow thead th { background: transparent; position: static; }
