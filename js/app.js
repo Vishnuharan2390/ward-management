@@ -178,8 +178,8 @@ const App = (() => {
     const attr = (k) => (form ? `name="w_${k}"` : `data-bind="work.${k}"`);
     return `
       <div class="workup">
-        <label class="ecg-check"><input type="checkbox" ${form ? 'name="w_ecg"' : 'data-check="work.ecg"'} ${work.ecg ? 'checked' : ''}> ECG taken</label>
-        <label>ECHO &amp; cardio opinion<input ${attr('echo')} value="${esc(work.echo)}"></label>
+        <label class="ecg-check"><input type="checkbox" ${form ? 'name="w_ecg"' : 'data-check="work.ecg"'} ${work.ecg ? 'checked' : ''}> ECG</label>
+        <label class="echo-line">ECHO<input ${attr('echo')} value="${esc(work.echo)}"></label>
         <label>Anaesthesia assessment
           <select ${attr('anaes')} data-pac><option value="">—</option>${opts(PAC_OPTIONS, work.anaes || '')}</select></label>
         <label class="pac-pending"${pend ? '' : ' hidden'}>Work pending to get assessment
