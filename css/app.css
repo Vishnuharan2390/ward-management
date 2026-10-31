@@ -1160,3 +1160,7 @@ html[data-ui="graphite"] .lab-in.from-photo input, html[data-ui="graphite"] .lab
 html[data-ui="graphite"] .slide { color: #000; }
 html[data-ui="graphite"] .deck-previews { background: #0b0b0c; }
 html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, html[data-ui="graphite"] textarea:focus { outline: 1px solid #bdbdc2; outline-offset: 1px; }
+
+/* WhatsApp share buttons: a small green dot marks them in every look */
+.btn.wa::before { content: ""; display: inline-block; width: .55em; height: .55em; border-radius: 50%; background: #25d366; margin-right: .45em; vertical-align: .05em; box-shadow: 0 0 0 2px rgba(37,211,102,.25); }
+.wa-row { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .6rem; }

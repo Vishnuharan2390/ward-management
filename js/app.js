@@ -335,6 +335,10 @@ const App = (() => {
           <h2>Ward status <span class="muted small">${fmtDate(todayISO())}</span></h2>
           <button class="btn" id="print-ward">Print / PDF</button>
         </div>
+        <div class="row wa-row">
+          <button class="btn small wa" id="wa-ward">WhatsApp: ward status</button>
+          <button class="btn small wa" id="wa-pending">WhatsApp: pending works</button>
+        </div>
         <div class="chips">
           <button class="chip ${Ward.detailed ? '' : 'on'}" data-layout="0">Notebook</button>
           <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
@@ -344,6 +348,8 @@ const App = (() => {
     },
     mount(el) {
       $('#print-ward', el).onclick = () => Print.wardBoard(activeCases(), Store.meta);
+      $('#wa-ward', el).onclick = () => Share.send(Share.wardText(activeCases()));
+      $('#wa-pending', el).onclick = () => Share.send(Share.pendingText(activeCases()));
       el.addEventListener('click', (e) => {
         const l = e.target.closest('[data-layout]');
         if (l) {
@@ -711,6 +717,7 @@ const App = (() => {
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
+              <button class="btn wa" id="wa-case">WhatsApp</button>
               <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
             </div>
           </div>
@@ -819,6 +826,7 @@ const App = (() => {
           }
         });
         $('#add-set', el).onclick = () => openLabModal(id);
+        $('#wa-case', el).onclick = () => Share.send(Share.caseText({ id, ...Store.cases[id] }));
         $('#ot-toggle', el).onclick = () => {
           const hide = !Store.cases[id].otHidden;
           Store.patch('cases', id, { otHidden: hide });
@@ -1122,6 +1130,7 @@ const App = (() => {
           <div class="form-actions">
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
+            <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>Share OT list on WhatsApp</button>
           </div>
           <p class="muted small">The print PDF puts the same list twice on one landscape sheet — top and bottom — to print and cut.</p>
         </div>`;
@@ -1236,6 +1245,7 @@ const App = (() => {
       };
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
+      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); Share.send(Share.otText(cases, dd)); };
     },
   };
 
