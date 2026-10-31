@@ -443,14 +443,17 @@ const App = (() => {
         auto.forEach((k) => ['input', 'change'].forEach((ev) => f.elements[k].addEventListener(ev, () => { touched[k] = true; })));
         const hint = () => {
           const plan = f.elements.plan.value;
-          const m = matchImplants(plan, Store.implants, f.elements.diagnosis.value);
+          const sug = suggestImplantsFor(plan, f.elements.diagnosis.value, Store.implants);
           const lv = levelFor(plan, Store.levels);
-          $('#impl-hint', el).textContent = m.length ? 'Implants from: ' + m.map((r) => r.name).join(', ') : (Object.keys(Store.implants).length ? 'No implant database match for this plan.' : 'Add procedures under Settings → Implant database to auto-fill implants.');
+          $('#impl-hint', el).textContent = sug.source === 'history'
+            ? `From your OT list of ${fmtDate(sug.entry.date)}: ${sug.entry.dx} — ${sug.entry.plan}`
+            : sug.source === 'list' ? 'From the reference implant list: ' + sug.matches.map((r) => r.name).join(', ')
+              : (plan.trim() ? 'No match in your previous OT lists or the reference list — type the implants.' : '');
           $('#level-hint', el).textContent = lv.rule ? `Level ${lv.level}: ${lv.rule.name}` : (plan.trim() ? 'No level match — pick it manually.' : '');
         };
         const fill = (force) => {
           const plan = f.elements.plan.value;
-          const sug = { implants: suggestFromPlan(plan, Store.implants, f.elements.diagnosis.value).implants, level: levelFor(plan, Store.levels).level };
+          const sug = { implants: suggestImplantsFor(plan, f.elements.diagnosis.value, Store.implants).implants, level: levelFor(plan, Store.levels).level };
           auto.forEach((k) => { if (force || !touched[k]) f.elements[k].value = sug[k]; });
         };
         ['plan', 'diagnosis'].forEach((k) => f.elements[k].addEventListener('input', () => {
@@ -1200,7 +1203,7 @@ const App = (() => {
         } else if (b.dataset.unpick !== undefined) {
           upd((x) => { x.selected = x.selected.filter((i) => i !== cid); });
         } else if (b.dataset.refill !== undefined) {
-          const sug = suggestFromPlan($('[data-f="plan"]', row).value, Store.implants, $('[data-f="diagnosis"]', row).value);
+          const sug = suggestImplantsFor($('[data-f="plan"]', row).value, $('[data-f="diagnosis"]', row).value, Store.implants);
           const ta = $('[data-f="implants"]', row);
           ta.value = sug.implants;
           ta.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1999,6 +2002,7 @@ const App = (() => {
     return `
       <div class="card" id="implants">
         <h3>Implant database</h3>
+        <p class="small"><b>Searched first:</b> your previous OT lists — ${OT_HISTORY.length} cases from ${esc(fmtDate(OT_HISTORY.at(-1).date))} to ${esc(fmtDate(OT_HISTORY[0].date))}. The most similar past case (same procedure and bone; side and spelling ignored) gives the implants exactly as written then. <b>Backup:</b> the reference list below.</p>
         <p class="muted small">When a case's plan matches an entry below, its implants fill in automatically (several matches are combined). Your own entries match on the procedure name, e.g. “SHORT PFN” matches “CR/ORIF WITH SHORT PFN LEFT”; the unit's list also checks the bone in the plan or diagnosis, as shown under each name.</p>
         <div class="table-wrap">
           <table class="board impl-table">
@@ -2019,7 +2023,7 @@ const App = (() => {
             </tfoot>
           </table>
         </div>
-        <label class="block test">Test a plan<input id="impl-test"></label>
+        <label class="block test">Test a diagnosis and plan<input id="impl-test"></label>
         <div id="impl-out" class="muted small"></div>
       </div>`;
   }
@@ -2170,10 +2174,11 @@ const App = (() => {
       // Implant database
       const test = $('#impl-test', el);
       const runTest = () => {
-        const s = suggestFromPlan(test.value, Store.implants, test.value);
-        $('#impl-out', el).innerHTML = s.matches.length
-          ? s.matches.map((r) => `<div><b>${esc(r.name)}</b>: ${esc(r.implants)}</div>`).join('')
-          : (test.value ? 'No match' : '');
+        const s = suggestImplantsFor(test.value, test.value, Store.implants);
+        $('#impl-out', el).innerHTML = s.source === 'history'
+          ? `<div><b>From your OT list of ${esc(fmtDate(s.entry.date))}</b> (${esc(s.entry.dx)} — ${esc(s.entry.plan)}):<br>${esc(s.entry.implants)}</div>`
+          : s.source === 'list' ? s.matches.map((r) => `<div><b>Reference list — ${esc(r.name)}</b>: ${esc(r.implants)}</div>`).join('')
+            : (test.value ? 'No match' : '');
       };
       test.oninput = runTest;
       $('#implants', el).addEventListener('change', (e) => {

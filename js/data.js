@@ -473,6 +473,79 @@ function suggestFromPlan(plan, rules, diagnosis = '') {
   return { matches: m, implants: items.join(', ') };
 }
 
+// ---- Previous OT lists (OT_HISTORY, js/ot-history.js) ---------------------
+// A new case is compared with every past case: procedure and bone must
+// agree; side, spelling and filler words are ignored. The most similar
+// (most recent on a tie) gives the implants, exactly as written then.
+const OT_SYNONYMS = [
+  [/#/g, ' FRACTURE '], [/\bCR\s*\/\s*ORIF\b|\bCR\s*\/\s*IF\b|\bCRIF\b|\bCRPP\b/g, ' CRIF '], [/\bOSTEOSYN\s*THESIS\b|\bOSSTEOSYNTHESIS\b|\bPLATEOSTEOSYNTHESIS\b/g, ' PLATE OSTEOSYNTHESIS '],
+  [/\bINTRA\s*MEDULLARY\b|\bINTRAMEDULLARY\b|\bINTERLOCKING\b|\bILN\b|\bILIN\b|\bIMIL\b|\bIM\b/g, ' IMIL '], [/\bNAILING\b|\bNAILS?\b/g, ' NAIL '],
+  [/\bPLATING\b|\bPLATES\b/g, ' PLATE '], [/\bK[-\s]?WIRES?\b|\bK[-\s]?WIRING\b|\bKWIRES?\b/g, ' KWIRE '], [/\bHEMI\s*ARTHROPLASTY\b|\bBIPOLAR\b|\bAUSTIN[-\s]*MOORE\b|\bAMP\b/g, ' HEMIARTHROPLASTY '],
+  [/\bNOF\b/g, ' NECK FEMUR '], [/\bIT\b|\bINTER\s*TROCHANTERIC\b|\bINTERTROCHANTER\b/g, ' INTERTROCHANTERIC '], [/\bSUB\s*TROCHANTERIC\b|\bSUBTROCHANTER\b/g, ' SUBTROCHANTERIC '],
+  [/\bBB\b|\bBOTH\s*BONES?\b/g, ' BOTHBONE '], [/\bEX[-\s]?FIX\b|\bEXTERNAL\s*FIXATORS?\b|\bEXTERNAL\s*FIXATION\b/g, ' EXFIX '], [/\bTENSION\s*BAND\s*WIRING\b|\bTBW\b/g, ' TBW '],
+  [/\bCANCELLOUS\s*SCREWS?\b|\bCC\s*SCREWS?\b|\bCCS\b/g, ' CCSCREW '], [/\bSUPRA\s*CONDYLAR\b|\bSUPRACONYLAR\b/g, ' SUPRACONDYLAR '], [/\bCALCANEUS\b|\bCALCANEAL\b/g, ' CALCANEUM '],
+  [/\bMALLEOL\w*\b|\bBIMALLEOLAR\b|\bTRIMALLEOLAR\b/g, ' MALLEOLUS '], [/\bVERTEBRA\w*\b|\b[CDTL]\d{1,2}\b/g, ' SPINE '],
+];
+const OT_STOP = new Set(['LEFT', 'RIGHT', 'LT', 'RT', 'BILATERAL', 'WITH', 'AND', 'OF', 'THE', 'FOR', 'TO', 'A', 'AN', 'IN', 'ON', 'AT', 'UNDER', 'CLOSED', 'SIMPLE', 'TYPE', 'FRACTURE', 'FRACTURES', 'SIDE', 'HIP', 'JOINT', 'REGION', 'MIDDLE', 'MID', 'THIRD', '3RD', 'PROXIMAL', 'DISTAL', 'SHAFT', 'ORIF', 'CRIF', 'OPEN', 'REDUCTION', 'INTERNAL', 'FIXATION', 'OSTEOSYNTHESIS']);
+// Words that decide the implants: if the new case has one, the past case must too.
+const OT_KEY = ['PFN', 'PFNA', 'SHORT', 'LONG', 'DHS', 'DCS', 'IMIL', 'RETROGRADE', 'TENS', 'PLATE', 'KWIRE', 'CCSCREW', 'HEMIARTHROPLASTY', 'THR', 'TKR', 'EXFIX', 'LRS', 'ILIZAROV', 'TBW', 'PEDICLE', 'SPINE', 'EXIT', 'REMOVAL', 'ARTHROSCOPIC', 'ARTHROSCOPY', 'ACL', 'BIOPSY', 'DEBRIDEMENT', 'SSG', 'AMPUTATION', 'CERCLAGE', 'BONE', 'GRAFT', 'GRAFTING', 'HYBRID', 'RING', 'ACDF', 'ANTERIOR', 'POSTERIOR', 'REVISION', 'INJECTION', 'RECON', 'ACETABULUM', 'FEMORAL', 'GUIDED', 'ULTRASOUNDED', 'ULTRASOUND'];
+const OT_BONES = ['FEMUR', 'TIBIA', 'FIBULA', 'HUMERUS', 'RADIUS', 'ULNA', 'FOREARM', 'CLAVICLE', 'MALLEOLUS', 'ANKLE', 'PATELLA', 'OLECRANON', 'CALCANEUM', 'SPINE', 'ACETABULUM', 'PELVIS', 'SCAPULA', 'METACARPAL', 'METATARSAL', 'PHALANX', 'NECK', 'INTERTROCHANTERIC', 'SUBTROCHANTERIC', 'SUPRACONDYLAR', 'LEG', 'WRIST', 'ELBOW', 'KNEE', 'SHOULDER', 'BOTHBONE'];
+
+function otTokens(text) {
+  let t = ` ${String(text || '').toUpperCase()} `;
+  for (const [re, to] of OT_SYNONYMS) t = t.replace(re, to);
+  return new Set(t.replace(/[^A-Z0-9]+/g, ' ').split(' ').filter((w) => w && w.length > 1 && !OT_STOP.has(w) && !/^\d+$/.test(w)));
+}
+const dice = (a, b) => {
+  if (!a.size || !b.size) return 0;
+  let n = 0;
+  for (const x of a) if (b.has(x)) n++;
+  return (2 * n) / (a.size + b.size);
+};
+let otIndex = null;
+function otIndexed() {
+  otIndex ||= (typeof OT_HISTORY === 'undefined' ? [] : OT_HISTORY).filter((r) => r.implants).map((r) => {
+    const plan = otTokens(r.plan);
+    const all = new Set([...plan, ...otTokens(r.dx)]);
+    return { r, plan, dx: otTokens(r.dx), all };
+  });
+  return otIndex;
+}
+
+// → { entry, score } or null
+function matchOtHistory(plan, diagnosis, skip) {
+  const qp = otTokens(plan);
+  const qd = otTokens(diagnosis);
+  const qa = new Set([...qp, ...qd]);
+  if (!qp.size) return null;
+  const keys = OT_KEY.filter((k) => qp.has(k));
+  const bones = OT_BONES.filter((k) => qa.has(k));
+  const scored = [];
+  for (const it of otIndexed()) {
+    if (it.r === skip) continue;
+    if (keys.some((k) => !it.plan.has(k) && !it.dx.has(k))) continue; // different procedure
+    if (bones.length && !bones.some((k) => it.all.has(k))) continue; // different bone
+    // A past case with extra procedures the new one doesn't mention ("implant
+    // exit WITH EXTERNAL FIXATOR") is a weaker match.
+    const extra = OT_KEY.filter((k) => it.plan.has(k) && !qp.has(k)).length;
+    const score = (0.65 * dice(qp, it.plan) + 0.35 * dice(qd, it.dx)) * 0.8 ** extra;
+    scored.push({ entry: it.r, score });
+  }
+  if (!scored.length) return null;
+  const top = Math.max(...scored.map((x) => x.score));
+  if (top < 0.45) return null;
+  // Near-ties (within 0.05) go to the most recent OT list.
+  return scored.filter((x) => x.score >= top - 0.05).sort((a, b) => b.entry.date.localeCompare(a.entry.date) || b.score - a.score)[0];
+}
+
+// Implants for a plan: previous OT lists first, then the reference list.
+function suggestImplantsFor(plan, diagnosis, rules) {
+  const h = matchOtHistory(plan, diagnosis);
+  if (h) return { implants: h.entry.implants, source: 'history', entry: h.entry, score: h.score };
+  const r = suggestFromPlan(plan, rules, diagnosis);
+  return r.implants ? { implants: r.implants, source: 'list', matches: r.matches } : { implants: '', source: '' };
+}
+
 // The unit's implant list (from OT_LIST_2_1.docx). Loaded once into the
 // implant database; everything stays editable in Settings.
 const PLATE_WORDS = ['plate', 'plating', 'plates', 'osteosynthesis', 'plateosteosynthesis', 'ossteosynthesis'];

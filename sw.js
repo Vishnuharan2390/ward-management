@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION with each release so phones
 // pick up the new files; data never goes through here (it lives in the
 // browser's storage or Firestore).
-const VERSION = 'v29';
+const VERSION = 'v30';
 const CACHE = 'preop-ward-' + VERSION;
 const SHELL = [
   './',
@@ -10,6 +10,7 @@ const SHELL = [
   'manifest.webmanifest',
   'css/app.css',
   'js/util.js',
+  'js/ot-history.js',
   'js/data.js',
   'js/store.js',
   'js/print.js',
