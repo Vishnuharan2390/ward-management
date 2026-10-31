@@ -947,7 +947,8 @@ html[data-ui="material"] .hosp { background: #eaddff; box-shadow: none; }
 html.flat .flow .set-acts .icon { color: var(--th-ink); opacity: .85; }
 
 /* ---- Gradient looks (flat base + gradients on chrome, buttons, tiles, headings) ---- */
-html[data-ui="crimson"], html[data-ui="aurora"] {
+html.grad {
+  --gink: #fff; --tg1: var(--g1); --tg2: var(--g3);
   --card: #fff; --field: #fff; --ink: #141a2c; --muted: #5d6680; --line: #e3e7f0; --hi: #fff; --lo: #e3e7f0; --face: #fff;
   --rc: 14px; --rb: 10px; --th-ink: #fff; --top-ink: #fff; --top-muted: rgba(255,255,255,.78); --top-accent: transparent;
   --font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --field-font: var(--font);
@@ -963,50 +964,71 @@ html[data-ui="aurora"] {
   --bg: #f3f4fb; --head-ink: #3730a3; --nav-on-ink: #4338ca; --primary-ink: #fff;
   --body-bg: radial-gradient(1100px 600px at -10% -10%, rgba(91,61,245,.16), transparent 60%), radial-gradient(900px 600px at 110% 20%, rgba(20,184,166,.16), transparent 55%), radial-gradient(900px 600px at 50% 120%, rgba(47,128,237,.14), transparent 60%), #f5f6fc;
 }
-html[data-ui="crimson"] body, html[data-ui="aurora"] body { background-attachment: fixed; }
-html[data-ui="crimson"] .top, html[data-ui="aurora"] .top { background: linear-gradient(110deg, var(--g1) 0%, var(--g2) 55%, var(--g3) 100%); }
-html[data-ui="crimson"] #nav a.on, html[data-ui="aurora"] #nav a.on { background: var(--bg); }
+html.grad body{ background-attachment: fixed; }
+html.grad .top{ background: linear-gradient(110deg, var(--g1) 0%, var(--g2) 55%, var(--g3) 100%); }
+html.grad #nav a.on{ background: var(--bg); }
 /* buttons */
-html[data-ui="crimson"] .btn.primary, html[data-ui="crimson"] .chip.on,
-html[data-ui="aurora"] .btn.primary, html[data-ui="aurora"] .chip.on {
-  background: linear-gradient(120deg, var(--g1), var(--g2) 60%, var(--g3)); color: #fff; box-shadow: 0 4px 14px color-mix(in srgb, var(--g2) 35%, transparent);
+html.grad .btn.primary, html.grad .chip.on {
+  background: linear-gradient(120deg, var(--g1), var(--g2) 60%, var(--g3)); color: var(--gink); box-shadow: 0 4px 14px color-mix(in srgb, var(--g2) 35%, transparent);
 }
-html[data-ui="crimson"] .btn, html[data-ui="aurora"] .btn { transition: transform .08s, box-shadow .15s; }
-html[data-ui="crimson"] .btn:active:not(:disabled), html[data-ui="aurora"] .btn:active:not(:disabled) { transform: translateY(1px); }
+html.grad .btn{ transition: transform .08s, box-shadow .15s; }
+html.grad .btn:active:not(:disabled){ transform: translateY(1px); }
 /* hospital heading + stat tiles */
-html[data-ui="crimson"] .hosp, html[data-ui="aurora"] .hosp {
-  background: linear-gradient(135deg, var(--g1) 0%, var(--g2) 60%, var(--g3) 100%); color: #fff; box-shadow: 0 10px 28px color-mix(in srgb, var(--g1) 30%, transparent);
+html.grad .hosp{
+  background: linear-gradient(135deg, var(--g1) 0%, var(--g2) 60%, var(--g3) 100%); color: var(--gink); box-shadow: 0 10px 28px color-mix(in srgb, var(--g1) 30%, transparent);
 }
-html[data-ui="crimson"] .hosp *, html[data-ui="aurora"] .hosp * { color: #fff !important; }
-html[data-ui="crimson"] .hosp-l3, html[data-ui="aurora"] .hosp-l3 { opacity: .95; letter-spacing: .02em; }
-html[data-ui="crimson"] .hosp-l4, html[data-ui="aurora"] .hosp-l4 { opacity: .8; }
-html[data-ui="crimson"] .stats div, html[data-ui="aurora"] .stats div { position: relative; overflow: hidden; }
-html[data-ui="crimson"] .stats div::before, html[data-ui="aurora"] .stats div::before {
+html.grad .hosp *{ color: var(--gink) !important; }
+html.grad .hosp-l3{ opacity: .95; letter-spacing: .02em; }
+html.grad .hosp-l4{ opacity: .8; }
+html.grad .stats div{ position: relative; overflow: hidden; }
+html.grad .stats div::before{
   content: ""; position: absolute; inset: 0 0 auto 0; height: 4px; background: linear-gradient(90deg, var(--g1), var(--g2), var(--g3));
 }
-html[data-ui="crimson"] .stats b, html[data-ui="aurora"] .stats b {
-  background: linear-gradient(120deg, var(--g1), var(--g3)); -webkit-background-clip: text; background-clip: text; color: transparent;
+html.grad .stats b{
+  background: linear-gradient(120deg, var(--tg1), var(--tg2)); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 /* gradient headings */
-html[data-ui="crimson"] .card > h3:first-child, html[data-ui="crimson"] .card > .row-between:first-child > h3, html[data-ui="crimson"] .form > fieldset.card > legend, html[data-ui="crimson"] .toolbar h2,
-html[data-ui="aurora"] .card > h3:first-child, html[data-ui="aurora"] .card > .row-between:first-child > h3, html[data-ui="aurora"] .form > fieldset.card > legend, html[data-ui="aurora"] .toolbar h2 {
-  background: linear-gradient(100deg, var(--g1), var(--g3)); -webkit-background-clip: text; background-clip: text; color: transparent;
+html.grad .card > h3:first-child, html.grad .card > .row-between:first-child > h3, html.grad .form > fieldset.card > legend, html.grad .toolbar h2 {
+  background: linear-gradient(100deg, var(--tg1), var(--tg2)); -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 /* case cards: gradient edge */
-html[data-ui="crimson"] .case-card, html[data-ui="aurora"] .case-card { border-left: 0; position: relative; }
-html[data-ui="crimson"] .case-card::before, html[data-ui="aurora"] .case-card::before {
+html.grad .case-card{ border-left: 0; position: relative; }
+html.grad .case-card::before{
   content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 4px; border-radius: 0 4px 4px 0; background: linear-gradient(180deg, var(--g1), var(--g2), var(--g3));
 }
-html[data-ui="crimson"] .progress i, html[data-ui="aurora"] .progress i { background: linear-gradient(90deg, var(--g3), #f59e0b); }
-html[data-ui="crimson"] .progress i.ok, html[data-ui="aurora"] .progress i.ok { background: linear-gradient(90deg, #10b981, #22c55e); }
+html.grad .progress i{ background: linear-gradient(90deg, var(--g3), #f59e0b); }
+html.grad .progress i.ok{ background: linear-gradient(90deg, #10b981, #22c55e); }
 /* tables */
-html[data-ui="crimson"] .board th, html[data-ui="crimson"] .flow thead th,
-html[data-ui="aurora"] .board th, html[data-ui="aurora"] .flow thead th { background: linear-gradient(110deg, var(--g1), var(--g2)); color: #fff; }
-html[data-ui="crimson"] .flow tr.grp th, html[data-ui="aurora"] .flow tr.grp th { background: color-mix(in srgb, var(--g2) 8%, #fff); }
-html[data-ui="crimson"] .picker tr.picked, html[data-ui="aurora"] .picker tr.picked { background: linear-gradient(110deg, var(--g1), var(--g2)); }
-html[data-ui="crimson"] .deck-previews, html[data-ui="aurora"] .deck-previews { background: linear-gradient(135deg, #1b2236, #2b2140); }
+html.grad .board th, html.grad .flow thead th{ background: linear-gradient(110deg, var(--g1), var(--g2)); color: var(--gink); }
+html.grad .flow tr.grp th{ background: color-mix(in srgb, var(--g2) 8%, #fff); }
+html.grad .picker tr.picked{ background: linear-gradient(110deg, var(--g1), var(--g2)); }
+html.grad .deck-previews{ background: linear-gradient(135deg, #1b2236, #2b2140); }
 /* one continuous gradient across a table's header row */
-html[data-ui="crimson"] .board thead tr, html[data-ui="crimson"] .flow thead tr,
-html[data-ui="aurora"] .board thead tr, html[data-ui="aurora"] .flow thead tr { background: linear-gradient(110deg, var(--g1), var(--g2) 70%, var(--g3)); }
-html[data-ui="crimson"] .board thead th, html[data-ui="crimson"] .flow thead th,
-html[data-ui="aurora"] .board thead th, html[data-ui="aurora"] .flow thead th { background: transparent; position: static; }
+html.grad .board thead tr, html.grad .flow thead tr{ background: linear-gradient(110deg, var(--g1), var(--g2) 70%, var(--g3)); }
+html.grad .board thead th, html.grad .flow thead th{ background: transparent; position: static; }
+
+/* ---- Pastel gradient looks: soft colours, dark ink on the gradients ---- */
+html[data-ui="blossom"], html[data-ui="mint"], html[data-ui="sorbet"] {
+  --gink: #2e2540; --th-ink: #2e2540; --top-ink: #2e2540; --top-muted: rgba(46,37,64,.7); --primary-ink: #2e2540;
+  --ink: #2a2638; --muted: #6b6680; --line: #ece6f2; --lo: #ece6f2;
+}
+html[data-ui="blossom"] {
+  --g1: #ffd8c8; --g2: #fbc8de; --g3: #d8cbf6; --tg1: #c45a7e; --tg2: #7a5cc6;
+  --brand: #8c4f86; --brand-2: #8c4f86; --red: #d22d4f; --ok: #2f8a5c;
+  --bg: #fdf7fa; --head-ink: #7a4a80; --nav-on-ink: #7a4a80;
+  --body-bg: radial-gradient(1000px 520px at 100% 0%, rgba(251,200,222,.45), transparent 60%), radial-gradient(900px 520px at 0% 100%, rgba(216,203,246,.45), transparent 60%), #fdf8fb;
+}
+html[data-ui="mint"] {
+  --g1: #c4f0dd; --g2: #c4e3f8; --g3: #d6d4fa; --tg1: #1f8d6c; --tg2: #4b5fc4;
+  --brand: #2c6e8f; --brand-2: #2c6e8f; --red: #d22d4f; --ok: #1f8d5c;
+  --bg: #f5fbfa; --head-ink: #2a6680; --nav-on-ink: #2a6680;
+  --body-bg: radial-gradient(1000px 520px at 0% 0%, rgba(196,240,221,.5), transparent 60%), radial-gradient(900px 520px at 100% 100%, rgba(214,212,250,.45), transparent 60%), #f6fbfb;
+}
+html[data-ui="sorbet"] {
+  --g1: #fff0b3; --g2: #ffd5b0; --g3: #ffc2c8; --tg1: #c27a12; --tg2: #cf4560;
+  --brand: #a5582a; --brand-2: #a5582a; --red: #d0213f; --ok: #2f8a5c;
+  --bg: #fffaf4; --head-ink: #94512a; --nav-on-ink: #94512a;
+  --body-bg: radial-gradient(1000px 520px at 100% 0%, rgba(255,213,176,.5), transparent 60%), radial-gradient(900px 520px at 0% 100%, rgba(255,240,179,.5), transparent 60%), #fffaf5;
+}
+html[data-ui="blossom"] .hosp, html[data-ui="mint"] .hosp, html[data-ui="sorbet"] .hosp { box-shadow: 0 10px 28px color-mix(in srgb, var(--g2) 55%, transparent); }
+html[data-ui="blossom"] .deck-previews, html[data-ui="mint"] .deck-previews, html[data-ui="sorbet"] .deck-previews { background: linear-gradient(135deg, #3a3350, #4a3a52); }
