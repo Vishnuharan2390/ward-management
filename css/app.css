@@ -1182,3 +1182,15 @@ html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, htm
 .imp-photos select { font-size: .75rem; }
 .imp-doa label { display: flex; flex-direction: column; font-size: .85rem; max-width: 220px; }
 .imp-doa p { margin: .4rem 0 0; }
+
+/* Pre-op X-rays PDF (OT list): patient header on every page */
+.xr-head { border: 1.5px solid #000; padding: 5pt 8pt; margin-bottom: 4mm; }
+.xr-name { font: bold 17pt Arial, Helvetica, sans-serif; letter-spacing: .02em; }
+.xr-no { font-weight: normal; }
+.xr-as { margin-left: 8pt; }
+.xr-dx { font: bold 12.5pt Arial, Helvetica, sans-serif; margin-top: 2pt; }
+.xr-page .ip-imgs img { max-height: 238mm; }
+.xr-foot { font: 8.5pt Arial, sans-serif; color: #444; text-align: right; margin-top: 2mm; }
+.xr-page .ip-imgs img { height: 236mm; width: auto; object-fit: contain; }
+@media print { html, body, html.flat body { background: #fff !important; } }
+@media print { :root, html[data-ui] { color-scheme: light !important; } }
