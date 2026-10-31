@@ -1112,3 +1112,51 @@ html[data-ui="dos"] .brand-ico { display: inline-block; }
 html.grad .hosp-logo { background: var(--gink); }
 html[data-ui="tangerine"] .hosp-logo { background: var(--or); }
 html[data-ui="midnight"] .hosp-logo { background: var(--ink); }
+
+/* ---- Graphite: monochrome dark, silver haze, white pill actions, mono eyebrows ---- */
+html[data-ui="graphite"] {
+  --desk: #0b0b0c; --bg: #0e0e0f; --card: #161617; --field: #111112; --ink: #f2f2f2; --muted: #8d8d92; --line: #26262a;
+  --hi: #26262a; --lo: #26262a; --dk: #000; --face: #161617; --brand: #f2f2f2; --brand-2: #f2f2f2;
+  --red: #ff5d62; --red-bg: #2a1416; --ok: #7ad69c; --ok-bg: #12241a; --warn: #f0c46a; --warn-bg: #272012; --blue-bg: #1c1c20;
+  --top-bg: rgba(14,14,15,.82); --top-ink: #f2f2f2; --top-muted: #a1a1a6; --top-accent: transparent; --blur: blur(14px);
+  --nav-on-bg: #f2f2f2; --nav-on-ink: #0e0e0f; --head-ink: #f2f2f2;
+  --primary-bg: #f5f5f5; --primary-ink: #0e0e0f; --btn-bg: #1f1f22; --btn-ink: #ededed; --th-bg: #1c1c1f; --th-ink: #d6d6da;
+  --rc: 16px; --rb: 10px;
+  --window: 0 0 0 1px #232326, 0 12px 30px rgba(0,0,0,.35);
+  --body-bg: radial-gradient(900px 420px at 15% -8%, rgba(255,255,255,.14), transparent 62%), radial-gradient(800px 500px at 110% 30%, rgba(200,200,205,.10), transparent 60%), radial-gradient(700px 400px at 40% 115%, rgba(255,255,255,.07), transparent 60%), #0b0b0c;
+  --font: "Figtree", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font);
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html[data-ui="graphite"] body { background-attachment: fixed; }
+html[data-ui="graphite"] .top { border-bottom: 1px solid #1d1d20; }
+html[data-ui="graphite"] .brand { font-weight: 800; letter-spacing: -.02em; }
+html[data-ui="graphite"] .menubar .sync, html[data-ui="graphite"] .menubar .ver { font-family: var(--mono); font-size: .72rem; letter-spacing: .02em; }
+html[data-ui="graphite"] #nav { background: #161617; margin: 2px 12px 8px; padding: 4px; border-radius: 12px; box-shadow: 0 0 0 1px #232326; }
+html[data-ui="graphite"] #nav a { border-radius: 9px; font-weight: 500; }
+html[data-ui="graphite"] .btn, html[data-ui="graphite"] .chip { border: 1px solid #2a2a2e; font-weight: 500; }
+html[data-ui="graphite"] .btn.primary, html[data-ui="graphite"] .chip.on { border-color: transparent; font-weight: 600; }
+html[data-ui="graphite"] .btn:hover:not(:disabled) { filter: brightness(1.12); }
+html[data-ui="graphite"] h1, html[data-ui="graphite"] h2, html[data-ui="graphite"] h3, html[data-ui="graphite"] legend { font-weight: 600; letter-spacing: -.01em; }
+/* hero-style hospital panel: big white line, grey second line, mono eyebrow */
+html[data-ui="graphite"] .hosp { text-align: left; padding: 18px 18px 16px; background: radial-gradient(420px 200px at 100% 0%, rgba(255,255,255,.08), transparent 70%), var(--card); }
+html[data-ui="graphite"] .hosp-logo { margin: 0 0 10px; background: #f2f2f2; width: 38px; height: 48px; }
+html[data-ui="graphite"] .hosp-l1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -.01em; color: #f5f5f5; line-height: 1.2; }
+html[data-ui="graphite"] .hosp-l2 { font-size: 1.1rem; font-weight: 500; color: #8a8a90; }
+html[data-ui="graphite"] .hosp-l3 { font-size: .9rem; font-weight: 500; color: #c9c9ce; margin-top: 6px; }
+html[data-ui="graphite"] .hosp-l4 { font-family: var(--mono); font-size: .72rem; color: #7d7d83; letter-spacing: .01em; }
+/* stat tiles like the sidebar counts */
+html[data-ui="graphite"] .stats b { color: #f5f5f5; font-weight: 600; }
+html[data-ui="graphite"] .stats span { font-family: var(--mono); font-size: .66rem; color: #8d8d92; }
+/* cards, badges, tags */
+html[data-ui="graphite"] .case-card { border-left: 1px solid var(--line); }
+html[data-ui="graphite"] .cc-plan { color: #c9c9ce; }
+html[data-ui="graphite"] .badge, html[data-ui="graphite"] .badge-select { background: #f2f2f2; color: #0e0e0f; }
+html[data-ui="graphite"] .tag { background: transparent; }
+html[data-ui="graphite"] .progress { background: #26262a; }
+html[data-ui="graphite"] .progress i { background: #f2f2f2; }
+html[data-ui="graphite"] .muted { color: var(--muted); }
+html[data-ui="graphite"] .lab-in.from-photo input, html[data-ui="graphite"] .lab-in.from-photo select { background: #2b2a12; color: var(--ink); }
+html[data-ui="graphite"] .slide { color: #000; }
+html[data-ui="graphite"] .deck-previews { background: #0b0b0c; }
+html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, html[data-ui="graphite"] textarea:focus { outline: 1px solid #bdbdc2; outline-offset: 1px; }
