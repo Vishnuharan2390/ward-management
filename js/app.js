@@ -280,6 +280,18 @@ const App = (() => {
     live: false,
     items: null,
     busy: '',
+    doa: '', // date of admission = the Admission day PPT's date
+    usePosted: false, // or the date each post was sent
+    back: '#/',
+    open(deckDate) {
+      Import.doa = deckDate || Deck.date || todayISO();
+      Import.back = deckDate ? '#/deck' : '#/';
+      Import.applyDoa();
+      return Import;
+    },
+    applyDoa() {
+      (Import.items || []).forEach((c) => { c.doa = Import.usePosted ? c.posted || Import.doa : Import.doa; });
+    },
     render() {
       const it = Import.items;
       const sexSel = (i, v) => `<select data-i="${i}" data-f="sex">${['', 'M', 'F'].map((x) => `<option${x === v ? ' selected' : ''}>${x}</option>`).join('')}</select>`;
@@ -287,6 +299,11 @@ const App = (() => {
       const list = it ? `
         <div class="toolbar"><h2>${it.length} case${it.length === 1 ? '' : 's'} found</h2>
           <button class="btn" id="imp-clear">Start over</button></div>
+        <div class="card imp-doa">
+          <label>Date of admission<input type="date" id="imp-doa" value="${esc(Import.doa)}" ${Import.usePosted ? 'disabled' : ''}></label>
+          <p class="small muted">${Import.usePosted ? 'Each case gets the date it was posted in the group.' : 'Taken from the Admission day PPT date. Changing it here changes the PPT date too.'}
+            <button class="link" id="imp-posted">${Import.usePosted ? 'Use the Admission day PPT date' : 'Use the date each case was posted instead'}</button></p>
+        </div>
         ${it.length ? '' : '<p class="empty">No case posts found. A post needs a line like “Udayakumar 26/M” and the diagnosis.</p>'}
         ${it.map((c, i) => `
           <div class="card imp-case${c.dup ? ' imp-dup' : ''}">
@@ -337,6 +354,7 @@ const App = (() => {
         c.dup = have.has(WaImport.key(c.name, c.age));
         c.sel = !c.dup;
         c.plan = defaultPlanFor(c.diagnosis);
+        c.posted = c.doa;
         c.photos = c.photos || [];
         for (const ph of c.photos) {
           ph.url = URL.createObjectURL(ph.blob);
@@ -344,6 +362,7 @@ const App = (() => {
         }
       }
       Import.items = cases;
+      Import.applyDoa();
       Import.busy = '';
       render();
     },
@@ -367,6 +386,19 @@ const App = (() => {
         const c = WaImport.parseCaseText($('#imp-text', el).value);
         if (!c) return toast('Couldn’t find a “Name 26/M” line and a diagnosis in that message', 5000);
         Import.load([{ ...c, doa: todayISO(), photos: [] }]);
+      };
+      const doa = $('#imp-doa', el);
+      if (doa) doa.onchange = () => {
+        Import.doa = doa.value || todayISO();
+        Deck.date = Import.doa;
+        Import.applyDoa();
+        render();
+      };
+      const posted = $('#imp-posted', el);
+      if (posted) posted.onclick = () => {
+        Import.usePosted = !Import.usePosted;
+        Import.applyDoa();
+        render();
       };
       const clear = $('#imp-clear', el);
       if (clear) clear.onclick = () => {
@@ -418,7 +450,8 @@ const App = (() => {
         (Import.items || []).forEach((c) => c.photos.forEach((ph) => URL.revokeObjectURL(ph.url)));
         Import.items = null;
         toast(`Added ${pick.length} case(s)${photos ? ` with ${photos - bad} photo(s)` : ''}${bad ? ` — ${bad} photo(s) couldn't be opened` : ''}`, 5000);
-        location.hash = '#/';
+        if (Import.back === '#/deck') Deck.date = Import.doa;
+        location.hash = Import.back;
       };
     },
   };
@@ -1548,6 +1581,7 @@ const App = (() => {
           }).join('') || '<div class="empty">No cases on this date yet. Tap “+ Add case” below.</div>'}
           <div class="deck-add-row">
             <button class="btn primary" id="deck-new">+ Add case ${st.cases.length + 1}</button>
+            <a class="btn wa" href="#/import/deck/${esc(date)}">From WhatsApp</a>
             ${others.length ? `<select id="deck-add" aria-label="Add an existing case"><option value="">or add an existing case…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select>` : ''}
           </div>
           ${cfg.skip.length ? `<p class="small"><button class="link" id="deck-unskip">Bring back ${cfg.skip.length} left-out case(s)</button></p>` : ''}
@@ -2579,7 +2613,8 @@ const App = (() => {
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
     [/^#\/new$/, () => CaseForm()],
-    [/^#\/import$/, () => Import],
+    [/^#\/import$/, () => Import.open()],
+    [/^#\/import\/deck\/([\d-]+)$/, (d) => Import.open(d)],
     [/^#\/new\/deck\/([\d-]+)$/, (d) => CaseForm(null, d)],
     [/^#\/case\/(\w+)$/, (id) => CaseDetail(id)],
     [/^#\/case\/(\w+)\/edit$/, (id) => CaseForm(id)],

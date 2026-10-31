@@ -1180,3 +1180,5 @@ html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, htm
 .imp-photos figure { margin: 0; width: 104px; display: flex; flex-direction: column; gap: .25rem; }
 .imp-photos img { width: 104px; height: 104px; object-fit: cover; border-radius: 8px; background: #000; }
 .imp-photos select { font-size: .75rem; }
+.imp-doa label { display: flex; flex-direction: column; font-size: .85rem; max-width: 220px; }
+.imp-doa p { margin: .4rem 0 0; }
