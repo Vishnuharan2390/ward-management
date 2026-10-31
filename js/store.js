@@ -65,9 +65,11 @@ const Store = (() => {
     saveLocal('cases');
     saveLocal('implants');
     // The unit's implant list, loaded once (kept if later edited or deleted).
-    if (!state.meta.main?.implantSeed) {
-      for (const r of UNIT_IMPLANTS) if (!state.implants[r.id]) state.implants[r.id] = { ...r };
-      state.meta.main = { ...(state.meta.main || {}), implantSeed: 'ot2' };
+    const seed = state.meta.main?.implantSeed;
+    if (seed !== UNIT_IMPLANTS_VERSION) {
+      if (!seed) for (const r of UNIT_IMPLANTS) if (!state.implants[r.id]) state.implants[r.id] = { ...r };
+      if (seed === 'ot2') implantUpgrade((id) => delete state.implants[id], (id, ch) => Object.assign(state.implants[id], ch));
+      state.meta.main = { ...(state.meta.main || {}), implantSeed: UNIT_IMPLANTS_VERSION };
       saveLocal('implants');
       saveLocal('meta');
     }
@@ -153,10 +155,11 @@ const Store = (() => {
     const maybeSeedImplants = () => {
       if (implantSeedChecked || !fresh.implants || !fresh.meta) return;
       implantSeedChecked = true;
-      if (state.meta.main?.implantSeed) return;
-      for (const r of UNIT_IMPLANTS) if (!state.implants[r.id]) fb.fsM.setDoc(ref('implants', r.id), r);
-      const doc = ref('meta', 'main');
-      fb.fsM.setDoc(doc, { implantSeed: 'ot2' }, { merge: true });
+      const seed = state.meta.main?.implantSeed;
+      if (seed === UNIT_IMPLANTS_VERSION) return;
+      if (!seed) for (const r of UNIT_IMPLANTS) if (!state.implants[r.id]) fb.fsM.setDoc(ref('implants', r.id), r);
+      if (seed === 'ot2') implantUpgrade((id) => fb.fsM.deleteDoc(ref('implants', id)), (id, ch) => fb.fsM.updateDoc(ref('implants', id), ch));
+      fb.fsM.setDoc(ref('meta', 'main'), { implantSeed: UNIT_IMPLANTS_VERSION }, { merge: true });
     };
     for (const coll of [...COLLS, 'members']) {
       unsubs.push(fb.fsM.onSnapshot(collRef(coll), { includeMetadataChanges: false }, (snap) => {
@@ -221,6 +224,12 @@ const Store = (() => {
       listen();
     }
     emit();
+  }
+
+  // ot2 → ot2b: drop the removed entries; short/long PFN no longer pulls both.
+  function implantUpgrade(del, upd) {
+    for (const id of UNIT_IMPLANTS_REMOVED) if (state.implants[id]) del(id);
+    for (const r of UNIT_IMPLANTS.filter((x) => x.id === 'ot2_10' || x.id === 'ot2_11')) if (state.implants[r.id]) upd(r.id, { keywords: r.keywords });
   }
 
   // Cases typed on this device before sharing was switched on.

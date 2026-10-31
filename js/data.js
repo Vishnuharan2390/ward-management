@@ -546,6 +546,19 @@ function suggestImplantsFor(plan, diagnosis, rules) {
   return r.implants ? { implants: r.implants, source: 'list', matches: r.matches } : { implants: '', source: '' };
 }
 
+const UNIT_IMPLANTS_REMOVED = ['ot2_15', 'ot2_20', 'ot2_23']; // femur shaft plating, cancellous screws, SS grafting
+const UNIT_IMPLANTS_VERSION = 'ot2b';
+
+// Standard plans, filled from the diagnosis until the plan is typed.
+function defaultPlanFor(diagnosis) {
+  const d = String(diagnosis || '').toUpperCase();
+  const side = /\b(LEFT|LT)\b/.test(d) ? ' LEFT' : /\b(RIGHT|RT)\b/.test(d) ? ' RIGHT' : '';
+  if (/SUB\s*TROCHANTER/.test(d)) return 'CR/ORIF WITH LONG PFN' + side;
+  if (/INTER\s*TROCHANTER|PER\s*TROCHANTER|\bIT\b/.test(d)) return 'CR/ORIF WITH SHORT PFN' + side;
+  if (/NECK\s+OF\s+(THE\s+)?FEMUR|FEMORAL\s+NECK|\bNOF\b|NECK\s+FEMUR/.test(d)) return 'HEMIARTHROPLASTY HIP' + side;
+  return '';
+}
+
 // The unit's implant list (from OT_LIST_2_1.docx). Loaded once into the
 // implant database; everything stays editable in Settings.
 const PLATE_WORDS = ['plate', 'plating', 'plates', 'osteosynthesis', 'plateosteosynthesis', 'ossteosynthesis'];
@@ -561,8 +574,8 @@ const UNIT_IMPLANTS = [
   ['ACL reconstruction', { keywords: ['acl', 'acl reconstruction', 'aclr'] }, 'INTERFERENTIAL SCREWS'],
   ['IMIL nailing — tibia', { keywords: NAIL_WORDS, site: ['tibia', 'tibial', 'leg'], exclude: ['tens', 'femur', 'femoral'] }, '8,9,10 * 320-360MM IMIL TIBIA NAIL, 4.9MM LOCKING BOLTS'],
   ['IMIL nailing — femur', { keywords: NAIL_WORDS, site: ['femur', 'femoral'], exclude: ['tens', 'pfn', 'intertrochanteric', 'subtrochanter', 'subtrochanteric', 'tibia', 'leg'] }, '8,9,10 * 360-440MM IMIL FEMUR NAIL, 4.5MM LOCKING SCREWS'],
-  ['Short PFN', { keywords: ['short pfn', 'short/long pfn'] }, '8,9,10 * 250MM SHORT PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
-  ['Long PFN', { keywords: ['long pfn', 'short/long pfn'] }, '8,9,10 * 380-440MM LONG PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
+  ['Short PFN', { keywords: ['short pfn'] }, '8,9,10 * 250MM SHORT PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
+  ['Long PFN', { keywords: ['long pfn'] }, '8,9,10 * 380-440MM LONG PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
   ['PFN (length not stated)', { keywords: ['pfn', 'pfna'], exclude: ['short pfn', 'long pfn', 'short/long pfn'] }, '8,9,10 * 250MM SHORT PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
   ['DHS', { keywords: ['dhs', 'dynamic hip screw'] }, 'DHS SYSTEM, 4-10 HOLED DHS PLATE, RICHARD SCREWS'],
   ['Plating — distal femur (supracondylar)', { keywords: [...PLATE_WORDS, 'retrograde'], site: ['supracondylar femur', 'supraconylar femur', 'distal femur', 'supracondylar # femur', 'supracondylar'], exclude: ['humerus'] }, '8-12 HOLED DFLCP / NON LOCKING PLATE, 4.5MM CORTICAL SCREWS, 4.5MM LOCKING SCREWS, 6.5MM CANCELLOUS SCREWS'],
@@ -577,7 +590,9 @@ const UNIT_IMPLANTS = [
   ['Split skin grafting', { keywords: ['ss grafting', 'ssg', 'split skin graft', 'split skin grafting', 'skin grafting'] }, 'HUMPY KNIFE & BLADE'],
   ['Amputation', { keywords: ['amputation'] }, 'GIGLI SAW, SOFT TISSUE INSTRUMENTS'],
   ['Biopsy / excision / curettage / implant exit', { keywords: ['biopsy', 'excision', 'curettage', 'implant exit', 'implant removal'] }, 'SOFT TISSUE INSTRUMENTS'],
-].map(([name, m, implants], i) => ({ id: 'ot2_' + String(i).padStart(2, '0'), order: i, name, keywords: m.keywords || [], site: m.site || [], exclude: m.exclude || [], implants }));
+].map(([name, m, implants], i) => ({ id: 'ot2_' + String(i).padStart(2, '0'), order: i, name, keywords: m.keywords || [], site: m.site || [], exclude: m.exclude || [], implants }))
+  // Removed at the unit's request (ids kept stable for the rest).
+  .filter((r) => !UNIT_IMPLANTS_REMOVED.includes(r.id));
 
 const DISPOSITIONS = {
   discharge: { label: 'Discharge', title: '', status: 'discharged', course: 'PATIENT IS BEING DISCHARGED IN A STABLE CONDITION.' },

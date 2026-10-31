@@ -456,7 +456,10 @@ const App = (() => {
           const sug = { implants: suggestImplantsFor(plan, f.elements.diagnosis.value, Store.implants).implants, level: levelFor(plan, Store.levels).level };
           auto.forEach((k) => { if (force || !touched[k]) f.elements[k].value = sug[k]; });
         };
+        let planTouched = !!f.elements.plan.value.trim();
+        f.elements.plan.addEventListener('input', () => { planTouched = true; });
         ['plan', 'diagnosis'].forEach((k) => f.elements[k].addEventListener('input', () => {
+          if (k === 'diagnosis' && !planTouched) f.elements.plan.value = defaultPlanFor(f.elements.diagnosis.value);
           hint();
           fill(false);
         }));
@@ -1473,7 +1476,13 @@ const App = (() => {
           })();
         } else if (t.dataset.cf && cid) {
           const v = t.value.trim();
-          Store.patch('cases', cid, { [t.dataset.cf]: v });
+          const ch = { [t.dataset.cf]: v };
+          const cur = Store.cases[cid];
+          if (t.dataset.cf === 'diagnosis' && !hasText(cur.plan)) {
+            const plan = defaultPlanFor(v);
+            if (plan) Object.assign(ch, { plan, implants: suggestImplantsFor(plan, v, Store.implants).implants, level: levelFor(plan, Store.levels).level });
+          }
+          Store.patch('cases', cid, ch);
           if (t.dataset.cf === 'deckStatus' || t.dataset.cf === 'name') render(); else drawPreview();
         } else if (t.dataset.skipimg) {
           save((x) => { if (t.checked) delete x.skipImg[t.dataset.skipimg]; else x.skipImg[t.dataset.skipimg] = true; }, false);
