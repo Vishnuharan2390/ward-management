@@ -1315,7 +1315,7 @@ const App = (() => {
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
             <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>Share OT list on WhatsApp</button>
-            <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op X-rays PDF</button>
+            <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op imaging PDF (X-ray, CT, MRI)</button>
           </div>
           <p class="muted small">The print PDF puts the same list twice on one landscape sheet — top and bottom — to print and cut.</p>
         </div>`;
@@ -1433,16 +1433,21 @@ const App = (() => {
       $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); Share.send(Share.otText(cases, dd)); };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
-        toast('Collecting X-rays…', 8000);
+        toast('Collecting X-rays, CT and MRI…', 8000);
+        const KINDS = [['xray', 'PRE-OP X-RAY'], ['ct', 'CT'], ['mri', 'MRI']];
         const items = [];
         const none = [];
         for (const [i, c] of cases.entries()) {
-          const images = (await Promise.all(caseImages(c.id, 'xray').map((im) => Store.getImage(im.id)))).filter(Boolean);
-          if (images.length) items.push({ c, n: i + 1, images });
+          const sections = [];
+          for (const [k, title] of KINDS) {
+            const images = (await Promise.all(caseImages(c.id, k).map((im) => Store.getImage(im.id)))).filter(Boolean);
+            if (images.length) sections.push({ title, images });
+          }
+          if (sections.length) items.push({ c, n: i + 1, sections });
           else none.push(c.name || 'Unnamed');
         }
-        if (!items.length) return toast('None of these cases has a pre-op X-ray uploaded yet.', 4000);
-        toast(none.length ? `No pre-op X-ray for: ${none.join(', ')} — left out.` : 'Ready', none.length ? 6000 : 1500);
+        if (!items.length) return toast('None of these cases has a pre-op X-ray, CT or MRI uploaded yet.', 4000);
+        toast(none.length ? `No pre-op imaging for: ${none.join(', ')} — left out.` : 'Ready', none.length ? 6000 : 1500);
         Print.otXrays(items, dd);
       };
     },

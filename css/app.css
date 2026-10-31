@@ -1194,3 +1194,6 @@ html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, htm
 .xr-page .ip-imgs img { height: 236mm; width: auto; object-fit: contain; }
 @media print { html, body, html.flat body { background: #fff !important; } }
 @media print { :root, html[data-ui] { color-scheme: light !important; } }
+.xr-page .ip-title { margin: 0 0 3mm; }
+.xr-part { font-size: 11pt; font-weight: normal; text-decoration: none; }
+.xr-page .ip-imgs img { height: 222mm; }

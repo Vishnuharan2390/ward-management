@@ -235,25 +235,29 @@ const Print = (() => {
   }
 
 
-  // Pre-op radiographs of the OT list cases: one page per patient (more if > 3 films),
-  // name, age/sex and diagnosis across the top.
+  // Pre-op imaging of the OT list cases: for each patient, X-rays, then CT, then MRI, each under
+  // its own heading (3 films per page, more pages if needed), name/age/sex/diagnosis on every page.
   function otXrays(items, draft) {
     const pages = [];
-    items.forEach(({ c, n, images }) => {
-      for (let i = 0; i < images.length; i += 3) {
-        const part = images.slice(i, i + 3);
-        pages.push(`
+    items.forEach(({ c, n, sections }) => {
+      sections.forEach(({ title, images }) => {
+        const total = Math.ceil(images.length / 3);
+        for (let i = 0; i < images.length; i += 3) {
+          const part = images.slice(i, i + 3);
+          pages.push(`
       <section class="ip-page xr-page">
         <div class="xr-head">
           <div class="xr-name"><span class="xr-no">${n}.</span> ${esc(up(c.name))} <span class="xr-as">${esc(up(ageSex(c)))}</span></div>
           <div class="xr-dx">${esc(up(c.diagnosis))}</div>
         </div>
+        <h2 class="ip-title">${esc(title)}${total > 1 ? ` <span class="xr-part">(${i / 3 + 1}/${total})</span>` : ''}</h2>
         <div class="ip-imgs n${part.length}">${part.map((src) => `<img src="${src}" alt="">`).join('')}</div>
-        <div class="xr-foot">${esc(otTitle(draft)[0])}${images.length > 3 ? ` · ${Math.floor(i / 3) + 1}/${Math.ceil(images.length / 3)}` : ''}</div>
+        <div class="xr-foot">${esc(otTitle(draft)[0])}</div>
       </section>`);
-      }
+        }
+      });
     });
-    go(`<div class="pr ip">${pages.join('')}</div>`, { title: `PREOP XRAYS ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'A4 portrait', margin: '10mm' });
+    go(`<div class="pr ip">${pages.join('')}</div>`, { title: `PREOP IMAGING ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'A4 portrait', margin: '10mm' });
   }
 
   return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, OT_COLUMNS, otTitle };
