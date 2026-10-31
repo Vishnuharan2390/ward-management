@@ -755,3 +755,128 @@ main { padding-top: 12px; }
 @media (max-width: 640px) { .workup { grid-template-columns: 1fr; } }
 .deck-uploads { margin-top: .6rem; align-items: center; }
 .impl-how { margin-top: .2rem; font-size: .72rem; line-height: 1.25; }
+
+
+/* ================================================================
+   Alternative looks (Settings → Look; per device). Windows 98 is the
+   default above; each block below re-skins it through the same tokens.
+   ================================================================ */
+
+/* ---- Windows XP ---- */
+html[data-ui="xp"] {
+  --desk: #3a6ea5; --bg: #ece9d8; --card: #ece9d8; --field: #fff; --ink: #000; --muted: #444;
+  --brand: #0a246a; --brand-2: #3a6ea5; --lo: #aca899; --face: #f5f4ea;
+  --font: Tahoma, Verdana, "Segoe UI", sans-serif; --field-font: Tahoma, Verdana, sans-serif;
+  --raised: inset 0 0 0 1px #003c74; --sunken: inset 0 0 0 1px #7f9db9; --window: 0 0 0 1px #0831d9, 2px 3px 8px rgba(0,0,0,.35);
+}
+html[data-ui="xp"] body { background: linear-gradient(180deg, #2f6fd1 0%, #6ea6ea 38%, #9fd06a 62%, #4f9a2f 100%) fixed; -webkit-font-smoothing: auto; }
+html[data-ui="xp"] .titlebar, html[data-ui="xp"] .card > h3:first-child, html[data-ui="xp"] .card > .row-between:first-child,
+html[data-ui="xp"] .form > fieldset.card > legend, html[data-ui="xp"] .sheet > .row-between > h3 {
+  background: linear-gradient(180deg, #0997ff 0%, #0053ee 10%, #0050ee 45%, #0066ff 90%, #0055e5 100%);
+}
+html[data-ui="xp"] .top { border-radius: 8px 8px 0 0; overflow: hidden; }
+html[data-ui="xp"] .card, html[data-ui="xp"] .hosp, html[data-ui="xp"] .stats div { border-radius: 8px 8px 3px 3px; overflow: hidden; }
+html[data-ui="xp"] .form > fieldset.card > legend { border-radius: 6px 6px 0 0; }
+html[data-ui="xp"] .winbtns i { border-radius: 3px; background: linear-gradient(#fff, #d6d3c9); }
+html[data-ui="xp"] .winbtns i:last-child { background: linear-gradient(#e8836c, #c0451f); color: #fff; }
+html[data-ui="xp"] .btn, html[data-ui="xp"] .chip { border-radius: 3px; background: linear-gradient(180deg, #fff 0%, #ecebe6 85%, #d6d0c5 100%); }
+html[data-ui="xp"] .btn.primary { box-shadow: inset 0 0 0 1px #003c74, inset 0 0 0 2px #7ab0f7; }
+html[data-ui="xp"] #nav a { border-radius: 4px 4px 0 0; background: linear-gradient(#fff, #ecebe6); box-shadow: inset 0 0 0 1px #919b9c; }
+html[data-ui="xp"] #nav a.on { box-shadow: inset 0 0 0 1px #919b9c, inset 0 3px 0 #e68b2c; }
+html[data-ui="xp"] .progress i { background: repeating-linear-gradient(90deg, #2fd02f 0 8px, transparent 8px 10px); }
+html[data-ui="xp"] .toolbar h2, html[data-ui="xp"] main > h2 { text-shadow: 1px 1px 2px rgba(0,0,0,.6); }
+
+/* ---- Classic Mac (OS 9 Platinum) ---- */
+html[data-ui="mac"] {
+  --desk: #6f7fb1; --bg: #dddddd; --card: #eeeeee; --field: #fff; --ink: #000; --muted: #555;
+  --brand: #000; --brand-2: #000; --lo: #888; --face: #fff;
+  --font: Geneva, "Chicago", Charcoal, Verdana, sans-serif; --field-font: Geneva, Verdana, sans-serif;
+  --raised: inset 0 0 0 1px #000, inset 1px 1px #fff, inset -2px -2px #aaa;
+  --sunken: inset 0 0 0 1px #888, inset 1px 1px #555;
+  --window: 0 0 0 1px #000, 2px 2px 0 rgba(0,0,0,.45);
+}
+html[data-ui="mac"] body { background: #6f7fb1 repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 2px, transparent 2px 4px); }
+html[data-ui="mac"] .titlebar, html[data-ui="mac"] .card > h3:first-child, html[data-ui="mac"] .card > .row-between:first-child,
+html[data-ui="mac"] .form > fieldset.card > legend, html[data-ui="mac"] .sheet > .row-between > h3 {
+  background: repeating-linear-gradient(180deg, #e8e8e8 0 1px, #b8b8b8 1px 2px); color: #000;
+}
+html[data-ui="mac"] .titlebar { justify-content: center; position: relative; }
+html[data-ui="mac"] .brand, html[data-ui="mac"] .card > h3:first-child, html[data-ui="mac"] .card > .row-between:first-child,
+html[data-ui="mac"] .card > .row-between:first-child .muted, html[data-ui="mac"] .card > .row-between:first-child label { color: #000; }
+html[data-ui="mac"] .brand { background: #e8e8e8; padding: 0 .5rem; }
+html[data-ui="mac"] .card > h3:first-child { text-align: center; justify-content: center; }
+html[data-ui="mac"] .winbtns { position: absolute; left: 8px; }
+html[data-ui="mac"] .winbtns i { font-size: 0; width: 12px; height: 12px; background: #ddd; box-shadow: inset 0 0 0 1px #000; }
+html[data-ui="mac"] .winbtns i:nth-child(2) { display: none; }
+html[data-ui="mac"] .winbtns i:last-child { position: absolute; left: calc(100vw - 48px); }
+html[data-ui="mac"] .btn, html[data-ui="mac"] .chip { border-radius: 6px; }
+html[data-ui="mac"] .btn.primary { box-shadow: 0 0 0 3px #000, inset 0 0 0 1px #000, inset 1px 1px #fff; margin: 3px; }
+html[data-ui="mac"] .hosp-l1, html[data-ui="mac"] .stats b { color: #000; }
+html[data-ui="mac"] .picker tr.picked, html[data-ui="mac"] .board tr.picked { background: #000; }
+html[data-ui="mac"] .progress i { background: repeating-linear-gradient(90deg, #6b6bd6 0 10px, #9a9aea 10px 20px); }
+
+/* ---- DOS terminal ---- */
+html[data-ui="dos"] {
+  --desk: #000; --bg: #000; --card: #000; --field: #000; --ink: #33ff66; --muted: #1fbf4a; --line: #33ff66;
+  --hi: #33ff66; --lo: #1a8a34; --dk: #33ff66; --face: #000; --brand: #33ff66; --brand-2: #33ff66; --brand-ink: #000;
+  --red: #ff5f5f; --red-bg: #000; --ok: #33ff66; --ok-bg: #000; --warn: #ffd23f; --warn-bg: #000; --blue-bg: #000;
+  --font: "VT323", "Courier New", monospace; --field-font: "VT323", "Courier New", monospace;
+  --raised: inset 0 0 0 1px #33ff66; --sunken: inset 0 -1px 0 #33ff66; --window: inset 0 0 0 1px #33ff66, inset 0 0 0 3px #000, inset 0 0 0 4px #33ff66;
+}
+html[data-ui="dos"] body { background: #000; color: #33ff66; font-size: 19px; text-shadow: 0 0 4px rgba(51,255,102,.45); }
+html[data-ui="dos"] input, html[data-ui="dos"] select, html[data-ui="dos"] textarea { font-size: 19px; color: #33ff66; background: #000; }
+html[data-ui="dos"] .titlebar, html[data-ui="dos"] .card > h3:first-child, html[data-ui="dos"] .card > .row-between:first-child,
+html[data-ui="dos"] .form > fieldset.card > legend, html[data-ui="dos"] .sheet > .row-between > h3 { background: #33ff66; color: #000; text-shadow: none; }
+html[data-ui="dos"] .brand, html[data-ui="dos"] .card > .row-between:first-child .muted, html[data-ui="dos"] .card > .row-between:first-child label { color: #000; }
+html[data-ui="dos"] .brand-ico, html[data-ui="dos"] .winbtns { display: none; }
+html[data-ui="dos"] .top, html[data-ui="dos"] #nav a, html[data-ui="dos"] #nav a.on { background: #000; color: #33ff66; }
+html[data-ui="dos"] #nav a.on { background: #33ff66; color: #000; }
+html[data-ui="dos"] .btn, html[data-ui="dos"] .chip { background: #000; color: #33ff66; }
+html[data-ui="dos"] .btn::before { content: "["; } html[data-ui="dos"] .btn::after { content: "]"; }
+html[data-ui="dos"] .btn.primary { background: #33ff66; color: #000; text-shadow: none; }
+html[data-ui="dos"] .chip.on { background: #33ff66; color: #000; }
+html[data-ui="dos"] .hosp-l1, html[data-ui="dos"] .hosp-l2, html[data-ui="dos"] .stats b { color: #33ff66; }
+html[data-ui="dos"] .hosp-l3 { color: #ffd23f; }
+html[data-ui="dos"] .table-wrap, html[data-ui="dos"] .board, html[data-ui="dos"] .flow, html[data-ui="dos"] .board th, html[data-ui="dos"] .flow thead th { background: #000; color: #33ff66; }
+html[data-ui="dos"] .board td, html[data-ui="dos"] .flow td { border-bottom: 1px dashed #1a8a34; }
+html[data-ui="dos"] .picker tr.picked, html[data-ui="dos"] .board tr.picked { background: #33ff66; color: #000; }
+html[data-ui="dos"] .tag, html[data-ui="dos"] .badge, html[data-ui="dos"] .badge-select, html[data-ui="dos"] .pill { background: #000; }
+html[data-ui="dos"] .progress i, html[data-ui="dos"] .progress i.ok { background: repeating-linear-gradient(90deg, #33ff66 0 10px, transparent 10px 12px); }
+html[data-ui="dos"] #toast { background: #000; color: #33ff66; border-color: #33ff66; }
+html[data-ui="dos"] .lab-in.from-photo input, html[data-ui="dos"] .lab-in.from-photo select { background: #002a10; }
+html[data-ui="dos"] .empty { text-shadow: none; }
+
+/* ---- Modern clinical ---- */
+html[data-ui="modern"] {
+  --desk: #f2f4f8; --bg: #f2f4f8; --card: #fff; --field: #fff; --ink: #111a2e; --muted: #5c6780; --line: #d9dfea;
+  --hi: #fff; --lo: #d9dfea; --face: #fff; --brand: #13294b; --brand-2: #13294b; --red: #c8102e;
+  --font: Helvetica, "Helvetica Neue", Arial, sans-serif; --field-font: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  --raised: inset 0 0 0 1px #d9dfea; --sunken: inset 0 0 0 1px #c9d1df; --window: 0 0 0 1px #e1e6ef, 0 1px 3px rgba(17,26,46,.06);
+}
+html[data-ui="modern"] body { -webkit-font-smoothing: antialiased; }
+html[data-ui="modern"] .top { background: #13294b; box-shadow: none; border-bottom: 3px solid #c8102e; padding: 0; }
+html[data-ui="modern"] .titlebar { background: none; padding: .55rem 16px .2rem; }
+html[data-ui="modern"] .winbtns { display: none; }
+html[data-ui="modern"] .menubar { color: #c9d4ea; padding: 0 16px; }
+html[data-ui="modern"] .menubar .sync, html[data-ui="modern"] .menubar .ver { color: #c9d4ea; }
+html[data-ui="modern"] #nav { padding: 4px 12px 0; }
+html[data-ui="modern"] #nav a { background: none; color: #c9d4ea; box-shadow: none; top: 0; border-radius: 8px 8px 0 0; }
+html[data-ui="modern"] #nav a.on { background: #f2f4f8; color: #13294b; box-shadow: none; }
+html[data-ui="modern"] .card, html[data-ui="modern"] .hosp, html[data-ui="modern"] .stats div, html[data-ui="modern"] .deck-case, html[data-ui="modern"] .chart { border-radius: 10px; }
+html[data-ui="modern"] .card > h3:first-child, html[data-ui="modern"] .card > .row-between:first-child,
+html[data-ui="modern"] .sheet > .row-between > h3 { background: none; color: #13294b; margin: 0 0 .6rem; padding: 0; }
+html[data-ui="modern"] .card > .row-between:first-child .muted, html[data-ui="modern"] .card > .row-between:first-child label { color: var(--muted); }
+html[data-ui="modern"] .form > fieldset.card > legend { background: none; color: #13294b; padding: 0; font-size: 1.05rem; }
+html[data-ui="modern"] .btn, html[data-ui="modern"] .chip { border-radius: 8px; background: #fff; }
+html[data-ui="modern"] .btn.primary, html[data-ui="modern"] .chip.on { background: #13294b; color: #fff; box-shadow: none; }
+html[data-ui="modern"] input, html[data-ui="modern"] select, html[data-ui="modern"] textarea { border-radius: 7px; }
+html[data-ui="modern"] .toolbar h2, html[data-ui="modern"] main > h2 { color: #111a2e; text-shadow: none; }
+html[data-ui="modern"] .toolbar h2 .muted, html[data-ui="modern"] main > h2 .muted { color: var(--muted); }
+html[data-ui="modern"] .empty { color: var(--muted); text-shadow: none; }
+html[data-ui="modern"] .table-wrap { border-radius: 10px; }
+html[data-ui="modern"] .board th, html[data-ui="modern"] .flow thead th { background: #13294b; color: #fff; box-shadow: none; }
+html[data-ui="modern"] .progress { border-radius: 4px; }
+html[data-ui="modern"] .progress i { background: #c8102e; border-radius: 3px; }
+html[data-ui="modern"] .progress i.ok { background: #1d7a46; }
+html[data-ui="modern"] .jump, html[data-ui="modern"] .deck-previews { background: #2b3540; }
+html[data-ui="modern"] .jump { background: var(--bg); }

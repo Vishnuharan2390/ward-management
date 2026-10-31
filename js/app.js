@@ -2093,6 +2093,13 @@ const App = (() => {
           </fieldset>
         </form>
 
+        <div class="card" id="look">
+          <h3>Look</h3>
+          <p class="muted small">How the app looks on this device. Printouts and PowerPoints are not affected.</p>
+          <div class="chips">${[['win98', 'Windows 98'], ['xp', 'Windows XP'], ['mac', 'Classic Mac'], ['dos', 'DOS terminal'], ['modern', 'Modern clinical']]
+            .map(([k, l]) => `<button class="chip${(document.documentElement.dataset.ui || 'win98') === k ? ' on' : ''}" data-ui-pick="${k}">${l}</button>`).join('')}</div>
+        </div>
+
         <form class="card form" id="meta">
           <fieldset><legend>Unit & letterhead (shared)</legend>
             <label>Unit<select name="unitId">${opts(UNITS.map((u) => [u.id, 'UNIT ' + u.id]), m.unitId)}</select></label>
@@ -2141,6 +2148,14 @@ const App = (() => {
     },
     mount(el) {
       $('#prof', el).onchange = (e) => Store.setProfile({ [e.target.name]: e.target.value.trim() });
+      $('#look', el).addEventListener('click', (e) => {
+        const k = e.target.closest('[data-ui-pick]')?.dataset.uiPick;
+        if (!k) return;
+        if (k === 'win98') delete document.documentElement.dataset.ui;
+        else document.documentElement.dataset.ui = k;
+        try { localStorage.setItem('wm.ui', k); } catch { /* private mode */ }
+        render();
+      });
       $('#meta', el).onchange = async (e) => {
         if (e.target.id === 'lh-file') {
           const file = e.target.files[0];

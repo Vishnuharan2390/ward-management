@@ -213,7 +213,7 @@ function pendingList(c) {
   if (!hasPreopXray(c)) out.push({ kind: 'inv', text: 'X-ray' });
   for (const w of WORKUP) {
     if (workDone(c, w)) continue;
-    const p = w.type === 'pac' && c.work?.anaesPending;
+    const p = w.type === 'pac' ? c.work?.anaesPending : '';
     out.push({ kind: 'inv', text: hasText(p) ? `PAC: ${p}` : w.label });
   }
   for (const o of listOf(c.opinions)) if (!hasText(o.note)) out.push({ kind: 'inv', text: o.dept + ' op.' });
