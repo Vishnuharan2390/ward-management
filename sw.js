@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION with each release so phones
 // pick up the new files; data never goes through here (it lives in the
 // browser's storage or Firestore).
-const VERSION = 'v36';
+const VERSION = 'v37';
 const CACHE = 'preop-ward-' + VERSION;
 const SHELL = [
   './',
@@ -20,6 +20,7 @@ const SHELL = [
   'js/voice.js',
   'js/app.js',
   'assets/letterhead.jpg',
+  'assets/andry-tree.svg',
   'assets/icons/apple-touch-icon.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',

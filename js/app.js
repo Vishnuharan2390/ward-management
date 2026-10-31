@@ -209,6 +209,7 @@ const App = (() => {
       const u = unitOf(Store.meta.unitId);
       return `
         <div class="hosp">
+          <div class="hosp-logo" aria-hidden="true"></div>
           <div class="hosp-l1">GOVERNMENT RAJAJI HOSPITAL, MADURAI</div>
           <div class="hosp-l2">MADURAI MEDICAL COLLEGE</div>
           <div class="hosp-l3">DEPARTMENT OF ORTHOPAEDICS AND TRAUMATOLOGY</div>

@@ -1097,3 +1097,18 @@ html[data-ui="tangerine"] .stats span { display: block; }
 html[data-ui="tangerine"] .stats div { border-radius: 22px; padding: .7rem .4rem; }
 html[data-ui="tangerine"] .case-card::before { top: 26px; bottom: 26px; }
 html[data-ui="tangerine"] .btn.primary { white-space: nowrap; text-align: left; }
+
+/* ---- Andry tree emblem (orthopaedics): title bar + hospital panel; takes each look's colour ---- */
+.brand-ico, html[data-ui] .brand-ico {
+  width: 18px; height: 22px; background: currentColor; box-shadow: none; border-radius: 0;
+  -webkit-mask: url(../assets/andry-tree.svg) center / contain no-repeat; mask: url(../assets/andry-tree.svg) center / contain no-repeat;
+}
+.brand-ico::before, .brand-ico::after { display: none; }
+html[data-ui="dos"] .brand-ico { display: inline-block; }
+.hosp-logo {
+  width: 46px; height: 58px; margin: 0 auto 6px; background: var(--brand); color: var(--brand);
+  -webkit-mask: url(../assets/andry-tree.svg) center / contain no-repeat; mask: url(../assets/andry-tree.svg) center / contain no-repeat;
+}
+html.grad .hosp-logo { background: var(--gink); }
+html[data-ui="tangerine"] .hosp-logo { background: var(--or); }
+html[data-ui="midnight"] .hosp-logo { background: var(--ink); }
