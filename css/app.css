@@ -1032,3 +1032,15 @@ html[data-ui="sorbet"] {
 }
 html[data-ui="blossom"] .hosp, html[data-ui="mint"] .hosp, html[data-ui="sorbet"] .hosp { box-shadow: 0 10px 28px color-mix(in srgb, var(--g2) 55%, transparent); }
 html[data-ui="blossom"] .deck-previews, html[data-ui="mint"] .deck-previews, html[data-ui="sorbet"] .deck-previews { background: linear-gradient(135deg, #3a3350, #4a3a52); }
+
+/* pastel fonts: Blossom = Nunito (soft, rounded), Mint = Quicksand (airy), Sorbet = Fredoka headings + Nunito text (playful) */
+html[data-ui="blossom"] { --font: "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font); }
+html[data-ui="mint"]    { --font: "Quicksand", "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font); }
+html[data-ui="sorbet"]  { --font: "Nunito", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font); }
+html[data-ui="mint"] body { font-weight: 500; }
+html[data-ui="mint"] input, html[data-ui="mint"] select, html[data-ui="mint"] textarea { font-weight: 600; }
+html[data-ui="blossom"] .hosp, html[data-ui="blossom"] h1, html[data-ui="blossom"] h2, html[data-ui="blossom"] h3, html[data-ui="blossom"] legend, html[data-ui="blossom"] .brand { font-weight: 800; letter-spacing: .01em; }
+html[data-ui="mint"] .hosp, html[data-ui="mint"] h1, html[data-ui="mint"] h2, html[data-ui="mint"] h3, html[data-ui="mint"] legend, html[data-ui="mint"] .brand { font-weight: 700; letter-spacing: .02em; }
+html[data-ui="sorbet"] .hosp, html[data-ui="sorbet"] h1, html[data-ui="sorbet"] h2, html[data-ui="sorbet"] h3, html[data-ui="sorbet"] legend, html[data-ui="sorbet"] .brand,
+html[data-ui="sorbet"] .stats b, html[data-ui="sorbet"] .cc-name, html[data-ui="sorbet"] .btn.primary, html[data-ui="sorbet"] #nav a { font-family: "Fredoka", "Nunito", sans-serif; font-weight: 500; letter-spacing: .01em; }
+html[data-ui="sorbet"] .hosp-l1, html[data-ui="sorbet"] h2, html[data-ui="sorbet"] .cc-name { font-weight: 600; }
