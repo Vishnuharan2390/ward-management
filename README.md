@@ -112,5 +112,6 @@ js/store.js       storage: local or Firebase live sync
 js/print.js       OT list / ward board / discharge summary layouts
 js/deck-engine.js admission-day deck slides (from the admission-deck tool)
 js/vendor/        pptxgenjs 4.0.1 (MIT) for building .pptx in the browser
+tools/release.py  bump the version (title bar, ?v= on every file, offline cache)
 js/app.js         screens
 ```

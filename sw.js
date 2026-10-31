@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION with each release so phones
 // pick up the new files; data never goes through here (it lives in the
 // browser's storage or Firestore).
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE = 'preop-ward-' + VERSION;
 const SHELL = [
   './',
@@ -42,7 +42,9 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    // Always ask the server first (no-cache = revalidate), so a new release
+    // never runs with files the browser kept from the previous one.
+    fetch(e.request, { cache: 'no-cache' })
       .then((res) => {
         if (res.ok) {
           const copy = res.clone();
