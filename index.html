@@ -17,9 +17,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=VT323&display=swap">
-  <link rel="stylesheet" href="css/app.css?v=31">
+  <link rel="stylesheet" href="css/app.css?v=32">
   <style id="page-style"></style>
-  <script>try { var ui = localStorage.getItem('wm.ui'); if (ui && ui !== 'win98') document.documentElement.dataset.ui = ui; } catch (e) {}</script>
+  <script>try { var ui = localStorage.getItem('wm.ui'); if (ui && ui !== 'win98') { document.documentElement.dataset.ui = ui; if (/^(modern|midnight|glass|material)$/.test(ui)) document.documentElement.classList.add('flat'); } } catch (e) {}</script>
 </head>
 <body>
   <header class="top">
@@ -29,7 +29,7 @@
     </div>
     <div class="menubar">
       <span id="sync" class="sync"></span>
-      <span class="ver" title="App version">v31 · 1 Nov</span>
+      <span class="ver" title="App version">v32 · 1 Nov</span>
     </div>
     <nav id="nav">
       <a href="#/">Cases</a>
@@ -45,17 +45,17 @@
   <div id="modal" hidden></div>
   <div id="toast"></div>
 
-  <script src="config.js?v=31"></script>
-  <script src="js/util.js?v=31"></script>
-  <script src="js/ot-history.js?v=31"></script>
-  <script src="js/data.js?v=31"></script>
-  <script src="js/store.js?v=31"></script>
-  <script src="js/print.js?v=31"></script>
-  <script src="js/vendor/pptxgen.bundle.js?v=31"></script>
-  <script src="js/deck-engine.js?v=31"></script>
-  <script src="js/report-ocr.js?v=31"></script>
-  <script src="js/voice.js?v=31"></script>
-  <script src="js/app.js?v=31"></script>
+  <script src="config.js?v=32"></script>
+  <script src="js/util.js?v=32"></script>
+  <script src="js/ot-history.js?v=32"></script>
+  <script src="js/data.js?v=32"></script>
+  <script src="js/store.js?v=32"></script>
+  <script src="js/print.js?v=32"></script>
+  <script src="js/vendor/pptxgen.bundle.js?v=32"></script>
+  <script src="js/deck-engine.js?v=32"></script>
+  <script src="js/report-ocr.js?v=32"></script>
+  <script src="js/voice.js?v=32"></script>
+  <script src="js/app.js?v=32"></script>
   <script>
     // Offline support when served from a web address (not when opened as a file).
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {

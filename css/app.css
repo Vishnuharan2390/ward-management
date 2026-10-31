@@ -846,37 +846,102 @@ html[data-ui="dos"] #toast { background: #000; color: #33ff66; border-color: #33
 html[data-ui="dos"] .lab-in.from-photo input, html[data-ui="dos"] .lab-in.from-photo select { background: #002a10; }
 html[data-ui="dos"] .empty { text-shadow: none; }
 
-/* ---- Modern clinical ---- */
-html[data-ui="modern"] {
-  --desk: #f2f4f8; --bg: #f2f4f8; --card: #fff; --field: #fff; --ink: #111a2e; --muted: #5c6780; --line: #d9dfea;
-  --hi: #fff; --lo: #d9dfea; --face: #fff; --brand: #13294b; --brand-2: #13294b; --red: #c8102e;
-  --font: Helvetica, "Helvetica Neue", Arial, sans-serif; --field-font: Helvetica, "Helvetica Neue", Arial, sans-serif;
-  --raised: inset 0 0 0 1px #d9dfea; --sunken: inset 0 0 0 1px #c9d1df; --window: 0 0 0 1px #e1e6ef, 0 1px 3px rgba(17,26,46,.06);
+/* ---- Modern looks (Modern clinical, Midnight, Glass, Material) ----
+   html.flat turns off the retro window chrome; each look sets the tokens. */
+html.flat {
+  --top-bg: #13294b; --top-ink: #ffffff; --top-muted: #c9d4ea; --top-accent: #c8102e;
+  --nav-on-bg: var(--bg); --nav-on-ink: var(--brand); --head-ink: var(--brand);
+  --btn-bg: var(--card); --btn-ink: var(--ink); --primary-bg: var(--brand); --primary-ink: #fff;
+  --rc: 10px; --rb: 8px; --body-bg: var(--bg); --blur: none; --th-bg: var(--brand); --th-ink: #fff;
+  --raised: inset 0 0 0 1px var(--line); --sunken: inset 0 0 0 1px var(--line); --window: 0 0 0 1px var(--line), 0 1px 3px rgba(0,0,0,.06);
 }
-html[data-ui="modern"] body { -webkit-font-smoothing: antialiased; }
-html[data-ui="modern"] .top { background: #13294b; box-shadow: none; border-bottom: 3px solid #c8102e; padding: 0; }
-html[data-ui="modern"] .titlebar { background: none; padding: .55rem 16px .2rem; }
-html[data-ui="modern"] .winbtns { display: none; }
-html[data-ui="modern"] .menubar { color: #c9d4ea; padding: 0 16px; }
-html[data-ui="modern"] .menubar .sync, html[data-ui="modern"] .menubar .ver { color: #c9d4ea; }
-html[data-ui="modern"] #nav { padding: 4px 12px 0; }
-html[data-ui="modern"] #nav a { background: none; color: #c9d4ea; box-shadow: none; top: 0; border-radius: 8px 8px 0 0; }
-html[data-ui="modern"] #nav a.on { background: #f2f4f8; color: #13294b; box-shadow: none; }
-html[data-ui="modern"] .card, html[data-ui="modern"] .hosp, html[data-ui="modern"] .stats div, html[data-ui="modern"] .deck-case, html[data-ui="modern"] .chart { border-radius: 10px; }
-html[data-ui="modern"] .card > h3:first-child, html[data-ui="modern"] .card > .row-between:first-child,
-html[data-ui="modern"] .sheet > .row-between > h3 { background: none; color: #13294b; margin: 0 0 .6rem; padding: 0; }
-html[data-ui="modern"] .card > .row-between:first-child .muted, html[data-ui="modern"] .card > .row-between:first-child label { color: var(--muted); }
-html[data-ui="modern"] .form > fieldset.card > legend { background: none; color: #13294b; padding: 0; font-size: 1.05rem; }
-html[data-ui="modern"] .btn, html[data-ui="modern"] .chip { border-radius: 8px; background: #fff; }
-html[data-ui="modern"] .btn.primary, html[data-ui="modern"] .chip.on { background: #13294b; color: #fff; box-shadow: none; }
-html[data-ui="modern"] input, html[data-ui="modern"] select, html[data-ui="modern"] textarea { border-radius: 7px; }
-html[data-ui="modern"] .toolbar h2, html[data-ui="modern"] main > h2 { color: #111a2e; text-shadow: none; }
-html[data-ui="modern"] .toolbar h2 .muted, html[data-ui="modern"] main > h2 .muted { color: var(--muted); }
-html[data-ui="modern"] .empty { color: var(--muted); text-shadow: none; }
-html[data-ui="modern"] .table-wrap { border-radius: 10px; }
-html[data-ui="modern"] .board th, html[data-ui="modern"] .flow thead th { background: #13294b; color: #fff; box-shadow: none; }
-html[data-ui="modern"] .progress { border-radius: 4px; }
-html[data-ui="modern"] .progress i { background: #c8102e; border-radius: 3px; }
-html[data-ui="modern"] .progress i.ok { background: #1d7a46; }
-html[data-ui="modern"] .jump, html[data-ui="modern"] .deck-previews { background: #2b3540; }
-html[data-ui="modern"] .jump { background: var(--bg); }
+html.flat body { background: var(--body-bg); -webkit-font-smoothing: antialiased; }
+html.flat .top { background: var(--top-bg); box-shadow: none; border-bottom: 3px solid var(--top-accent); padding: 0; backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur); }
+html.flat .titlebar { background: none; padding: .6rem 16px .2rem; }
+html.flat .brand { color: var(--top-ink); }
+html.flat .winbtns { display: none; }
+html.flat .menubar { padding: 0 16px; }
+html.flat .menubar .sync, html.flat .menubar .ver { color: var(--top-muted); }
+html.flat #nav { padding: 4px 12px 0; }
+html.flat #nav a { background: none; color: var(--top-muted); box-shadow: none; top: 0; border-radius: var(--rb) var(--rb) 0 0; }
+html.flat #nav a.on { background: var(--nav-on-bg); color: var(--nav-on-ink); box-shadow: none; }
+html.flat .card, html.flat .hosp, html.flat .stats div, html.flat .deck-case, html.flat .chart, html.flat .staff-unit, html.flat .ot-row, html.flat .sheet {
+  border-radius: var(--rc); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+}
+html.flat .card > h3:first-child, html.flat .card > .row-between:first-child, html.flat .sheet > .row-between > h3 { background: none; color: var(--head-ink); margin: 0 0 .6rem; padding: 0; }
+html.flat .card > .row-between:first-child > h3 { color: var(--head-ink); }
+html.flat .card > .row-between:first-child .muted, html.flat .card > .row-between:first-child label { color: var(--muted); }
+html.flat .form > fieldset.card > legend { background: none; color: var(--head-ink); padding: 0; font-size: 1.05rem; }
+html.flat .form fieldset, html.flat .lab-group { box-shadow: inset 0 0 0 1px var(--line); border-radius: var(--rb); }
+html.flat .form > fieldset.card { box-shadow: var(--window); }
+html.flat .btn, html.flat .chip { border-radius: var(--rb); background: var(--btn-bg); color: var(--btn-ink); }
+html.flat .btn.primary, html.flat .chip.on { background: var(--primary-bg); color: var(--primary-ink); box-shadow: none; }
+html.flat .btn:disabled { text-shadow: none; opacity: .5; }
+html.flat input, html.flat select, html.flat textarea { border-radius: calc(var(--rb) - 1px); }
+html.flat .toolbar h2, html.flat main > h2 { color: var(--ink); text-shadow: none; }
+html.flat .toolbar h2 .muted, html.flat main > h2 .muted { color: var(--muted); }
+html.flat .empty { color: var(--muted); text-shadow: none; }
+html.flat .table-wrap { border-radius: var(--rc); overflow: auto; }
+html.flat .board th, html.flat .flow thead th { background: var(--th-bg); color: var(--th-ink); box-shadow: none; }
+html.flat .flow tr.grp th { background: var(--bg); color: var(--head-ink); }
+html.flat .progress { border-radius: 4px; box-shadow: none; background: var(--line); }
+html.flat .progress i { background: var(--red); border-radius: 3px; }
+html.flat .progress i.ok { background: var(--ok); }
+html.flat .jump { background: var(--body-bg); }
+html.flat .picker tr.picked, html.flat .board tr.picked { background: var(--primary-bg); color: var(--primary-ink); }
+html.flat .hosp-l1, html.flat .stats b { color: var(--head-ink); }
+html.flat .tag, html.flat .badge, html.flat .badge-select, html.flat .pill { border-radius: 999px; }
+html.flat .tag { padding: .12rem .55rem; }
+html.flat #toast { border-radius: 10px; border: 0; background: var(--ink); color: var(--card); box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+html.flat .empty { text-shadow: none; }
+
+/* Modern clinical — white, navy, red */
+html[data-ui="modern"] {
+  --desk: #f2f4f8; --bg: #f2f4f8; --card: #fff; --field: #fff; --ink: #111a2e; --muted: #5c6780; --line: #dde3ec;
+  --hi: #fff; --lo: #d9dfea; --face: #fff; --brand: #13294b; --brand-2: #13294b; --red: #c8102e; --ok: #1d7a46;
+  --font: Helvetica, "Helvetica Neue", Arial, sans-serif; --field-font: Helvetica, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Midnight — dark, for night duty */
+html[data-ui="midnight"] {
+  --desk: #0d1424; --bg: #0d1424; --card: #151f35; --field: #0f182b; --ink: #e6ebf5; --muted: #93a0bb; --line: #26324d;
+  --hi: #26324d; --lo: #26324d; --dk: #000; --face: #151f35; --brand: #5ec2c6; --brand-2: #5ec2c6; --red: #ff6b7f; --red-bg: #2a1520;
+  --ok: #6fd39a; --ok-bg: #12291f; --warn: #f3b860; --warn-bg: #2a2212; --blue-bg: #17233d;
+  --top-bg: #0a1020; --top-accent: #5ec2c6; --nav-on-bg: #0d1424; --nav-on-ink: #e6ebf5; --head-ink: #e6ebf5;
+  --primary-bg: #5ec2c6; --primary-ink: #06222a; --btn-bg: #1b2742; --th-bg: #1b2742; --th-ink: #cfe3f5;
+  --window: 0 0 0 1px #22304c; --font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --field-font: var(--font);
+  color-scheme: dark;
+}
+html[data-ui="midnight"] .tag { background: transparent; }
+html[data-ui="midnight"] .lab-in.from-photo input, html[data-ui="midnight"] .lab-in.from-photo select { background: #2b2a12; color: var(--ink); }
+html[data-ui="midnight"] .hosp-l3 { color: var(--red); }
+html[data-ui="midnight"] .slide { color: #000; }
+
+/* Glass — frosted cards on a soft gradient (iPhone style) */
+html[data-ui="glass"] {
+  --desk: #e9eefb; --bg: rgba(255,255,255,.45); --card: rgba(255,255,255,.62); --field: rgba(255,255,255,.85); --ink: #1c1c1e; --muted: #5d6370; --line: rgba(60,70,100,.14);
+  --hi: #fff; --lo: rgba(60,70,100,.18); --face: #fff; --brand: #0a4fbf; --brand-2: #0a4fbf; --red: #e0283c; --ok: #1f9d55;
+  --top-bg: rgba(255,255,255,.55); --top-ink: #1c1c1e; --top-muted: #4a5163; --top-accent: transparent; --nav-on-bg: rgba(255,255,255,.85); --nav-on-ink: #0a4fbf;
+  --head-ink: #1c1c1e; --primary-bg: #0a84ff; --primary-ink: #fff; --btn-bg: rgba(255,255,255,.75); --th-bg: rgba(255,255,255,.7); --th-ink: #1c1c1e;
+  --rc: 18px; --rb: 12px; --blur: saturate(160%) blur(18px);
+  --body-bg: radial-gradient(1200px 700px at 10% -10%, #c7d7ff 0%, transparent 60%), radial-gradient(900px 600px at 110% 10%, #ffd6e7 0%, transparent 55%), radial-gradient(900px 700px at 50% 120%, #c9f2e6 0%, transparent 60%), #eef1f8;
+  --window: 0 0 0 1px rgba(255,255,255,.7), 0 8px 24px rgba(30,40,80,.10);
+  --font: -apple-system, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --field-font: var(--font);
+}
+html[data-ui="glass"] body { background-attachment: fixed; }
+html[data-ui="glass"] .top { border-bottom: 1px solid rgba(255,255,255,.6); }
+html[data-ui="glass"] .brand-ico { box-shadow: none; border-radius: 4px; }
+
+/* Material — tonal surfaces, pill buttons (Android style) */
+html[data-ui="material"] {
+  --desk: #f7f2fa; --bg: #f7f2fa; --card: #ffffff; --field: #fff; --ink: #1d1b20; --muted: #625b71; --line: #e7e0ec;
+  --hi: #fff; --lo: #cac4d0; --face: #fff; --brand: #4f378b; --brand-2: #4f378b; --red: #b3261e; --ok: #146c2e; --blue-bg: #eaddff;
+  --top-bg: #4f378b; --top-accent: #d0bcff; --top-muted: #e8def8; --nav-on-bg: #f7f2fa; --nav-on-ink: #4f378b; --head-ink: #4f378b;
+  --primary-bg: #6750a4; --primary-ink: #fff; --btn-bg: #eaddff; --btn-ink: #21005d; --th-bg: #eaddff; --th-ink: #21005d;
+  --rc: 16px; --rb: 999px; --window: 0 1px 2px rgba(0,0,0,.08), 0 2px 6px rgba(79,55,139,.08);
+  --font: Roboto, "Segoe UI", Helvetica, Arial, sans-serif; --field-font: var(--font);
+}
+html[data-ui="material"] input, html[data-ui="material"] select, html[data-ui="material"] textarea { border-radius: 8px; }
+html[data-ui="material"] .stats div { background: #eaddff; box-shadow: none; }
+html[data-ui="material"] .hosp { background: #eaddff; box-shadow: none; }
+html.flat .flow .set-acts .icon { color: var(--th-ink); opacity: .85; }
