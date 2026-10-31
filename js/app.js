@@ -1841,7 +1841,9 @@ const App = (() => {
         <div class="card">
           <h3>Sharing</h3>
           ${Store.mode === 'local'
-            ? '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and senior PGs, connect Firebase — see <b>README.md</b>.</p>'
+            ? (window.WARD_CONFIG?.firebase
+              ? '<p>This copy was opened as a file, so it runs in <b>local mode</b>: data stays in this browser only. For live sharing, open <b>https://vishnuharan2390.github.io/ward-management/</b> instead.</p>'
+              : '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and senior PGs, connect Firebase — see <b>README.md</b>.</p>')
             : `<p>Signed in as <b>${esc(Store.user?.email)}</b> · sync: ${esc(Store.status)} <button class="btn small" id="signout">Sign out</button></p>
                ${Store.localCaseCount() ? `<p class="notice">This device has <b>${Store.localCaseCount()}</b> case(s) saved before sharing was switched on. <button class="btn small primary" id="upload-local">Copy them to the shared database</button></p>` : ''}
                <h4>Team</h4>

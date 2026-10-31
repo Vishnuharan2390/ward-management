@@ -8,7 +8,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function owners() {
       return [
-        'you@gmail.com'
+        'vishnuapple9.1@gmail.com'
       ];
     }
     function signedIn() {

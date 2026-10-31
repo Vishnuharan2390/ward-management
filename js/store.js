@@ -15,7 +15,9 @@ const Store = (() => {
   let status = 'local';
   let unsubs = [];
 
-  const mode = CFG.firebase ? 'firebase' : 'local';
+  // Firebase sign-in needs a real web address; a downloaded copy opened as a
+  // file stays in local mode.
+  const mode = CFG.firebase && location.protocol.startsWith('http') ? 'firebase' : 'local';
   const emit = () => subs.forEach((f) => f());
 
   // ---- profile (per device) ----

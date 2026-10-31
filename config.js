@@ -1,25 +1,23 @@
 // Ward Management configuration.
 //
-// LOCAL MODE (default): leave `firebase: null`. Everything is stored in this
-// browser only — good for trying the app out, not for sharing.
+// SHARED MODE is on: everyone whose email is on the team list (Settings →
+// Team) signs in and sees the same live data. Set `firebase: null` to go
+// back to single-device local mode.
 //
-// SHARED MODE: paste your Firebase web config below (see README.md). Everyone
-// whose email is added under Settings → Team can sign in with Google and sees
-// the same live data.
+// These values identify the Firebase project; they are not passwords.
+// Access is controlled by firestore.rules (team list + verified email).
 window.WARD_CONFIG = {
-  firebase: null,
-  // firebase: {
-  //   apiKey: "...",
-  //   authDomain: "your-project.firebaseapp.com",
-  //   projectId: "your-project",
-  //   appId: "...",
-  // },
+  firebase: {
+    apiKey: 'AIzaSyBI8bub3UpXN-fxBzlbWryzBdZigtt88Us',
+    authDomain: 'ortho-ward-c2e69.firebaseapp.com',
+    projectId: 'ortho-ward-c2e69',
+  },
 
   // One id per unit/ward. Change it if another unit wants its own board.
   unitId: 'ortho-unit-1',
 
   // Emails allowed to manage the team list (must match firestore.rules).
   ownerEmails: [
-    // 'you@gmail.com',
+    'vishnuapple9.1@gmail.com',
   ],
 };
