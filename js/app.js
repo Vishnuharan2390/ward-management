@@ -35,6 +35,10 @@ const App = (() => {
     const customs = customParams(c);
     return `
       <div class="lab-form">
+        <div class="ocr-row">
+          <label class="btn small">📷 Read report photo<input type="file" accept="image/*" data-ocr hidden></label>
+          <span class="ocr-status small muted">Take a clear, flat photo of the report — values are filled in for you to check.</span>
+        </div>
         <label class="lab-date">Date of investigations<input type="date" name="labdate" value="${esc(set.date || c.doa || todayISO())}"></label>
         ${LAB_GROUPS.map((g) => `
           <fieldset class="lab-group"><legend>${esc(g.long || g.label)}${g.optional ? ' <span class="muted">(if needed)</span>' : ''}</legend>
@@ -66,9 +70,46 @@ const App = (() => {
       const row = e.target.closest('.custom-row');
       if (row) $('[data-cv]', row).classList.toggle('is-flag', !!flagOf($('[data-cv]', row).value, { range: $('[data-cr]', row).value }));
     });
-    root.addEventListener('change', (e) => {
+    root.addEventListener('change', async (e) => {
       const l = e.target.closest('[data-param]');
       if (l && e.target.tagName === 'SELECT') l.classList.toggle('is-flag', !!flagOf(e.target.value, params[l.dataset.param]));
+      if (e.target.dataset.ocr === undefined) return;
+      // Photo of a report → fill the empty boxes, highlight what was filled.
+      const file = e.target.files[0];
+      e.target.value = '';
+      if (!file) return;
+      const status = $('.ocr-status', root);
+      status.classList.remove('muted');
+      status.textContent = 'Getting the report reader ready (first time downloads about 7 MB)…';
+      try {
+        const text = await ReportOCR.read(file, (m) => {
+          if (m.status === 'recognizing text') status.textContent = `Reading the report… ${Math.round(m.progress * 100)}%`;
+        });
+        const { values, date, unsure } = ReportOCR.parse(text);
+        const filled = [];
+        const skipped = [];
+        for (const [k, v] of Object.entries(values)) {
+          const el = $(`[name="p_${k}"]`, root);
+          if (!el) continue;
+          const p = params[k];
+          if (el.value.trim() && el.value.trim() !== v) { skipped.push(p.label); continue; }
+          el.value = v;
+          const lab = el.closest('[data-param]');
+          lab.classList.add('from-photo');
+          lab.classList.toggle('photo-unsure', unsure.includes(k));
+          lab.classList.toggle('is-flag', !!flagOf(v, p));
+          filled.push(`${p.label} ${p.options ? v : fmtVal(v, p)}${unsure.includes(k) ? ' (check — decimal point restored)' : ''}`);
+        }
+        if (date) $('[name=labdate]', root).value = date;
+        status.innerHTML = filled.length
+          ? `<b>Filled ${filled.length} value(s) from the photo — check each highlighted box before saving.</b> ${esc(filled.join(' · '))}${skipped.length ? `<br>Kept what you had typed for: ${esc(skipped.join(', '))}.` : ''}${date ? `<br>Report date set to ${esc(fmtDate(date))}.` : ''}
+             <details><summary>What the reader saw</summary><pre class="ocr-text">${esc(text)}</pre></details>`
+          : `<b>Couldn't find any values in that photo.</b> Try again with the report flat, well lit and filling the frame, or type them in.
+             <details><summary>What the reader saw</summary><pre class="ocr-text">${esc(text)}</pre></details>`;
+      } catch (err) {
+        console.error(err);
+        status.textContent = 'Could not read the photo: ' + err.message;
+      }
     });
     root.addEventListener('click', (e) => {
       if (e.target.closest('[data-add-custom]')) {
@@ -2310,6 +2351,7 @@ const App = (() => {
 
   function render() {
     deferred = false;
+    Voice.stop();
     const y = window.scrollY;
     const same = current && current.hash === location.hash;
     if (!same) current = { hash: location.hash, view: resolve() };
@@ -2321,6 +2363,7 @@ const App = (() => {
     App.el.replaceWith(fresh);
     App.el = fresh;
     v.mount?.(fresh);
+    Voice.attach(fresh);
     current.loading = Store.status === 'connecting' && !!fresh.querySelector('.empty');
     window.scrollTo(0, same ? y : 0);
     const sec = section();
