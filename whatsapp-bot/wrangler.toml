@@ -1,0 +1,24 @@
+name = "ward-whatsapp-bot"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Conversation history + duplicate-delivery guard. Create it once with:
+#   npx wrangler kv namespace create HISTORY
+# and paste the id it prints below.
+[[kv_namespaces]]
+binding = "HISTORY"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+[vars]
+# Comma-separated WhatsApp numbers allowed to talk to the bot, with country code, no "+".
+# Everyone else is ignored. Example: "919876543210,919812345678"
+ALLOWED_NUMBERS = ""
+GRAPH_VERSION = "v21.0"
+CLAUDE_MODEL = "claude-opus-5-5"
+
+# Secrets (never put these in this file) — set each with `npx wrangler secret put NAME`:
+#   ANTHROPIC_API_KEY   from console.anthropic.com
+#   WHATSAPP_TOKEN      permanent access token from Meta (System User token)
+#   WHATSAPP_PHONE_ID   the bot number's "Phone number ID" in Meta's WhatsApp → API Setup
+#   APP_SECRET          Meta app → Settings → Basic → App secret (verifies webhooks are really from Meta)
+#   VERIFY_TOKEN        any random phrase you choose; type the same phrase into Meta's webhook setup
