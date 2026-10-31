@@ -442,21 +442,69 @@ function keywordRegex(k) {
   return new RegExp(`(^|[^a-z0-9])${e}([^a-z0-9]|$)`, 'i');
 }
 
-// A procedure matches when its name appears in the plan (whole words, any case).
-function matchImplants(text, rules) {
-  if (!text) return [];
+// A rule matches when its procedure words (`keywords`, or else its name)
+// appear in the plan, and — if it lists a `site` — that bone / region is in
+// the plan or diagnosis. `exclude` words (in plan or diagnosis) veto it.
+const kwHit = (list, text) => (list || []).some((k) => k && keywordRegex(k).test(text));
+function matchImplants(plan, rules, diagnosis = '') {
+  if (!plan) return [];
+  const both = `${plan} ${diagnosis || ''}`;
   return Object.values(rules || {})
-    .filter((r) => [r.name, ...(r.keywords || [])].some((k) => k && keywordRegex(k).test(text)))
-    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    .filter((r) => kwHit(r.keywords?.length ? r.keywords : [r.name], plan))
+    .filter((r) => !r.site?.length || kwHit(r.site, both))
+    .filter((r) => !kwHit(r.exclude, both))
+    .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.name || '').localeCompare(b.name || ''));
 }
 
-function suggestFromPlan(plan, rules) {
-  const m = matchImplants(plan, rules);
-  return {
-    matches: m,
-    implants: m.map((r) => r.implants).filter((x) => x && x.toUpperCase() !== 'NIL').join(', '),
-  };
+function suggestFromPlan(plan, rules, diagnosis = '') {
+  const m = matchImplants(plan, rules, diagnosis);
+  // Join the matched lists, dropping repeated items (e.g. 8MM CERVICAL SCREW in short and long PFN).
+  const seen = new Set();
+  const items = [];
+  for (const r of m) {
+    // Items are separated by ", "; sizes like 8,9,10 have no space and stay whole.
+    for (const part of String(r.implants || '').split(/,\s+/)) {
+      const t = part.trim();
+      if (!t || t.toUpperCase() === 'NIL' || seen.has(t.toUpperCase())) continue;
+      seen.add(t.toUpperCase());
+      items.push(t);
+    }
+  }
+  return { matches: m, implants: items.join(', ') };
 }
+
+// The unit's implant list (from OT_LIST_2_1.docx). Loaded once into the
+// implant database; everything stays editable in Settings.
+const PLATE_WORDS = ['plate', 'plating', 'plates', 'osteosynthesis', 'plateosteosynthesis', 'ossteosynthesis'];
+const NAIL_WORDS = ['imil', 'iln', 'ilin', 'interlocking', 'nailing', 'nail'];
+const UNIT_IMPLANTS = [
+  ['Plating — radius / ulna (forearm, Galeazzi)', { keywords: PLATE_WORDS, site: ['radius', 'ulna', 'forearm', 'galeazzi', 'monteggia', 'bbfa', 'bb forearm'], exclude: ['distal radius', 'barton', 'radial head', 'giant cell tumor', 'gct'] }, '6-10 HOLED ASIAN DCP, 3.5MM CORTICAL SCREWS (10-30)'],
+  ['Plating — humerus shaft', { keywords: PLATE_WORDS, site: ['shaft of humerus', 'humerus shaft', 'humeral shaft', 'shaft humerus'] }, '6-10 HOLED NARROW DCP, 8-10 HOLED NARROW LCP, 4.5MM CORTICAL SCREWS, 5MM LOCKING SCREWS'],
+  ['Plating — clavicle', { keywords: PLATE_WORDS, site: ['clavicle'] }, '6-10 HOLED CLAVICULAR PLATE / RECON PLATE, 3.5MM CORTICAL SCREWS'],
+  ['Volar Barton / distal radius', { keywords: [...PLATE_WORDS, 'k wire', 'k-wire', 'kwire'], site: ['barton', 'distal radius'] }, '2-3MM K WIRES, 3-5 HOLED ELLIS PLATE, 3.5MM CORTICAL SCREWS'],
+  ['K-wire stabilisation (supracondylar humerus)', { keywords: ['k wire', 'k-wire', 'kwire', 'k wiring', 'crpp'], exclude: ['barton', 'distal radius', 'calcaneum', 'calcaneus'] }, '1.5 / 2.5MM K WIRES'],
+  ['TENS nailing', { keywords: ['tens', 'tens nailing', 'elastic nail'] }, '2-3.5MM TENS NAILS'],
+  ['Arthroscopic procedures', { keywords: ['arthroscopic', 'arthroscopy'] }, 'ARTHROSCOPIC INSTRUMENTS'],
+  ['ACL reconstruction', { keywords: ['acl', 'acl reconstruction', 'aclr'] }, 'INTERFERENTIAL SCREWS'],
+  ['IMIL nailing — tibia', { keywords: NAIL_WORDS, site: ['tibia', 'tibial', 'leg'], exclude: ['tens', 'femur', 'femoral'] }, '8,9,10 * 320-360MM IMIL TIBIA NAIL, 4.9MM LOCKING BOLTS'],
+  ['IMIL nailing — femur', { keywords: NAIL_WORDS, site: ['femur', 'femoral'], exclude: ['tens', 'pfn', 'intertrochanteric', 'subtrochanter', 'subtrochanteric', 'tibia', 'leg'] }, '8,9,10 * 360-440MM IMIL FEMUR NAIL, 4.5MM LOCKING SCREWS'],
+  ['Short PFN', { keywords: ['short pfn', 'short/long pfn'] }, '8,9,10 * 250MM SHORT PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
+  ['Long PFN', { keywords: ['long pfn', 'short/long pfn'] }, '8,9,10 * 380-440MM LONG PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
+  ['PFN (length not stated)', { keywords: ['pfn', 'pfna'], exclude: ['short pfn', 'long pfn', 'short/long pfn'] }, '8,9,10 * 250MM SHORT PFN, 8MM CERVICAL SCREW, 6.2MM DEROTATION SCREW, 4.9MM LOCKING BOLTS'],
+  ['DHS', { keywords: ['dhs', 'dynamic hip screw'] }, 'DHS SYSTEM, 4-10 HOLED DHS PLATE, RICHARD SCREWS'],
+  ['Plating — distal femur (supracondylar)', { keywords: [...PLATE_WORDS, 'retrograde'], site: ['supracondylar femur', 'supraconylar femur', 'distal femur', 'supracondylar # femur', 'supracondylar'], exclude: ['humerus'] }, '8-12 HOLED DFLCP / NON LOCKING PLATE, 4.5MM CORTICAL SCREWS, 4.5MM LOCKING SCREWS, 6.5MM CANCELLOUS SCREWS'],
+  ['Plating — femur shaft', { keywords: PLATE_WORDS, site: ['shaft of femur', 'femur shaft', 'femoral shaft', 'shaft femur'], exclude: ['supracondylar', 'distal femur'] }, '8 HOLED NARROW DCP, 4.5MM LOCKING SCREWS'],
+  ['Plating — ankle / malleoli', { keywords: [...PLATE_WORDS, 'screw fixation'], site: ['bimalleolar', 'trimalleolar', 'malleolus', 'malleolar', 'ankle'] }, '6-10 HOLED 1/3RD TUBULAR PLATE, 3.5MM CORTICAL SCREWS, 4MM MALLEOLAR SCREWS, WASHER'],
+  ['Plating — distal tibia', { keywords: PLATE_WORDS, site: ['tibia', 'leg', 'distal tibia'], exclude: ['malleolus', 'malleolar', 'ankle', 'plateau'] }, '6-10 HOLED DTLCP, LOCKING SCREWS, 4MM CORTICAL SCREWS (30-60), 6-10 HOLED 1/3RD TUBULAR PLATE, 3.5MM CORTICAL SCREWS'],
+  ['Bone grafting', { keywords: ['bone grafting', 'bone graft'] }, 'BONE GRAFTING INSTRUMENTS'],
+  ['Hemiarthroplasty', { keywords: ['hemiarthroplasty', 'bipolar', 'austin moore', 'austin-moore', 'amp'] }, '41-53 AUSTIN-MOORE / BIPOLAR PROSTHESIS'],
+  ['Cancellous screw fixation', { keywords: ['cancellous screw', 'cancellous screws', 'cc screw', 'cc screws', 'ccs'] }, '6.5MM CANCELLOUS SCREW SYSTEM'],
+  ['Plating — calcaneum', { keywords: PLATE_WORDS, site: ['calcaneum', 'calcaneus', 'calcaneal'] }, 'CALCANEUM PLATE, 2MM K WIRE, 4MM CANCELLOUS SCREWS (20-50MM)'],
+  ['Radial head replacement', { keywords: ['radial head replacement', 'radial head arthroplasty'] }, 'RADIAL HEAD PROSTHESIS'],
+  ['Split skin grafting', { keywords: ['ss grafting', 'ssg', 'split skin graft', 'split skin grafting', 'skin grafting'] }, 'HUMPY KNIFE & BLADE'],
+  ['Amputation', { keywords: ['amputation'] }, 'GIGLI SAW, SOFT TISSUE INSTRUMENTS'],
+  ['Biopsy / excision / curettage / implant exit', { keywords: ['biopsy', 'excision', 'curettage', 'implant exit', 'implant removal'] }, 'SOFT TISSUE INSTRUMENTS'],
+].map(([name, m, implants], i) => ({ id: 'ot2_' + String(i).padStart(2, '0'), order: i, name, keywords: m.keywords || [], site: m.site || [], exclude: m.exclude || [], implants }));
 
 const DISPOSITIONS = {
   discharge: { label: 'Discharge', title: '', status: 'discharged', course: 'PATIENT IS BEING DISCHARGED IN A STABLE CONDITION.' },

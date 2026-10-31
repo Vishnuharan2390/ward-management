@@ -443,20 +443,20 @@ const App = (() => {
         auto.forEach((k) => ['input', 'change'].forEach((ev) => f.elements[k].addEventListener(ev, () => { touched[k] = true; })));
         const hint = () => {
           const plan = f.elements.plan.value;
-          const m = matchImplants(plan, Store.implants);
+          const m = matchImplants(plan, Store.implants, f.elements.diagnosis.value);
           const lv = levelFor(plan, Store.levels);
           $('#impl-hint', el).textContent = m.length ? 'Implants from: ' + m.map((r) => r.name).join(', ') : (Object.keys(Store.implants).length ? 'No implant database match for this plan.' : 'Add procedures under Settings → Implant database to auto-fill implants.');
           $('#level-hint', el).textContent = lv.rule ? `Level ${lv.level}: ${lv.rule.name}` : (plan.trim() ? 'No level match — pick it manually.' : '');
         };
         const fill = (force) => {
           const plan = f.elements.plan.value;
-          const sug = { implants: suggestFromPlan(plan, Store.implants).implants, level: levelFor(plan, Store.levels).level };
+          const sug = { implants: suggestFromPlan(plan, Store.implants, f.elements.diagnosis.value).implants, level: levelFor(plan, Store.levels).level };
           auto.forEach((k) => { if (force || !touched[k]) f.elements[k].value = sug[k]; });
         };
-        f.elements.plan.addEventListener('input', () => {
+        ['plan', 'diagnosis'].forEach((k) => f.elements[k].addEventListener('input', () => {
           hint();
           fill(false);
-        });
+        }));
         $('#impl-fill', el).onclick = () => fill(true);
         hint();
 
@@ -1200,7 +1200,7 @@ const App = (() => {
         } else if (b.dataset.unpick !== undefined) {
           upd((x) => { x.selected = x.selected.filter((i) => i !== cid); });
         } else if (b.dataset.refill !== undefined) {
-          const sug = suggestFromPlan($('[data-f="plan"]', row).value, Store.implants);
+          const sug = suggestFromPlan($('[data-f="plan"]', row).value, Store.implants, $('[data-f="diagnosis"]', row).value);
           const ta = $('[data-f="implants"]', row);
           ta.value = sug.implants;
           ta.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1991,17 +1991,21 @@ const App = (() => {
 
   // ---------------------------------------------------------------- Settings
   function implantSection() {
-    const rules = Object.entries(Store.implants).map(([id, r]) => ({ ...r, id })).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const rules = Object.entries(Store.implants).map(([id, r]) => ({ ...r, id }))
+      .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.name || '').localeCompare(b.name || ''));
+    const how = (r) => (r.keywords?.length
+      ? `plan has: ${r.keywords.slice(0, 3).join(', ')}${r.keywords.length > 3 ? '…' : ''}${r.site?.length ? ` · site: ${r.site.slice(0, 4).join(', ')}${r.site.length > 4 ? '…' : ''}` : ''}`
+      : 'plan contains the procedure name');
     return `
       <div class="card" id="implants">
         <h3>Implant database</h3>
-        <p class="muted small">When a case's plan contains a procedure name below, its implants fill in automatically. Matching is by whole word and ignores case, so “SHORT PFN” matches “CR/ORIF WITH SHORT PFN LEFT”.</p>
+        <p class="muted small">When a case's plan matches an entry below, its implants fill in automatically (several matches are combined). Your own entries match on the procedure name, e.g. “SHORT PFN” matches “CR/ORIF WITH SHORT PFN LEFT”; the unit's list also checks the bone in the plan or diagnosis, as shown under each name.</p>
         <div class="table-wrap">
           <table class="board impl-table">
             <thead><tr><th>Procedure</th><th>Implants</th><th></th></tr></thead>
             <tbody>
               ${rules.map((r) => `<tr data-rule="${r.id}">
-                <td><input data-k="name" value="${esc(r.name)}" aria-label="Procedure"></td>
+                <td><input data-k="name" value="${esc(r.name)}" aria-label="Procedure"><div class="muted small impl-how">${esc(how(r))}</div></td>
                 <td><textarea data-k="implants" rows="2" aria-label="Implants">${esc(r.implants)}</textarea></td>
                 <td><button class="icon" data-del-rule title="Delete">✕</button></td>
               </tr>`).join('') || '<tr><td colspan="3" class="empty">No procedures yet. Add the first one below.</td></tr>'}
@@ -2151,7 +2155,7 @@ const App = (() => {
       // Implant database
       const test = $('#impl-test', el);
       const runTest = () => {
-        const s = suggestFromPlan(test.value, Store.implants);
+        const s = suggestFromPlan(test.value, Store.implants, test.value);
         $('#impl-out', el).innerHTML = s.matches.length
           ? s.matches.map((r) => `<div><b>${esc(r.name)}</b>: ${esc(r.implants)}</div>`).join('')
           : (test.value ? 'No match' : '');

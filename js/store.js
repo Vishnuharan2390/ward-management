@@ -64,6 +64,13 @@ const Store = (() => {
     for (const id of Object.keys(state.implants)) if (id.startsWith('seed')) delete state.implants[id];
     saveLocal('cases');
     saveLocal('implants');
+    // The unit's implant list, loaded once (kept if later edited or deleted).
+    if (!state.meta.main?.implantSeed) {
+      for (const r of UNIT_IMPLANTS) if (!state.implants[r.id]) state.implants[r.id] = { ...r };
+      state.meta.main = { ...(state.meta.main || {}), implantSeed: 'ot2' };
+      saveLocal('implants');
+      saveLocal('meta');
+    }
     if (localStorage.getItem(LS + 'levels') === null) {
       state.levels = Object.fromEntries(SEED_LEVELS.map((r) => [r.id, { ...r }]));
       saveLocal('levels');
@@ -141,12 +148,23 @@ const Store = (() => {
   function listen() {
     status = 'connecting';
     let seededLevels = false;
+    const fresh = {};
+    let implantSeedChecked = false;
+    const maybeSeedImplants = () => {
+      if (implantSeedChecked || !fresh.implants || !fresh.meta) return;
+      implantSeedChecked = true;
+      if (state.meta.main?.implantSeed) return;
+      for (const r of UNIT_IMPLANTS) if (!state.implants[r.id]) fb.fsM.setDoc(ref('implants', r.id), r);
+      const doc = ref('meta', 'main');
+      fb.fsM.setDoc(doc, { implantSeed: 'ot2' }, { merge: true });
+    };
     for (const coll of [...COLLS, 'members']) {
       unsubs.push(fb.fsM.onSnapshot(collRef(coll), { includeMetadataChanges: false }, (snap) => {
         const m = {};
         snap.forEach((d) => { m[d.id] = coll === 'cases' ? migrateCase(d.data()) : d.data(); });
         state[coll] = m;
         status = 'ok';
+        if (!snap.metadata.fromCache) { fresh[coll] = true; maybeSeedImplants(); }
         // First connection for the unit: load the WOPL level list once.
         if (coll === 'levels' && snap.empty && !snap.metadata.fromCache && !seededLevels) {
           seededLevels = true;

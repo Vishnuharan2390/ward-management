@@ -754,3 +754,4 @@ main { padding-top: 12px; }
 .ecg-check input { transform: scale(1.3); }
 @media (max-width: 640px) { .workup { grid-template-columns: 1fr; } }
 .deck-uploads { margin-top: .6rem; align-items: center; }
+.impl-how { margin-top: .2rem; font-size: .72rem; line-height: 1.25; }
