@@ -56,7 +56,7 @@ const App = (() => {
     <div class="custom-row">
       <input data-cn placeholder="Investigation">
       <input data-cv placeholder="Value" inputmode="decimal">
-      <input data-cr placeholder="Normal range, e.g. 0.6 – 1.2">
+      <input data-cr placeholder="Normal range">
       <input data-cu placeholder="Units">
       <button type="button" class="icon" data-rm-custom title="Remove">✕</button>
     </div>`;
@@ -362,23 +362,23 @@ const App = (() => {
               <label>Age<input name="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
               <label>IP number<input name="ipNo" value="${esc(c.ipNo)}"></label>
-              <label>Ward<input name="ward" value="${esc(c.ward)}" placeholder="e.g. 90A"></label>
+              <label>Ward<input name="ward" value="${esc(c.ward)}"></label>
               <label>Date of admission<input type="date" name="doa" value="${esc(c.doa)}"></label>
-              <label>Attender<input name="attender" value="${esc(c.attender)}" placeholder="e.g. S/O BOMMU"></label>
+              <label>Attender<input name="attender" value="${esc(c.attender)}"></label>
               <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
               <label>Address<input name="address" value="${esc(c.address)}"></label>
             </fieldset>
  <fieldset class="card" id="sec-plan"><legend>Diagnosis & plan</legend>
               <label class="span2">Diagnosis<textarea name="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
-              <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT">${esc(c.plan)}</textarea></label>
+              <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2">${esc(c.plan)}</textarea></label>
               <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
               <label>Scheme status<select name="scheme">${schemeOpts(c.scheme)}</select></label>
-              <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}" placeholder="DM, SHTN…"></label>
-              <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}" placeholder="MLC/RTA"></label>
-              <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(id ? c.writtenBy : (c.writtenBy || Store.meta.lastPg || ''))}" placeholder="DR.NAME PG"></label>
-              <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3" placeholder="e.g. ABOVE KNEE POP SLAB&#10;INJ. ANALGESICS">${esc(c.treatment)}</textarea></label>
+              <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>
+              <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}"></label>
+              <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(id ? c.writtenBy : (c.writtenBy || Store.meta.lastPg || ''))}"></label>
+              <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3">${esc(c.treatment)}</textarea></label>
               <label class="span2">Implants
-                <textarea name="implants" rows="2" placeholder="Filled from the implant database when the plan matches">${esc(c.implants)}</textarea>
+                <textarea name="implants" rows="2">${esc(c.implants)}</textarea>
                 <span class="hint" id="impl-hint"></span>
               </label>
               <div class="span2"><button type="button" class="btn small" id="impl-fill">↻ Fill implants & level from database</button></div>
@@ -390,8 +390,8 @@ const App = (() => {
             </fieldset>` : `
             <fieldset class="card block-fs" id="sec-inv"><legend>Investigations</legend>
               <div class="span2">${labFormHTML(c)}</div>
-              <label>Pus C/S — organism<input name="pusOrganism" class="italic" placeholder="if sent"></label>
-              <label>Sensitive to<input name="pusSensitive" placeholder="antibiotics"></label>
+              <label>Pus C/S — organism<input name="pusOrganism" class="italic"></label>
+              <label>Sensitive to<input name="pusSensitive"></label>
             </fieldset>
             <fieldset class="card" id="sec-img"><legend>Radiographs & wound pictures</legend>
               <p class="span2 muted small">Uploaded once here — they appear on the case page, in the OT list viewer and in the PowerPoints.</p>
@@ -399,7 +399,7 @@ const App = (() => {
               <div class="span2 pending-imgs" id="pending-imgs"></div>
             </fieldset>
             <fieldset class="card" id="sec-work"><legend>Work-up</legend>
-              ${WORKUP.map((w) => `<label>${esc(w.long || w.label)}<input name="w_${w.k}" placeholder="Result / remarks"></label>`).join('')}
+              ${WORKUP.map((w) => `<label>${esc(w.long || w.label)}<input name="w_${w.k}"></label>`).join('')}
             </fieldset>`}
             <div class="form-actions">
               <button class="btn primary" type="submit">${id ? 'Save' : 'Add case'}</button>
@@ -606,16 +606,16 @@ const App = (() => {
   function openCustomChartModal(caseId) {
     const m = $('#modal');
     const colRow = () => `<div class="custom-row cc-row">
-      <input data-cc="label" placeholder="Column, e.g. INR">
+      <input data-cc="label" placeholder="Column">
       <input data-cc="unit" placeholder="Unit">
-      <input data-cc="range" placeholder="Normal range, e.g. 0.8 – 1.2">
+      <input data-cc="range" placeholder="Normal range">
       <label class="small nowrap"><input type="checkbox" data-cc="text"> text</label>
       <button type="button" class="icon" data-rm-custom title="Remove">✕</button>
     </div>`;
     m.innerHTML = `
       <form class="sheet card form" id="chart-modal" autocomplete="off">
         <div class="row-between"><h3>New chart</h3><button type="button" class="icon" data-close>✕</button></div>
-        <label>Chart name<input name="title" required placeholder="e.g. INR chart, Hb chart, Vitals"></label>
+        <label>Chart name<input name="title" required></label>
         <p class="muted small">Columns to record each time. Tick “text” for words rather than numbers.</p>
         <div class="cc-cols">${colRow()}${colRow()}</div>
         <button type="button" class="btn small" data-add-col>+ Add column</button>
@@ -694,8 +694,8 @@ const App = (() => {
               <button class="btn small primary" id="add-set">+ ${labSets(c).length ? 'Repeat investigations' : 'Enter investigations'}</button></div>
             ${flowsheetHTML(c)}
             <div class="pus">
-              <label>Pus C/S — organism<input class="italic" data-bind="pus.organism" value="${esc(c.pus?.organism)}" placeholder="if sent"></label>
-              <label>Sensitive to<input data-bind="pus.sensitive" value="${esc(c.pus?.sensitive)}" placeholder="antibiotics"></label>
+              <label>Pus C/S — organism<input class="italic" data-bind="pus.organism" value="${esc(c.pus?.organism)}"></label>
+              <label>Sensitive to<input data-bind="pus.sensitive" value="${esc(c.pus?.sensitive)}"></label>
             </div>
           </section>
 
@@ -749,7 +749,7 @@ const App = (() => {
                 </li>`).join('') || '<li class="muted small">Nothing pending. Add works for your HS / co-PGs below.</li>'}
             </ul>
             <form class="inline-add" id="add-task">
-              <input name="text" placeholder="e.g. Send blood for cross-match" required>
+              <input name="text" placeholder="New pending work" required>
               <select name="to"><option value="">Anyone</option>${opts(ROLES)}</select>
               <button class="btn small primary">Add</button>
             </form>
@@ -759,10 +759,10 @@ const App = (() => {
             <h3>Operative details</h3>
             <div class="op-grid">
               <label>Date of surgery<input type="date" data-bind="surgeryDate" value="${esc(c.surgeryDate || c.otDate || '')}"></label>
-              <label>Surgeon<input data-bind="surgeon" list="dl-surgeons" value="${esc(c.surgeon)}" placeholder="DR. NAME MS ORTHO"></label>
-              <label class="span2">Procedure done<textarea data-bind="procedureDone" rows="2" placeholder="${esc(c.plan || '')}">${esc(c.procedureDone)}</textarea></label>
-              <label class="span2">Assistant surgeon(s)<input data-bind="assistants" list="dl-pg" value="${esc(c.assistants)}" placeholder="DR. NAME PG, DR. NAME PG"></label>
-              <label class="span2">Operative notes<textarea data-bind="opNotes" rows="6" placeholder="Position, approach, findings, reduction, implants used (with sizes), closure…">${esc(c.opNotes)}</textarea></label>
+              <label>Surgeon<input data-bind="surgeon" list="dl-surgeons" value="${esc(c.surgeon)}"></label>
+              <label class="span2">Procedure done<textarea data-bind="procedureDone" rows="2">${esc(c.procedureDone)}</textarea></label>
+              <label class="span2">Assistant surgeon(s)<input data-bind="assistants" list="dl-pg" value="${esc(c.assistants)}"></label>
+              <label class="span2">Operative notes<textarea data-bind="opNotes" rows="6">${esc(c.opNotes)}</textarea></label>
               <label class="span2">Implants used <span class="hint">picked up from the operative notes — edit if needed</span>
                 <textarea data-bind="implantsUsed" rows="2">${esc(c.implantsUsed)}</textarea></label>
               <div class="span2"><button class="btn small" id="impl-from-notes">↻ Pick implants from operative notes</button></div>
@@ -1330,7 +1330,7 @@ const App = (() => {
             <label>Date<input type="date" id="deck-date" value="${esc(date)}"></label>
             <label>Unit<input value="UNIT ${esc(st.unit)}" disabled></label>
             <label class="span2">Professor<input id="deck-prof" list="dl-chiefs" value="${esc(st.professor)}"></label>
-            <label class="span2">DAOS<input id="deck-daos" list="dl-aps" value="${esc(st.daos)}" placeholder="DR. NAME MS ORTHO"></label>
+            <label class="span2">DAOS<input id="deck-daos" list="dl-aps" value="${esc(st.daos)}"></label>
           </fieldset>
         </div>
 
@@ -1352,9 +1352,9 @@ const App = (() => {
               </div>
               <div class="deck-fields">
                 <label>Status<select data-cf="deckStatus"><option value="">No status</option>${opts(DeckEngine.STATUSES, cc.deckStatus || '')}</select></label>
-                <label>Mode<input data-cf="mode" list="dl-mode" value="${esc(cc.mode)}" placeholder="MLC/RTA"></label>
+                <label>Mode<input data-cf="mode" list="dl-mode" value="${esc(cc.mode)}"></label>
                 <label class="span2">Diagnosis<textarea data-cf="diagnosis" rows="2">${esc(cc.diagnosis)}</textarea></label>
-                <label class="span2">Treatment <span class="hint">one item per line</span><textarea data-cf="treatment" rows="3" placeholder="${esc(cc.plan || '')}">${esc(cc.treatment)}</textarea></label>
+                <label class="span2">Treatment <span class="hint">one item per line</span><textarea data-cf="treatment" rows="3">${esc(cc.treatment)}</textarea></label>
                 <label class="span2">Case sheet written by<input data-cf="writtenBy" list="dl-pg" value="${esc(cc.writtenBy)}"></label>
               </div>
               ${ADMISSION_KINDS.filter((k) => caseImages(c.id, k.k).length).map((k) => {
@@ -1744,8 +1744,8 @@ const App = (() => {
               <label>Consultant<input name="consultant" value="${esc(d.consultant)}"></label>
               <label>Date of surgery<input type="date" name="dos" value="${esc(d.dos)}"></label>
               <label>Date of discharge / transfer<input type="date" name="dod" value="${esc(d.dod)}"></label>
-              <label>Time<input name="dodTime" value="${esc(d.dodTime)}" placeholder="e.g. 2 PM"></label>
-              <label>Attender<input name="attender" value="${esc(d.attender)}" placeholder="S/O …"></label>
+              <label>Time<input name="dodTime" value="${esc(d.dodTime)}"></label>
+              <label>Attender<input name="attender" value="${esc(d.attender)}"></label>
               <label>Ph. no<input name="phone" type="tel" value="${esc(d.phone)}"></label>
               <label>Contact no (optional)<input name="contact" type="tel" value="${esc(d.contact)}"></label>
               <label class="span2">Address<input name="address" value="${esc(d.address)}"></label>
@@ -1954,14 +1954,14 @@ const App = (() => {
             </tbody>
             <tfoot>
               <tr id="impl-add">
-                <td><input name="name" placeholder="e.g. SHORT PFN" aria-label="New procedure"></td>
-                <td><textarea name="implants" rows="2" placeholder="e.g. 9,10,11*250MM SHORT PFN, 6.2MM DEROTATION SCREW…" aria-label="New implants"></textarea></td>
+                <td><input name="name" aria-label="New procedure"></td>
+                <td><textarea name="implants" rows="2" aria-label="New implants"></textarea></td>
                 <td><button class="btn small primary" id="impl-add-btn">Add</button></td>
               </tr>
             </tfoot>
           </table>
         </div>
-        <label class="block test">Test a plan<input id="impl-test" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT"></label>
+        <label class="block test">Test a plan<input id="impl-test"></label>
         <div id="impl-out" class="muted small"></div>
       </div>`;
   }
@@ -1991,15 +1991,15 @@ const App = (() => {
             <tfoot>
               <tr id="level-add">
                 <td><select name="level" aria-label="New level">${levelOpts('II')}</select></td>
-                <td><input name="category" placeholder="e.g. Trauma" aria-label="New category"></td>
+                <td><input name="category" aria-label="New category"></td>
                 <td><input name="name" placeholder="Procedure" aria-label="New procedure"></td>
-                <td><input name="keywords" placeholder="e.g. tens, elastic nail" aria-label="New match words"></td>
+                <td><input name="keywords" aria-label="New match words"></td>
                 <td><button class="btn small primary" id="level-add-btn">Add</button></td>
               </tr>
             </tfoot>
           </table>
         </div>
-        <label class="block test">Test a plan<input id="level-test" placeholder="e.g. CR/ORIF WITH SHORT PFN LEFT"></label>
+        <label class="block test">Test a plan<input id="level-test"></label>
         <div id="level-out" class="muted small"></div>
       </div>`;
   }
@@ -2030,7 +2030,7 @@ const App = (() => {
         <h2>Settings</h2>
         <form class="card form" id="prof">
           <fieldset><legend>You (on this device)</legend>
-            <label>Your name<input name="name" value="${esc(p.name)}" placeholder="Dr. …"></label>
+            <label>Your name<input name="name" value="${esc(p.name)}"></label>
             <label>Role<select name="role"><option value="">—</option>${opts(ROLES, p.role)}</select></label>
           </fieldset>
         </form>
