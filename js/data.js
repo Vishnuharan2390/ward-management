@@ -462,7 +462,10 @@ const ADVICE_PHRASES = [
 ];
 
 // Treatment given — quick-add drug lists.
+// Standard treatment for every case.
+const STANDARD_TREATMENT = ['IV FLUIDS', 'ANALGESICS'];
 const DRUGS_ALL = [
+  ...STANDARD_TREATMENT,
   'INJ. HEPARIN 5000 IU SC BD',
   'INJ. PARACETAMOL 1G IV BD',
   'INJ. RANITIDINE 50MG IV BD',

@@ -376,7 +376,7 @@ const App = (() => {
               <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>
               <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}"></label>
               <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(id ? c.writtenBy : (c.writtenBy || Store.meta.lastPg || ''))}"></label>
-              <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3">${esc(c.treatment)}</textarea></label>
+              <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3">${esc(id ? c.treatment : (c.treatment ?? STANDARD_TREATMENT.join('\n')))}</textarea></label>
               <label class="span2">Implants
                 <textarea name="implants" rows="2">${esc(c.implants)}</textarea>
                 <span class="hint" id="impl-hint"></span>
