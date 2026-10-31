@@ -1164,3 +1164,19 @@ html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, htm
 /* WhatsApp share buttons: a small green dot marks them in every look */
 .btn.wa::before { content: ""; display: inline-block; width: .55em; height: .55em; border-radius: 50%; background: #25d366; margin-right: .45em; vertical-align: .05em; box-shadow: 0 0 0 2px rgba(37,211,102,.25); }
 .wa-row { display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 .6rem; }
+
+/* Import from WhatsApp */
+.imp-steps { margin: 0 0 .8rem; padding-left: 1.2rem; line-height: 1.5; }
+#imp-text { width: 100%; font: inherit; }
+.imp-case { margin-bottom: .8rem; }
+.imp-dup { opacity: .7; }
+.imp-pick { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .5rem; }
+.imp-pick input { width: 1.2rem; height: 1.2rem; }
+.imp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem .6rem; }
+.imp-grid .span2 { grid-column: span 2; }
+.imp-grid label { display: flex; flex-direction: column; font-size: .8rem; }
+.imp-grid textarea { font: inherit; }
+.imp-photos { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }
+.imp-photos figure { margin: 0; width: 104px; display: flex; flex-direction: column; gap: .25rem; }
+.imp-photos img { width: 104px; height: 104px; object-fit: cover; border-radius: 8px; background: #000; }
+.imp-photos select { font-size: .75rem; }

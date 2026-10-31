@@ -224,6 +224,7 @@ const App = (() => {
         <div class="toolbar">
           <input type="search" id="q" placeholder="Search name, IP, ward, diagnosis…" value="${esc(dashQuery)}">
           <a class="btn primary" href="#/new">+ New case</a>
+          <a class="btn wa" href="#/import">From WhatsApp</a>
         </div>
         <div class="chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
         <div class="cards">${cardsHTML(all.length)}</div>`;
@@ -271,6 +272,156 @@ const App = (() => {
         </a>`;
     }).join('');
   }
+
+
+  // ---------------------------------------------------------------- Import from WhatsApp
+  // Cases posted in the unit WhatsApp group: paste one message, or open the group's "Export chat" file.
+  const Import = {
+    live: false,
+    items: null,
+    busy: '',
+    render() {
+      const it = Import.items;
+      const sexSel = (i, v) => `<select data-i="${i}" data-f="sex">${['', 'M', 'F'].map((x) => `<option${x === v ? ' selected' : ''}>${x}</option>`).join('')}</select>`;
+      const kinds = [...ADD_CASE_KINDS.map((k) => [k.k, k.label]), ['skip', 'Don’t add']];
+      const list = it ? `
+        <div class="toolbar"><h2>${it.length} case${it.length === 1 ? '' : 's'} found</h2>
+          <button class="btn" id="imp-clear">Start over</button></div>
+        ${it.length ? '' : '<p class="empty">No case posts found. A post needs a line like “Udayakumar 26/M” and the diagnosis.</p>'}
+        ${it.map((c, i) => `
+          <div class="card imp-case${c.dup ? ' imp-dup' : ''}">
+            <label class="imp-pick"><input type="checkbox" data-i="${i}" data-f="sel" ${c.sel ? 'checked' : ''}>
+              <b>${c.caseNo ? `Case ${esc(c.caseNo)} · ` : ''}${esc(c.name)} ${esc(c.age)}/${esc(c.sex)}</b>
+              <span class="muted small">${c.doa ? 'posted ' + esc(fmtDate(c.doa)) : ''}${c.sender ? ' by ' + esc(c.sender) : ''}</span>
+              ${c.dup ? '<span class="tag task">Already in Cases</span>' : ''}</label>
+            <div class="form imp-grid">
+              <label class="span2">Name<input data-i="${i}" data-f="name" value="${esc(c.name)}"></label>
+              <label>Age<input data-i="${i}" data-f="age" inputmode="numeric" value="${esc(c.age)}"></label>
+              <label>Sex${sexSel(i, c.sex)}</label>
+              <label>IP no.<input data-i="${i}" data-f="ipNo" value="${esc(c.ipNo)}"></label>
+              <label>Ward<input data-i="${i}" data-f="ward" value="${esc(c.ward)}"></label>
+              <label>Mode<input data-i="${i}" data-f="mode" list="dl-mode" value="${esc(c.mode)}"></label>
+              <label>DOA<input type="date" data-i="${i}" data-f="doa" value="${esc(c.doa)}"></label>
+              <label class="span2">Diagnosis<textarea data-i="${i}" data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
+              <label class="span2">Plan<input data-i="${i}" data-f="plan" value="${esc(c.plan)}"></label>
+            </div>
+            ${c.photos.length ? `<div class="imp-photos">${c.photos.map((ph, j) => `
+              <figure><img src="${ph.url}" alt=""><select data-i="${i}" data-p="${j}">${kinds.map(([k, l]) => `<option value="${k}"${k === ph.kind ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></figure>`).join('')}</div>` : ''}
+            ${c.missing ? `<p class="muted small">${c.missing} photo(s) in this post weren't in the file — export the chat <b>with media</b> (Attach Media) to bring them in.</p>` : ''}
+          </div>`).join('')}
+        ${it.length ? `<div class="form-actions"><button class="btn primary" id="imp-add">Add ${it.filter((c) => c.sel).length} case(s) to Cases</button></div>` : ''}
+        ${datalist('dl-mode', MODES)}` : '';
+      return `
+        <h2>Import from WhatsApp</h2>
+        ${Import.busy ? `<p class="notice">${esc(Import.busy)}</p>` : ''}
+        ${it ? list : `
+        <section class="card">
+          <h3>Whole group (with photos)</h3>
+          <ol class="small imp-steps">
+            <li>Open the group in WhatsApp → tap the group name at the top.</li>
+            <li>Scroll down → <b>Export chat</b> → <b>Attach Media</b> → <b>Save to Files</b> (Android: ⋮ → More → Export chat → Include media).</li>
+            <li>Pick that file here. Every “Case …” post is found, with its X-ray and wound photos.</li>
+          </ol>
+          <label class="btn primary">Open exported chat (.zip / .txt)<input type="file" id="imp-file" accept=".zip,.txt,application/zip,text/plain" hidden></label>
+        </section>
+        <section class="card">
+          <h3>One case (text only)</h3>
+          <p class="small muted">Long-press the case message in WhatsApp → Copy → paste here.</p>
+          <textarea id="imp-text" rows="6" placeholder="Case 11&#10;Udayakumar 26/M&#10;MLC/RTA&#10;&#10;COMPOUND GRADE IIIB FRACTURE BOTH BONE LEG LEFT"></textarea>
+          <div class="form-actions"><button class="btn primary" id="imp-read">Read message</button></div>
+        </section>`}`;
+    },
+    async load(cases) {
+      const have = new Set(caseList().map((c) => WaImport.key(c.name, c.age)));
+      for (const c of cases) {
+        c.dup = have.has(WaImport.key(c.name, c.age));
+        c.sel = !c.dup;
+        c.plan = defaultPlanFor(c.diagnosis);
+        c.photos = c.photos || [];
+        for (const ph of c.photos) {
+          ph.url = URL.createObjectURL(ph.blob);
+          ph.kind = await WaImport.guessKind(ph.blob);
+        }
+      }
+      Import.items = cases;
+      Import.busy = '';
+      render();
+    },
+    mount(el) {
+      const file = $('#imp-file', el);
+      if (file) file.onchange = async () => {
+        const f = file.files[0];
+        if (!f) return;
+        Import.busy = 'Reading the chat…';
+        render();
+        try {
+          await Import.load(await WaImport.readExport(f));
+        } catch (err) {
+          Import.busy = '';
+          render();
+          toast(`Couldn't read that file (${err.message}). Pick the .zip or .txt from WhatsApp's Export chat.`, 6000);
+        }
+      };
+      const read = $('#imp-read', el);
+      if (read) read.onclick = () => {
+        const c = WaImport.parseCaseText($('#imp-text', el).value);
+        if (!c) return toast('Couldn’t find a “Name 26/M” line and a diagnosis in that message', 5000);
+        Import.load([{ ...c, doa: todayISO(), photos: [] }]);
+      };
+      const clear = $('#imp-clear', el);
+      if (clear) clear.onclick = () => {
+        (Import.items || []).forEach((c) => c.photos.forEach((ph) => URL.revokeObjectURL(ph.url)));
+        Import.items = null;
+        render();
+      };
+      el.addEventListener('input', (e) => {
+        const t = e.target;
+        const c = Import.items?.[t.dataset.i];
+        if (!c) return;
+        if (t.dataset.p !== undefined) c.photos[t.dataset.p].kind = t.value;
+        else if (t.dataset.f === 'sel') c.sel = t.checked;
+        else if (t.dataset.f) {
+          if (t.dataset.f === 'diagnosis' && c.plan === defaultPlanFor(c.diagnosis)) {
+            c.plan = defaultPlanFor(t.value);
+            const pl = $(`[data-i="${t.dataset.i}"][data-f="plan"]`, el);
+            if (pl) pl.value = c.plan;
+          }
+          c[t.dataset.f] = t.value;
+        }
+        if (t.dataset.f === 'sel') $('#imp-add', el).textContent = `Add ${Import.items.filter((x) => x.sel).length} case(s) to Cases`;
+      });
+      el.addEventListener('change', (e) => e.target.dispatchEvent(new Event('input', { bubbles: true })));
+      const add = $('#imp-add', el);
+      if (add) add.onclick = async () => {
+        const pick = Import.items.filter((c) => c.sel);
+        if (!pick.length) return toast('Tick at least one case');
+        add.disabled = true;
+        let photos = 0;
+        let bad = 0;
+        for (const c of pick) {
+          const nid = uid();
+          const plan = c.plan.trim().toUpperCase();
+          const diagnosis = c.diagnosis.trim().toUpperCase();
+          Store.create('cases', nid, {
+            name: c.name.trim().toUpperCase(), age: String(c.age).trim(), sex: c.sex, ipNo: (c.ipNo || '').trim(), ward: (c.ward || '').trim().toUpperCase(),
+            mode: c.mode.trim().toUpperCase(), diagnosis, plan, doa: c.doa || todayISO(),
+            implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
+            status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'), writtenBy: Store.meta.lastPg || '',
+          });
+          for (const ph of c.photos.filter((x) => x.kind !== 'skip')) {
+            toast(`Saving photos… ${++photos}`, 8000);
+            try {
+              await Store.addImage(nid, ph.kind, await compressImage(ph.blob), c.caseNo ? `WhatsApp case ${c.caseNo}` : 'WhatsApp');
+            } catch { bad++; }
+          }
+        }
+        (Import.items || []).forEach((c) => c.photos.forEach((ph) => URL.revokeObjectURL(ph.url)));
+        Import.items = null;
+        toast(`Added ${pick.length} case(s)${photos ? ` with ${photos - bad} photo(s)` : ''}${bad ? ` — ${bad} photo(s) couldn't be opened` : ''}`, 5000);
+        location.hash = '#/';
+      };
+    },
+  };
 
   // ---------------------------------------------------------------- Ward board
   const activeCases = () => caseList().filter(isActive).sort(byWard);
@@ -2428,6 +2579,7 @@ const App = (() => {
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
     [/^#\/new$/, () => CaseForm()],
+    [/^#\/import$/, () => Import],
     [/^#\/new\/deck\/([\d-]+)$/, (d) => CaseForm(null, d)],
     [/^#\/case\/(\w+)$/, (id) => CaseDetail(id)],
     [/^#\/case\/(\w+)\/edit$/, (id) => CaseForm(id)],
