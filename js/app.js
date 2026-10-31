@@ -2379,7 +2379,7 @@ const App = (() => {
     App.el.replaceWith(fresh);
     App.el = fresh;
     v.mount?.(fresh);
-    Voice.attach(fresh);
+    // Voice.attach(fresh); — dictation buttons switched off for now (js/voice.js)
     current.loading = Store.status === 'connecting' && !!fresh.querySelector('.empty');
     window.scrollTo(0, same ? y : 0);
     const sec = section();
