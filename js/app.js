@@ -1352,14 +1352,16 @@ const App = (() => {
             return `
             <div class="deck-case" data-dcase="${c.id}">
               <div class="row-between">
-                <b>Case ${i + 1} · ${esc(c.name)} <span class="muted">${esc(c.ageSex)}</span></b>
+                <b>Case ${i + 1}${c.name ? ' · ' + esc(c.name) : ''} <span class="muted">${esc(c.ageSex)}</span></b>
                 <span class="nowrap">
                   <button class="icon" data-dmove="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
                   <button class="icon" data-dmove="1" ${i < st.cases.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
-                  <button class="icon" data-dskip title="Leave out of this deck">✕</button>
+                  <button class="icon" data-dskip title="${cc.name ? 'Leave out of this deck' : 'Delete this blank case'}">✕</button>
                 </span>
               </div>
               <div class="deck-fields">
+                <label>Name<input data-cf="name" value="${esc(cc.name)}" autocomplete="off"></label>
+                <label>Age/Sex<input data-agesex value="${esc(ageSex(cc))}" autocomplete="off"></label>
                 <label>Status<select data-cf="deckStatus"><option value="">No status</option>${opts(DeckEngine.STATUSES, cc.deckStatus || '')}</select></label>
                 <label>Mode<input data-cf="mode" list="dl-mode" value="${esc(cc.mode)}"></label>
                 <label class="span2">Diagnosis<textarea data-cf="diagnosis" rows="2">${esc(cc.diagnosis)}</textarea></label>
@@ -1372,11 +1374,12 @@ const App = (() => {
                   <div class="row-between"><input class="deck-label" data-dlabel="${key}" value="${esc(cfg.labels[key] || k.deck)}" aria-label="Slide title">
                     <label class="small nowrap"><input type="checkbox" data-dsplit="${key}" ${cfg.split[key] ? 'checked' : ''}> separate slides</label></div>
                   <div class="dthumbs">${thumbs(c, k)}</div></div>`;
-              }).join('') || `<p class="muted small">No radiographs or wound pictures. <a href="#/case/${c.id}">Add on the case page</a>.</p>`}
+              }).join('')}
+              <div class="img-adders deck-uploads">${ADMISSION_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-dupload="${k.k}" hidden></label>`).join('')}<span class="busy small muted"></span></div>
             </div>`;
-          }).join('') || '<div class="empty">No cases admitted on this date yet. Tap “+ Add new case” below.</div>'}
+          }).join('') || '<div class="empty">No cases on this date yet. Tap “+ Add case” below.</div>'}
           <div class="deck-add-row">
-            <a class="btn primary" href="#/new/deck/${esc(date)}">+ Add new case</a>
+            <button class="btn primary" id="deck-new">+ Add case ${st.cases.length + 1}</button>
             ${others.length ? `<select id="deck-add" aria-label="Add an existing case"><option value="">or add an existing case…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select>` : ''}
           </div>
           ${cfg.skip.length ? `<p class="small"><button class="link" id="deck-unskip">Bring back ${cfg.skip.length} left-out case(s)</button></p>` : ''}
@@ -1421,6 +1424,21 @@ const App = (() => {
       $('#deck-daos', el).onchange = (e) => save((x) => { x.daos = e.target.value.trim().toUpperCase(); }, false);
       $('#deck-pv', el).onclick = () => { Deck.showPreview = !Deck.showPreview; render(); };
       $('#deck-count', el).onclick = () => save((x) => { x.cons = countCons(deckState(date, x)); });
+      // A case added here is a real ward case: admitted on the deck's date.
+      $('#deck-new', el).onclick = () => {
+        const nid = uid();
+        const last = deckCases(date, cfg).at(-1);
+        Store.create('cases', nid, {
+          name: '', doa: date, status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'),
+          writtenBy: (last && Store.cases[last.id]?.writtenBy) || Store.meta.lastPg || '',
+        });
+        save((x) => { x.order = [...deckCases(date, x).map((c) => c.id).filter((i) => i !== nid), nid]; });
+        const card = $(`[data-dcase="${nid}"]`, App.el);
+        if (card) {
+          card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(() => $('[data-cf=name]', card)?.focus({ preventScroll: true }), 350);
+        }
+      };
       const add = $('#deck-add', el);
       if (add) add.onchange = () => save((x) => { x.extra = [...new Set([...x.extra, add.value])]; x.skip = x.skip.filter((i) => i !== add.value); });
       const uns = $('#deck-unskip', el);
@@ -1429,10 +1447,31 @@ const App = (() => {
       el.addEventListener('change', (e) => {
         const t = e.target;
         const cid = t.closest('[data-dcase]')?.dataset.dcase;
-        if (t.dataset.cf && cid) {
+        if (t.dataset.agesex !== undefined && cid) {
+          // "66/M", "66 M", "66yrs/F" → age and sex on the ward case.
+          const m = t.value.trim().match(/^(\d{1,3})\s*(?:y(?:rs?|ears?)?)?\s*[/,\s-]?\s*([mfo])?/i);
+          Store.patch('cases', cid, m ? { age: m[1], ...(m[2] ? { sex: m[2].toUpperCase() } : {}) } : { age: t.value.trim() });
+          render();
+        } else if (t.dataset.dupload && cid) {
+          const files = [...t.files];
+          const kind = t.dataset.dupload;
+          t.value = '';
+          (async () => {
+            const busy = $('.busy', t.closest('[data-dcase]'));
+            for (let i = 0; i < files.length; i++) {
+              if (busy) busy.textContent = `Adding image ${i + 1} of ${files.length}…`;
+              try {
+                await Store.addImage(cid, kind, await compressImage(files[i]), files[i].name.replace(/\.[^.]+$/, ''));
+              } catch (err) {
+                toast(`"${files[i].name}" couldn't be opened as an image. Use JPG or PNG.`, 4000);
+              }
+            }
+            render();
+          })();
+        } else if (t.dataset.cf && cid) {
           const v = t.value.trim();
           Store.patch('cases', cid, { [t.dataset.cf]: v });
-          if (t.dataset.cf === 'deckStatus') render(); else drawPreview();
+          if (t.dataset.cf === 'deckStatus' || t.dataset.cf === 'name') render(); else drawPreview();
         } else if (t.dataset.skipimg) {
           save((x) => { if (t.checked) delete x.skipImg[t.dataset.skipimg]; else x.skipImg[t.dataset.skipimg] = true; }, false);
           t.closest('.dthumb').classList.toggle('off', !t.checked);
@@ -1457,6 +1496,12 @@ const App = (() => {
             x.order = ids;
           });
         } else if (b.dataset.dskip !== undefined) {
+          const cc = Store.cases[cid];
+          if (cc && !hasText(cc.name) && !Object.keys(cc.images || {}).length) {
+            Store.remove('cases', cid); // a blank card added by mistake
+            save((x) => { x.order = x.order.filter((i) => i !== cid); });
+            return;
+          }
           save((x) => { x.skip = [...new Set([...x.skip, cid])]; x.extra = x.extra.filter((i) => i !== cid); });
         }
       });
