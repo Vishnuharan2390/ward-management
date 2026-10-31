@@ -1044,3 +1044,56 @@ html[data-ui="mint"] .hosp, html[data-ui="mint"] h1, html[data-ui="mint"] h2, ht
 html[data-ui="sorbet"] .hosp, html[data-ui="sorbet"] h1, html[data-ui="sorbet"] h2, html[data-ui="sorbet"] h3, html[data-ui="sorbet"] legend, html[data-ui="sorbet"] .brand,
 html[data-ui="sorbet"] .stats b, html[data-ui="sorbet"] .cc-name, html[data-ui="sorbet"] .btn.primary, html[data-ui="sorbet"] #nav a { font-family: "Fredoka", "Nunito", sans-serif; font-weight: 500; letter-spacing: .01em; }
 html[data-ui="sorbet"] .hosp-l1, html[data-ui="sorbet"] h2, html[data-ui="sorbet"] .cc-name { font-weight: 600; }
+
+/* ---- Tangerine: warm cream canvas, bold Poppins, tangerine rounded tiles, violet accent, big soft corners ---- */
+html[data-ui="tangerine"] {
+  --or: #ec7a12; --or-2: #f59a3a; --vio: #9a6ae0;
+  --desk: #fcefdf; --bg: #fdf4e8; --card: #fffcf7; --field: #fffaf3; --ink: #141210; --muted: #7a6f66; --line: #f1e4d3;
+  --hi: #fff; --lo: #f1e4d3; --face: #fffcf7; --brand: #141210; --brand-2: #141210; --red: #d0262f; --ok: #2f8a5c;
+  --top-bg: #fffcf7; --top-ink: #141210; --top-muted: #7a6f66; --top-accent: transparent;
+  --nav-on-bg: var(--or); --nav-on-ink: #fff; --head-ink: #141210;
+  --btn-bg: #fff3e4; --btn-ink: #3a2a1c; --primary-bg: var(--or); --primary-ink: #fff;
+  --th-bg: var(--or); --th-ink: #fff;
+  --rc: 28px; --rb: 14px; --blur: none;
+  --window: 0 2px 6px rgba(120,70,20,.04), 0 18px 40px rgba(160,95,30,.08);
+  --body-bg: #fcefdf;
+  --font: "Poppins", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font);
+}
+html[data-ui="tangerine"] .top { box-shadow: 0 6px 24px rgba(160,95,30,.06); }
+html[data-ui="tangerine"] .brand { font-weight: 700; letter-spacing: -.01em; }
+html[data-ui="tangerine"] #nav { gap: 4px; padding-bottom: 6px; }
+html[data-ui="tangerine"] #nav a { border-radius: 999px; font-weight: 600; color: #141210; }
+html[data-ui="tangerine"] #nav a.on { box-shadow: 0 6px 16px rgba(236,122,18,.3); }
+html[data-ui="tangerine"] h1, html[data-ui="tangerine"] h2, html[data-ui="tangerine"] h3, html[data-ui="tangerine"] legend { font-weight: 700; letter-spacing: -.01em; }
+/* signature button: tangerine disc tucked behind the start of the label */
+html[data-ui="tangerine"] .btn.primary {
+  background: radial-gradient(circle at 1.15em 50%, var(--or) 1.25em, transparent 1.3em), transparent;
+  color: #141210; font-weight: 700; padding-left: .75em; box-shadow: none; border-radius: 999px;
+}
+html[data-ui="tangerine"] .btn.primary:hover { background: radial-gradient(circle at 1.15em 50%, var(--or) 1.25em, transparent 1.3em), #fff1df; }
+html[data-ui="tangerine"] .chip.on { box-shadow: 0 6px 14px rgba(236,122,18,.28); }
+html[data-ui="tangerine"] .btn, html[data-ui="tangerine"] .chip { font-weight: 600; }
+/* hospital panel: big bold black type on cream with a soft halo */
+html[data-ui="tangerine"] .hosp { background: radial-gradient(420px 220px at 85% 50%, #f7ebdd, transparent 70%), var(--card); }
+html[data-ui="tangerine"] .hosp-l1 { font-weight: 800; letter-spacing: -.01em; }
+html[data-ui="tangerine"] .hosp-l3, html[data-ui="tangerine"] .hosp-l4 { color: var(--muted); }
+/* stat tiles: number in a tangerine rounded square, like the spec icons */
+html[data-ui="tangerine"] .stats b {
+  display: inline-grid; place-items: center; min-width: 2.3em; height: 2.3em; padding: 0 .3em; margin-bottom: .3rem;
+  background: var(--or); color: #fff; border-radius: 14px; box-shadow: 0 8px 18px rgba(236,122,18,.3);
+}
+html[data-ui="tangerine"] .stats span, html[data-ui="tangerine"] .stats small { font-weight: 600; color: #141210; }
+/* cards + accents */
+html[data-ui="tangerine"] .case-card { border-left: 0; position: relative; }
+html[data-ui="tangerine"] .case-card::before { content: ""; position: absolute; left: 0; top: 14px; bottom: 14px; width: 4px; border-radius: 0 4px 4px 0; background: var(--or); }
+html[data-ui="tangerine"] .cc-name { font-weight: 700; }
+html[data-ui="tangerine"] .cc-plan { color: var(--vio); font-weight: 600; }
+html[data-ui="tangerine"] .progress i { background: var(--or); }
+html[data-ui="tangerine"] .flow tr.grp th { background: #fff1df; color: #141210; }
+html[data-ui="tangerine"] .picker tr.picked { background: var(--or); color: #fff; }
+html[data-ui="tangerine"] .deck-previews { background: #2a211b; }
+html[data-ui="tangerine"] input:focus, html[data-ui="tangerine"] select:focus, html[data-ui="tangerine"] textarea:focus { outline: 2px solid var(--or-2); outline-offset: 1px; }
+html[data-ui="tangerine"] .stats span { display: block; }
+html[data-ui="tangerine"] .stats div { border-radius: 22px; padding: .7rem .4rem; }
+html[data-ui="tangerine"] .case-card::before { top: 26px; bottom: 26px; }
+html[data-ui="tangerine"] .btn.primary { white-space: nowrap; text-align: left; }
