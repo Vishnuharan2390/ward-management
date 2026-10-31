@@ -180,7 +180,7 @@ const Print = (() => {
           ${sec('PAST HISTORY / TREATMENT HISTORY', up(d.past))}
           ${sec('EXAMINATION FINDINGS:', d.exam)}
           ${sec('INVESTIGATIONS', up(d.investigations))}
-          ${sec('OPERATIVE NOTES', up(d.opNotes))}
+          ${sec('OPERATIVE NOTES', up(c.opNotes || d.opNotes))}
           ${sec('TREATMENT GIVEN', up(d.treatment))}
           ${sec('COURSE IN HOSPITAL:', up(d.course))}
           ${sec('CONDITION ON ' + (d.disposition === 'postop' ? 'TRANSFER' : 'DISCHARGE'), up(d.condition))}

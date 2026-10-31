@@ -97,6 +97,8 @@ const IMAGE_KINDS = [
   { k: 'powound', label: 'Post-op wound pic', deck: 'POST-OP WOUND PIC' },
 ];
 const ADMISSION_KINDS = IMAGE_KINDS.filter((k) => k.admission);
+// Upload buttons on the add-case page: admission pictures plus post-op X-ray.
+const ADD_CASE_KINDS = IMAGE_KINDS.filter((k) => k.admission || k.k === 'poxray');
 const imageKind = (k) => IMAGE_KINDS.find((x) => x.k === k) || { k, label: k, deck: String(k).toUpperCase() };
 
 // Admission-day deck (same lists as the unit's admission-deck tool).
@@ -373,6 +375,37 @@ function levelFor(plan, rules) {
   const rules2 = [...new Set(kept.map((h) => h.r))];
   const best = rules2.reduce((a, r) => (LEVELS.indexOf(r.level) > LEVELS.indexOf(a?.level) ? r : a), null);
   return { level: best?.level || '', rule: best, matches: rules2 };
+}
+
+// ---- Implants used, read from operative notes -------------------------------
+// Picks out phrases like "10MM X 250MM SHORT PFN", "6.2MM DEROTATION SCREW",
+// "4.5MM 8 HOLE LCP" from free-text notes. The result is editable.
+const IMPLANT_WORDS = 'tension band wiring|nails?|plates?|screws?|k-?wires?|wires?|bolts?|prosthes[ie]s|bipolar|austin moore|stems?|cups?|liners?|cages?|rods?|pins?|anchors?|endobuttons?|bone cement|fixators?|clamps?|washers?|lcp|dcp|lc-dcp|pfna?|dhs|dcs|iln|ilin|tens|philos|lrs|ex-?fix|staples?|tension band|tbw|interference screws?';
+const IMPLANT_RE = new RegExp(
+  `((?:\\d[\\d./]*\\s*(?:mm|cm|g|hole[sd]?)?\\s*(?:[x×*]\\s*\\d[\\d.]*\\s*(?:mm|cm)?\\s*)?)?(?:[a-z0-9.-]+\\s+){0,4}?(?:${IMPLANT_WORDS})(?:\\s+(?:${IMPLANT_WORDS}))?(?:\\s+(?:size|no\\.?|#)\\s*\\d[\\d.]*)?)\\b`, 'gi');
+const IMPLANT_STOP = new Set(['with', 'and', 'using', 'used', 'fixed', 'fixation', 'inserted', 'insertion', 'was', 'were', 'is', 'a', 'an', 'the', 'by', 'of', 'over', 'into', 'then', 'distally', 'proximally', 'locked', 'locking-', 'placed', 'passed', 'applied', 'done', 'reduction', 'reduced', 'under', 'through', 'via', 'after', 'followed', 'secured', 'stabilised', 'stabilized', 'achieved', 'in', 'on', 'to', 'for', 'one', 'and/or']);
+const NOT_IMPLANT = /\b(no|removed?|removal|broken|old|guide wires?|drill|wound closed|skin|sutures?)\b/i;
+
+function extractImplants(notes) {
+  const out = [];
+  for (const clause of String(notes || '').split(/[\n;.](?!\d)|,\s*(?=[a-z]*\s*\d)|\band\b|\bwith\b/i)) {
+    if (NOT_IMPLANT.test(clause)) continue;
+    let m;
+    IMPLANT_RE.lastIndex = 0;
+    while ((m = IMPLANT_RE.exec(clause))) {
+      const words = m[1].trim().split(/\s+/);
+      while (words.length > 1 && IMPLANT_STOP.has(words[0].toLowerCase())) words.shift();
+      const phrase = words.join(' ').toUpperCase().replace(/\s+([X×*])\s+/g, ' X ');
+      // Keep phrases with a size, a named implant system, or a describing word
+      // ("AO CLAMPS", "UNCEMENTED STEM"); drop a bare "PLATE".
+      if (!/\d/.test(phrase) && words.length < 2 && !/\b(PFNA?|DHS|DCS|ILN|ILIN|TENS|PHILOS|LRS|LCP|DCP|BIPOLAR|TBW|ENDOBUTTONS?)\b/.test(phrase)) continue;
+      if (!out.some((x) => x === phrase || x.includes(phrase))) {
+        for (let i = out.length - 1; i >= 0; i--) if (phrase.includes(out[i])) out.splice(i, 1);
+        out.push(phrase);
+      }
+    }
+  }
+  return out.join(', ');
 }
 
 // ---- Implant matching ---------------------------------------------------

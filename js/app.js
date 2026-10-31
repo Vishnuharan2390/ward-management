@@ -149,7 +149,14 @@ const App = (() => {
       const cnt = (s) => all.filter((c) => (c.status || 'preop') === s).length;
       const ready = all.filter((c) => (c.status || 'preop') === 'preop' && readiness(c).ready).length;
       const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ['discharged', 'Discharged'], ['all', 'All']];
+      const u = unitOf(Store.meta.unitId);
       return `
+        <div class="hosp">
+          <div class="hosp-l1">GOVERNMENT RAJAJI HOSPITAL, MADURAI</div>
+          <div class="hosp-l2">MADURAI MEDICAL COLLEGE</div>
+          <div class="hosp-l3">DEPARTMENT OF ORTHOPAEDICS AND TRAUMATOLOGY</div>
+          <div class="hosp-l4">ORTHO UNIT ${esc(u.id)} · ${esc(u.chief)}</div>
+        </div>
         <div class="stats">
           <div><b>${cnt('preop')}</b><span>Pre-op</span></div>
           <div><b>${ready}</b><span>Work-up complete</span></div>
@@ -346,8 +353,8 @@ const App = (() => {
               <label>Sensitive to<input name="pusSensitive" placeholder="antibiotics"></label>
             </fieldset>
             <fieldset class="card" id="sec-img"><legend>Radiographs & wound pictures</legend>
-              <p class="span2 muted small">Uploaded once here — they appear on the case page, in the OT list viewer and in the admission-day deck.</p>
-              <div class="span2 img-adders">${ADMISSION_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-pending="${k.k}" hidden></label>`).join('')}</div>
+              <p class="span2 muted small">Uploaded once here — they appear on the case page, in the OT list viewer and in the PowerPoints.</p>
+              <div class="span2 img-adders">${ADD_CASE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-pending="${k.k}" hidden></label>`).join('')}</div>
               <div class="span2 pending-imgs" id="pending-imgs"></div>
             </fieldset>
             <fieldset class="card" id="sec-work"><legend>Work-up</legend>
@@ -707,6 +714,20 @@ const App = (() => {
             </form>
           </section>
 
+          <section class="card" id="operative">
+            <h3>Operative details</h3>
+            <div class="op-grid">
+              <label>Date of surgery<input type="date" data-bind="surgeryDate" value="${esc(c.surgeryDate || c.otDate || '')}"></label>
+              <label>Surgeon<input data-bind="surgeon" list="dl-surgeons" value="${esc(c.surgeon)}" placeholder="DR. NAME MS ORTHO"></label>
+              <label class="span2">Procedure done<textarea data-bind="procedureDone" rows="2" placeholder="${esc(c.plan || '')}">${esc(c.procedureDone)}</textarea></label>
+              <label class="span2">Assistant surgeon(s)<input data-bind="assistants" list="dl-pg" value="${esc(c.assistants)}" placeholder="DR. NAME PG, DR. NAME PG"></label>
+              <label class="span2">Operative notes<textarea data-bind="opNotes" rows="6" placeholder="Position, approach, findings, reduction, implants used (with sizes), closure…">${esc(c.opNotes)}</textarea></label>
+              <label class="span2">Implants used <span class="hint">picked up from the operative notes — edit if needed</span>
+                <textarea data-bind="implantsUsed" rows="2">${esc(c.implantsUsed)}</textarea></label>
+              <div class="span2"><button class="btn small" id="impl-from-notes">↻ Pick implants from operative notes</button></div>
+            </div>
+          </section>
+
           <section class="card">
             <h3>Radiographs & wound pictures</h3>
             <div class="img-adders">${IMAGE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-upload="${k.k}" hidden></label>`).join('')}</div>
@@ -714,10 +735,17 @@ const App = (() => {
               ${caseImages(id).map((im) => `<button class="thumb" data-open="${im.id}"><img data-img="${im.id}" alt=""><span>${esc(imageKind(im.kind).label)}${im.caption ? ' · ' + esc(im.caption) : ''}</span></button>`).join('') || '<div class="muted small">None yet.</div>'}
             </div>
           </section>
-          ${datalist('dl-depts', OPINION_DEPTS)}`;
+          ${datalist('dl-depts', OPINION_DEPTS)}
+          ${datalist('dl-surgeons', [...new Set(allUnits().flatMap((u) => [u.chief, ...u.aps]))])}${datalist('dl-pg', Store.meta.pgs || [])}`;
       },
       mount(el) {
         if (!Store.cases[id]) return;
+        $('#impl-from-notes', el).onclick = () => {
+          const found = extractImplants(Store.cases[id].opNotes);
+          if (!found) return toast('No implants with sizes found in the operative notes.', 3500);
+          Store.patch('cases', id, { implantsUsed: found, implantsAuto: found });
+          toast('Implants picked up from the operative notes');
+        };
         $$('img[data-img]', el).forEach((img) => {
           Store.getImage(img.dataset.img).then((src) => { if (src) img.src = src; });
         });
@@ -744,7 +772,14 @@ const App = (() => {
 
         el.addEventListener('change', async (e) => {
           const t = e.target;
-          if (t.dataset.bind) {
+          if (t.dataset.bind === 'opNotes') {
+            // Fill "Implants used" from the notes unless someone has edited it by hand.
+            const cur = Store.cases[id];
+            const found = extractImplants(t.value);
+            const ch = { opNotes: t.value.trim() };
+            if (!hasText(cur.implantsUsed) || cur.implantsUsed === cur.implantsAuto) Object.assign(ch, { implantsUsed: found, implantsAuto: found });
+            Store.patch('cases', id, ch);
+          } else if (t.dataset.bind) {
             Store.patch('cases', id, { [t.dataset.bind]: t.value.trim() });
           } else if (t.dataset.task) {
             const k = 'tasks.' + t.dataset.task;
@@ -1400,6 +1435,149 @@ const App = (() => {
     },
   };
 
+  // ---------------------------------------------------------------- Post-op PPT
+  // Operated cases → one details slide each (name, age/sex, diagnosis,
+  // procedure, implants, surgeon, assistant) followed by pre-op X-ray,
+  // pre-op CT / MRI and post-op X-ray, in the admission deck's slide style.
+  const surgeryDate = (c) => c.surgeryDate || c.otDate || c.discharge?.dos || '';
+  const isOperated = (c) => !!(c.surgeryDate || hasText(c.opNotes) || hasText(c.procedureDone) || c.deckStatus === 'OPERATED'
+    || caseImages(c.id, 'poxray').length || ((c.status === 'postop' || c.status === 'discharged') && c.otDate));
+  const POSTOP_SEL = 'wm.v1.postopSel';
+  const postopSel = () => { try { return JSON.parse(localStorage.getItem(POSTOP_SEL)) || []; } catch { return []; } };
+  const setPostopSel = (ids) => { try { localStorage.setItem(POSTOP_SEL, JSON.stringify(ids)); } catch { /* ignore */ } };
+
+  function postopState(ids) {
+    const slidesFor = (c) => [['xray', 'PRE-OP X-RAY'], ['ct', 'PRE-OP CT'], ['mri', 'PRE-OP MRI'], ['poxray', 'POST-OP X-RAY']]
+      .map(([k, label]) => ({ id: c.id + ':' + k, label, images: caseImages(c.id, k).map((im) => im.id) }))
+      .filter((x) => x.images.length);
+    return {
+      noCover: true,
+      unit: unitOf(Store.meta.unitId).id,
+      date: todayISO(),
+      cons: {},
+      cases: ids.map((id) => ({ id, ...Store.cases[id] })).filter((c) => c.name !== undefined).map((c) => ({
+        id: c.id,
+        status: '',
+        rows: [
+          { k: 'NAME', v: DeckEngine.up(c.name), kb: true, vb: true },
+          { k: 'AGE/SEX', v: DeckEngine.up(ageSex(c)), vb: true },
+          { k: 'DIAGNOSIS', v: DeckEngine.up(c.diagnosis), vb: true, diag: true },
+          { k: 'PROCEDURE DONE', v: DeckEngine.up(c.procedureDone || c.plan) },
+          { k: 'IMPLANTS', v: DeckEngine.up(c.implantsUsed || extractImplants(c.opNotes) || c.implants) },
+          { k: 'SURGEON', v: DeckEngine.up(c.surgeon) },
+          { k: 'ASSISTANT SURGEON', v: DeckEngine.up(c.assistants) },
+        ],
+        slides: slidesFor(c),
+      })),
+    };
+  }
+
+  const PostOp = {
+    live: false,
+    from: null,
+    to: null,
+    all: false,
+    showPreview: false,
+    render() {
+      PostOp.to ||= todayISO();
+      PostOp.from ||= todayISO(-14);
+      const sel = postopSel().filter((id) => Store.cases[id]);
+      const list = caseList().filter(isOperated)
+        .filter((c) => PostOp.all || sel.includes(c.id) || !surgeryDate(c) || (surgeryDate(c) >= PostOp.from && surgeryDate(c) <= PostOp.to))
+        .sort((a, b) => surgeryDate(b).localeCompare(surgeryDate(a)) || (a.name || '').localeCompare(b.name || ''));
+      const cnt = (c, ...ks) => ks.reduce((n, k) => n + caseImages(c.id, k).length, 0);
+      const missing = (c) => [!hasText(c.surgeon) && 'surgeon', !hasText(c.implantsUsed || extractImplants(c.opNotes) || c.implants) && 'implants', !cnt(c, 'poxray') && 'post-op X-ray'].filter(Boolean);
+      return `
+        <div class="toolbar">
+          <h2>Post-operative PPT</h2>
+          <button class="btn primary" id="po-dl" ${sel.length ? '' : 'disabled'}>Download PowerPoint (${sel.length})</button>
+        </div>
+        <div class="card">
+          <h3>Operated cases</h3>
+          <div class="po-filter">
+            <label>Operated from<input type="date" id="po-from" value="${esc(PostOp.from)}"></label>
+            <label>to<input type="date" id="po-to" value="${esc(PostOp.to)}"></label>
+            <label class="small nowrap"><input type="checkbox" id="po-all" ${PostOp.all ? 'checked' : ''}> show all</label>
+          </div>
+          <p class="muted small">A case shows here once it has a date of surgery, operative notes, procedure done or a post-op X-ray (fill these under <b>Operative details</b> on the case page).</p>
+          <div class="table-wrap">
+            <table class="board picker po-table">
+              <thead><tr><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Procedure done</th><th>Surgery</th><th>Images</th><th></th></tr></thead>
+              <tbody>
+                ${list.map((c) => {
+                  const miss = missing(c);
+                  return `<tr class="${sel.includes(c.id) ? 'picked' : ''}" data-row="${c.id}">
+                    <td><input type="checkbox" data-po="${c.id}" ${sel.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
+                    <td><b>${esc(c.name)}</b>${miss.length ? `<div class="miss small">missing: ${esc(miss.join(', '))}</div>` : ''}</td>
+                    <td class="nowrap">${esc(ageSex(c))}</td>
+                    <td>${esc(c.diagnosis)}</td>
+                    <td>${esc(c.procedureDone || c.plan)}</td>
+                    <td class="nowrap">${esc(fmtDate(surgeryDate(c))) || '—'}</td>
+                    <td class="nowrap small">Pre X ${cnt(c, 'xray')} · CT/MRI ${cnt(c, 'ct', 'mri')} · Post X ${cnt(c, 'poxray')}</td>
+                    <td><a href="#/case/${c.id}" class="small" data-nopick>Edit</a></td>
+                  </tr>`;
+                }).join('') || '<tr><td colspan="8" class="empty">No operated cases in this range.</td></tr>'}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="row-between"><h3>Slides</h3><button class="btn small" id="po-pv">${PostOp.showPreview ? 'Hide preview' : 'Show preview'}</button></div>
+          <div id="po-previews" class="deck-previews"${PostOp.showPreview ? '' : ' hidden'}></div>
+        </div>`;
+    },
+    mount(el) {
+      const ids = () => postopSel().filter((id) => Store.cases[id]);
+      const drawPreview = async () => {
+        const box = $('#po-previews', el);
+        if (!box || box.hidden) return;
+        const st = postopState(ids());
+        const paint = () => {
+          let n = 0;
+          box.innerHTML = DeckEngine.buildModels(st, Object.fromEntries(deckImgs)).filter((m) => !(m.kind === 'image' && !m.imgs.length))
+            .map((m) => `<div class="pslide"><div class="meta"><b>Slide ${++n}</b></div><div class="slide">${DeckEngine.slideHTML(m)}</div></div>`).join('')
+            || '<p class="muted">Tick cases above.</p>';
+        };
+        paint();
+        if (await loadDeckImages(st)) paint();
+      };
+      drawPreview();
+      $('#po-from', el).onchange = (e) => { PostOp.from = e.target.value; render(); };
+      $('#po-to', el).onchange = (e) => { PostOp.to = e.target.value; render(); };
+      $('#po-all', el).onchange = (e) => { PostOp.all = e.target.checked; render(); };
+      $('#po-pv', el).onclick = () => { PostOp.showPreview = !PostOp.showPreview; render(); };
+      el.addEventListener('click', (e) => {
+        if (e.target.closest('[data-nopick]')) return;
+        const row = e.target.closest('[data-row]');
+        if (!row) return;
+        const cid = row.dataset.row;
+        const cur = ids();
+        const on = e.target.matches('[data-po]') ? e.target.checked : !cur.includes(cid);
+        setPostopSel(on ? [...new Set([...cur, cid])] : cur.filter((x) => x !== cid));
+        render();
+      });
+      $('#po-dl', el).onclick = async (e) => {
+        const btn = e.currentTarget;
+        btn.disabled = true;
+        btn.textContent = 'Building…';
+        try {
+          const st = postopState(ids());
+          await loadDeckImages(st);
+          const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
+          const blob = await pres.write({ outputType: 'blob' });
+          const name = `POST_OP_CASES_UNIT_${st.unit}_${fmtDate(todayISO()).replace(/\//g, '_')}.pptx`;
+          offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+        } catch (err) {
+          console.error(err);
+          toast('Could not build the PowerPoint: ' + err.message, 5000);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = `Download PowerPoint (${ids().length})`;
+        }
+      };
+    },
+  };
+
   // Phones need a fresh tap for Save / Share, so ask in a small sheet.
   function offerFile(file) {
     const saveIt = () => {
@@ -1475,7 +1653,6 @@ const App = (() => {
       ['past', 'Past history / treatment history', 4, ['past', '↻ template']],
       ['exam', 'Examination findings', 12, ['exam', '↻ template']],
       ['investigations', 'Investigations (optional)', 3, ['inv', '↻ from case']],
-      ['opNotes', 'Operative notes (optional)', 4],
       ['treatment', 'Treatment given', 6],
       ['course', 'Course in hospital', 5, ['course', '↻ auto-write']],
       ['condition', 'Condition on discharge', 4],
@@ -1491,7 +1668,7 @@ const App = (() => {
         const d = {
           disposition: 'discharge',
           dod: todayISO(),
-          dos: c.otDate || '',
+          dos: c.surgeryDate || c.otDate || '',
           consultant: unit,
           unitLine: unit,
           doctor: 'ORTHO ' + unit,
@@ -1499,7 +1676,7 @@ const App = (() => {
           phone: c.phone,
           address: c.address,
           diagnosis: c.diagnosis,
-          procedure: c.plan,
+          procedure: c.procedureDone || c.plan,
           past: pastTemplate(c),
           exam: EXAM_TEMPLATE,
           treatment: [...DRUGS_ALL, ...(isSpinePelvis(c) ? DRUGS_SPINE_PELVIS : [])].join('\n'),
@@ -2113,6 +2290,7 @@ const App = (() => {
     [/^#\/discharge\/(\w+)$/, (id) => Discharge(id)],
     [/^#\/(settings|implants)$/, () => Settings],
     [/^#\/deck$/, () => Deck],
+    [/^#\/postop$/, () => PostOp],
   ];
 
   function resolve() {
@@ -2126,7 +2304,7 @@ const App = (() => {
   }
 
   function section() {
-    const m = (location.hash || '#/').match(/^#\/(ward|ot|deck|settings)\b/);
+    const m = (location.hash || '#/').match(/^#\/(ward|ot|deck|postop|settings)\b/);
     return m ? '#/' + m[1] : '#/';
   }
 
