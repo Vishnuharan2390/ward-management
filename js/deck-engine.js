@@ -96,7 +96,9 @@ function consModel(st) {
   const v = st.cons || {};
   return { kind: 'cons', target: 'sec-cons',
     left: CONS_LEFT.map(([k, l]) => `${l} : ${up(v[k])}`),
-    right: CONS_RIGHT.map(([k, l]) => `${l} : ${up(v[k])}`) };
+    // Ward app: list only the modes of injury that have cases (skip blank / 0 / NIL).
+    right: CONS_RIGHT.filter(([k]) => { const x = up(v[k]); return x && x !== '0' && x !== 'NIL'; })
+      .map(([k, l]) => `${l} : ${up(v[k])}`) };
 }
 
 function buildModels(st, images) {
