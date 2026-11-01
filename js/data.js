@@ -221,6 +221,17 @@ function pendingList(c) {
   return out;
 }
 
+// The ward notebook's "To do's": pending opinions, investigations to repeat (the deranged
+// ones, by name only), and the to-do list. Deranged values themselves are not listed.
+function notebookTodo(c) {
+  const out = [];
+  for (const o of listOf(c.opinions)) if (!hasText(o.note)) out.push({ kind: 'inv', text: `${String(o.dept).toUpperCase()} OPINION` });
+  const rep = [...new Set(abnormalList(c).map((x) => x.label))];
+  if (rep.length) out.push({ kind: 'flag', text: 'REPEAT ' + rep.join(', ').toUpperCase() });
+  for (const t of listOf(c.tasks)) if (!t.done) out.push({ kind: 'task', text: t.text + (t.to ? ` → ${t.to}` : '') });
+  return out;
+}
+
 function abnormalList(c) {
   const out = [];
   const seen = new Set();
@@ -229,7 +240,7 @@ function abnormalList(c) {
     seen.add(p.k);
     const l = latest(c, p.k);
     const f = l && flagOf(l.value, p);
-    if (f) out.push({ kind: 'flag', text: `${p.label} ${fmtVal(l.value, p)}${FLAG_MARK[f]}` });
+    if (f) out.push({ kind: 'flag', label: p.label, text: `${p.label} ${fmtVal(l.value, p)}${FLAG_MARK[f]}` });
   };
   [...ALL_PARAMS, ...customParams(c)].forEach(check);
   Object.values(c.charts || {}).forEach((ch) => (ch.cols || []).forEach(check));

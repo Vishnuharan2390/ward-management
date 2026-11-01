@@ -482,7 +482,7 @@ const App = (() => {
               <td>${c.status === 'posted' ? '<span class="tag task">BOT</span><br>' : ''}${i + 1}</td>
               <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
-              <td>${[...abnormalList(c), ...pendingList(c)].map(tagHTML).join('') || '<span class="muted">—</span>'}</td>
+              <td>${notebookTodo(c).map(tagHTML).join('') || '<span class="muted">—</span>'}</td>
               <td>${esc(assessmentScheme(c))}</td>
             </tr>`).join('') || '<tr><td colspan="5" class="empty">No active pre-op cases.</td></tr>'}
           </tbody>
@@ -528,7 +528,7 @@ const App = (() => {
           <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>
-        <p class="muted small">Tap a row to open the case. BOT = posted for OT. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
+        <p class="muted small">Tap a row to open the case. BOT = posted for OT. Notebook “To do’s” shows pending opinions, investigations to repeat (deranged ones) and the to-do list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
       $('#print-ward', el).onclick = () => Print.wardBoard(activeCases(), Store.meta);
