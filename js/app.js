@@ -1475,9 +1475,13 @@ const App = (() => {
 
   // Image slides for a case: one slide per image type with the pictures side
   // by side, unless split into separate slides.
+  // The image groups a case shows in the deck: the fixed kinds, then its custom batches.
+  const deckKindsFor = (cid) => [...DECK_KINDS, ...[...new Set(caseImages(cid).map((im) => im.kind).filter((k) => /^custom-/.test(k)))]
+    .sort((a, b) => parseInt(a.slice(7), 10) - parseInt(b.slice(7), 10)).map(imageKind)];
+
   function deckSlides(c, cfg) {
     const out = [];
-    for (const k of ADMISSION_KINDS) {
+    for (const k of deckKindsFor(c.id)) {
       const imgs = caseImages(c.id, k.k).filter((im) => !cfg.skipImg[im.id]);
       if (!imgs.length) continue;
       const key = c.id + ':' + k.k;
@@ -1587,14 +1591,14 @@ const App = (() => {
                 <label class="span2">Treatment <span class="hint">one item per line</span><textarea data-cf="treatment" rows="3">${esc(cc.treatment)}</textarea></label>
                 <label class="span2">Case sheet written by<input data-cf="writtenBy" list="dl-pg" value="${esc(cc.writtenBy)}"></label>
               </div>
-              ${ADMISSION_KINDS.filter((k) => caseImages(c.id, k.k).length).map((k) => {
+              ${deckKindsFor(c.id).filter((k) => caseImages(c.id, k.k).length).map((k) => {
                 const key = c.id + ':' + k.k;
                 return `<div class="deck-imgs">
                   <div class="row-between"><input class="deck-label" data-dlabel="${key}" value="${esc(cfg.labels[key] || k.deck)}" aria-label="Slide title">
                     <label class="small nowrap"><input type="checkbox" data-dsplit="${key}" ${cfg.split[key] ? 'checked' : ''}> separate slides</label></div>
                   <div class="dthumbs">${thumbs(c, k)}</div></div>`;
               }).join('')}
-              <div class="img-adders deck-uploads">${ADMISSION_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-dupload="${k.k}" hidden></label>`).join('')}<span class="busy small muted"></span></div>
+              <div class="img-adders deck-uploads">${[...DECK_KINDS, { k: 'custom', label: 'Custom' }].map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-dupload="${k.k}" hidden></label>`).join('')}<span class="busy small muted"></span></div>
             </div>`;
           }).join('') || '<div class="empty">No cases on this date yet. Tap “+ Add case” below.</div>'}
           <div class="deck-add-row">
@@ -1674,8 +1678,13 @@ const App = (() => {
           render();
         } else if (t.dataset.dupload && cid) {
           const files = [...t.files];
-          const kind = t.dataset.dupload;
+          let kind = t.dataset.dupload;
           t.value = '';
+          // Custom: a new slide group per upload, with its own editable title.
+          if (kind === 'custom') {
+            const n = Math.max(0, ...caseImages(cid).map((im) => (/^custom-(\d+)$/.exec(im.kind) || [0, 0])[1] * 1));
+            kind = 'custom-' + (n + 1);
+          }
           (async () => {
             const busy = $('.busy', t.closest('[data-dcase]'));
             for (let i = 0; i < files.length; i++) {
@@ -1687,6 +1696,10 @@ const App = (() => {
               }
             }
             render();
+            if (/^custom-/.test(kind)) {
+              const title = $(`[data-dlabel="${cid}:${kind}"]`, App.el);
+              if (title) { title.scrollIntoView({ block: 'center' }); title.focus(); title.select(); toast('Type a title for this slide'); }
+            }
           })();
         } else if (t.dataset.cf && cid) {
           const v = t.value.trim();

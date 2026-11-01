@@ -107,13 +107,18 @@ const IMAGE_KINDS = [
   { k: 'ct', label: 'CT', deck: 'CT', admission: true },
   { k: 'mri', label: 'MRI', deck: 'MRI', admission: true },
   { k: 'wound', label: 'Wound pic', deck: 'WOUND PIC', admission: true },
+  { k: 'prxray', label: 'Post-reduction X-ray', deck: 'POST-REDUCTION X-RAY' },
   { k: 'poxray', label: 'Post-op X-ray', deck: 'POST-OP X-RAY' },
   { k: 'powound', label: 'Post-op wound pic', deck: 'POST-OP WOUND PIC' },
 ];
 const ADMISSION_KINDS = IMAGE_KINDS.filter((k) => k.admission);
 // Upload buttons on the add-case page: admission pictures plus post-op X-ray.
 const ADD_CASE_KINDS = IMAGE_KINDS.filter((k) => k.admission || k.k === 'poxray');
-const imageKind = (k) => IMAGE_KINDS.find((x) => x.k === k) || { k, label: k, deck: String(k).toUpperCase() };
+// Admission day PPT upload buttons: admission pictures + post-reduction and post-op X-rays
+// (+ "Custom": each batch is its own slide, kind custom-1, custom-2…, with a title you type).
+const DECK_KINDS = [...ADMISSION_KINDS, ...IMAGE_KINDS.filter((k) => k.k === 'prxray' || k.k === 'poxray')];
+const imageKind = (k) => IMAGE_KINDS.find((x) => x.k === k)
+  || (/^custom/.test(k) ? { k, label: 'Custom', deck: 'CUSTOM' } : { k, label: k, deck: String(k).toUpperCase() });
 
 // Admission-day deck (same lists as the unit's admission-deck tool).
 const MODES = ['MLC/RTA', 'MLC/OLD RTA', 'MLC/TTA', 'NMLC/FALL', 'MLC/FALL FROM HEIGHT', 'MLC/ASSAULT', 'NMLC/ACCIDENTAL INJURY', 'MLC/WORKSPOT INJURY', 'MLC/SELF INFLICTED', 'MLC/ELECTROCUTION'];
