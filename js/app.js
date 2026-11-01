@@ -2696,6 +2696,7 @@ const App = (() => {
     App.el.replaceWith(fresh);
     App.el = fresh;
     v.mount?.(fresh);
+    capsKeyboard(fresh);
     // Voice.attach(fresh); — dictation buttons switched off for now (js/voice.js)
     current.loading = Store.status === 'connecting' && !!fresh.querySelector('.empty');
     window.scrollTo(0, same ? y : 0);
@@ -2732,8 +2733,23 @@ const App = (() => {
     const [a, b] = [t.selectionStart, t.selectionEnd];
     t.value = u;
     try { t.setSelectionRange(a, b); } catch { /* some input types have no caret */ }
+    // Safari treats a value set by script as "unchanged", so it skips the change event when the
+    // field is left, and the edit is never saved. Remember it and send the change ourselves.
+    t._capsDirty = true;
   }
-  document.addEventListener('focusin', (e) => { if (capsOK(e.target)) e.target.setAttribute('autocapitalize', 'characters'); });
+  document.addEventListener('focusin', (e) => {
+    if (capsOK(e.target)) e.target.setAttribute('autocapitalize', 'characters');
+    e.target._capsDirty = false;
+  });
+  document.addEventListener('change', (e) => { e.target._capsDirty = false; }, true);
+  document.addEventListener('focusout', (e) => {
+    const t = e.target;
+    if (!t._capsDirty) return;
+    t._capsDirty = false;
+    t.dispatchEvent(new Event('change', { bubbles: true }));
+  }, true);
+  // Keyboard opens in caps lock from the first tap (iPhone reads this before focus).
+  const capsKeyboard = (root) => $$('input, textarea', root).forEach((el) => { if (capsOK(el)) el.setAttribute('autocapitalize', 'characters'); });
   // Capture phase: values are already in capitals when the app's own handlers read them.
   document.addEventListener('input', (e) => { if (!e.isComposing && capsOK(e.target)) toCaps(e.target); }, true);
   document.addEventListener('compositionend', (e) => { if (capsOK(e.target)) { toCaps(e.target); e.target.dispatchEvent(new Event('input', { bubbles: true })); } }, true);
