@@ -2065,7 +2065,7 @@ const App = (() => {
                 <button type="button" class="btn primary" id="out-summary">Generate PDF</button></div>
               <div class="out-row"><div><b>2 · Radiographs PDF</b><div class="muted small">Pre-op X-ray, post-op X-ray and post-op wound pic, one page each.</div></div>
                 <button type="button" class="btn primary" id="out-imgs">Generate PDF</button></div>
-              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Patient slide (name, age/sex, IP no., DOA/DOS/DOD, diagnosis, procedure, phone, address), then pre-op X-ray, wound pic if any, post-op X-ray. Saved as NAME_AGE-SEX_IPNO.</div></div>
+              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Patient slide (name, age/sex, IP no., DOA/DOS/DOD, diagnosis, procedure, phone, address), then pre-op X-ray, wound pic if any, post-op X-ray, then the discharge summary (one page per slide). Saved as NAME_AGE-SEX_IPNO.</div></div>
                 <button type="button" class="btn primary" id="out-ppt">Download PowerPoint</button></div>
             </div>
           </div>`;
@@ -2200,6 +2200,8 @@ const App = (() => {
           btn.textContent = 'Building…';
           try {
             await loadDeckImages(st);
+            st.pages = await DcPages.render(cc, d, Store.meta); // the discharge summary, a page per slide, at the end
+            st.pageAspect = DcPages.ASPECT;
             const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
             const blob = await pres.write({ outputType: 'blob' });
             // NAME_AGE-SEX_IPNO.pptx — a "/" isn't allowed in file names, so 26/M is written 26-M.

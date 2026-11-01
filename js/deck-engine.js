@@ -184,6 +184,13 @@ function buildPptx(PptxGenJS, st, images) {
         valign: 'middle', margin: [6, 12, 6, 12], wrap: false, objectName: 'Image title' });
     }
   }
+  // Ward app: full document pages (e.g. the discharge summary), one portrait page per slide.
+  (st.pages || []).forEach((data, i) => {
+    const s = pres.addSlide({ masterName: 'BASE' });
+    const h = BAR_TOP - 0.3;
+    const w = h / (st.pageAspect || Math.SQRT2);
+    s.addImage({ data: data.replace(/^data:/, ''), x: (SW - w) / 2, y: 0.15, w, h, objectName: `Discharge summary page ${i + 1}` });
+  });
   return pres;
 }
 
