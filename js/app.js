@@ -1434,14 +1434,14 @@ const App = (() => {
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
         toast('Collecting X-rays, CT and MRI…', 8000);
-        const KINDS = [['xray', 'PRE-OP X-RAY'], ['ct', 'CT'], ['mri', 'MRI']];
+        const KINDS = [['xray', 'PRE-OP X-RAY', 3], ['ct', 'CT', 1], ['mri', 'MRI', 1]];
         const items = [];
         const none = [];
         for (const [i, c] of cases.entries()) {
           const sections = [];
-          for (const [k, title] of KINDS) {
+          for (const [k, title, per] of KINDS) {
             const images = (await Promise.all(caseImages(c.id, k).map((im) => Store.getImage(im.id)))).filter(Boolean);
-            if (images.length) sections.push({ title, images });
+            if (images.length) sections.push({ title, images, per });
           }
           if (sections.length) items.push({ c, n: i + 1, sections });
           else none.push(c.name || 'Unnamed');

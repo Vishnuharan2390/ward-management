@@ -236,21 +236,21 @@ const Print = (() => {
 
 
   // Pre-op imaging of the OT list cases: for each patient, X-rays, then CT, then MRI, each under
-  // its own heading (3 films per page, more pages if needed), name/age/sex/diagnosis on every page.
+  // its own heading (X-rays 3 per page; CT and MRI one image per page), name/age/sex/diagnosis on every page.
   function otXrays(items, draft) {
     const pages = [];
     items.forEach(({ c, n, sections }) => {
-      sections.forEach(({ title, images }) => {
-        const total = Math.ceil(images.length / 3);
-        for (let i = 0; i < images.length; i += 3) {
-          const part = images.slice(i, i + 3);
+      sections.forEach(({ title, images, per = 3 }) => {
+        const total = Math.ceil(images.length / per);
+        for (let i = 0; i < images.length; i += per) {
+          const part = images.slice(i, i + per);
           pages.push(`
       <section class="ip-page xr-page">
         <div class="xr-head">
           <div class="xr-name"><span class="xr-no">${n}.</span> ${esc(up(c.name))} <span class="xr-as">${esc(up(ageSex(c)))}</span></div>
           <div class="xr-dx">${esc(up(c.diagnosis))}</div>
         </div>
-        <h2 class="ip-title">${esc(title)}${total > 1 ? ` <span class="xr-part">(${i / 3 + 1}/${total})</span>` : ''}</h2>
+        <h2 class="ip-title">${esc(title)}${total > 1 ? ` <span class="xr-part">(${i / per + 1}/${total})</span>` : ''}</h2>
         <div class="ip-imgs n${part.length}">${part.map((src) => `<img src="${src}" alt="">`).join('')}</div>
         <div class="xr-foot">${esc(otTitle(draft)[0])}</div>
       </section>`);
