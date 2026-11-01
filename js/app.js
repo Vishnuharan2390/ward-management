@@ -2065,7 +2065,7 @@ const App = (() => {
                 <button type="button" class="btn primary" id="out-summary">Generate PDF</button></div>
               <div class="out-row"><div><b>2 · Radiographs PDF</b><div class="muted small">Pre-op X-ray, post-op X-ray and post-op wound pic, one page each.</div></div>
                 <button type="button" class="btn primary" id="out-imgs">Generate PDF</button></div>
-              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Patient slide (name, age/sex, IP no., diagnosis, procedure, phone, address), then pre-op X-ray, wound pic if any, post-op X-ray. Saved as NAME_AGE-SEX_IPNO.</div></div>
+              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Patient slide (name, age/sex, IP no., DOA/DOS/DOD, diagnosis, procedure, phone, address), then pre-op X-ray, wound pic if any, post-op X-ray. Saved as NAME_AGE-SEX_IPNO.</div></div>
                 <button type="button" class="btn primary" id="out-ppt">Download PowerPoint</button></div>
             </div>
           </div>`;
@@ -2170,6 +2170,7 @@ const App = (() => {
           const btn = e.currentTarget;
           const d = save();
           const cc = c();
+          const fd = (iso) => (iso ? fmtDate(iso).replace(/\//g, '.') : '—');
           const statusOf = { dar: 'DISCHARGED AT REQUEST', ama: 'AMA', absconded: 'ABSCOND', postop: 'TRANSFERRED TO POST-OP WARD' };
           const want = [['xray', 'PRE-OP X-RAY'], ['wound', 'WOUND PIC'], ['poxray', 'POST-OP X-RAY']];
           const slides = want.map(([k, label]) => ({ id: 'dc-' + k, label, images: caseImages(id, k).map((im) => im.id) })).filter((x) => x.images.length);
@@ -2186,6 +2187,7 @@ const App = (() => {
                 { k: 'NAME', v: DeckEngine.up(cc.name), kb: true, vb: true },
                 { k: 'AGE/SEX', v: DeckEngine.up(ageSex(cc)), vb: true },
                 { k: 'IP NO', v: DeckEngine.up(cc.ipNo) },
+                { k: 'DOA / DOS / DOD', v: `${fd(cc.doa)} / ${fd(d.dos)} / ${fd(d.dod)}` },
                 { k: 'DIAGNOSIS', v: DeckEngine.up(d.diagnosis || cc.diagnosis), vb: true, diag: true },
                 { k: 'PROCEDURE DONE', v: DeckEngine.up(d.procedure || cc.plan) },
                 { k: 'PHONE NO', v: (cc.phone || '').trim() },
