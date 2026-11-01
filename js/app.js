@@ -2065,8 +2065,7 @@ const App = (() => {
                 <button type="button" class="btn primary" id="out-summary">Generate PDF</button></div>
               <div class="out-row"><div><b>2 · Radiographs PDF</b><div class="muted small">Pre-op X-ray, post-op X-ray and post-op wound pic, one page each.</div></div>
                 <button type="button" class="btn primary" id="out-imgs">Generate PDF</button></div>
-              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Discharge summary slide, then pre-op X-ray and post-op X-ray.</div>
-                <label class="small"><input type="checkbox" id="ppt-wound" ${isCompound(c) ? 'checked' : ''}> Include pre-op wound pic${isCompound(c) ? ' (compound fracture)' : ''}</label></div>
+              <div class="out-row"><div><b>3 · Discharge PowerPoint</b><div class="muted small">Patient slide (name, age/sex, IP no., diagnosis, procedure, phone, address), then pre-op X-ray, wound pic if any, post-op X-ray. Saved as NAME_AGE-SEX_IPNO.</div></div>
                 <button type="button" class="btn primary" id="out-ppt">Download PowerPoint</button></div>
             </div>
           </div>`;
@@ -2171,9 +2170,8 @@ const App = (() => {
           const btn = e.currentTarget;
           const d = save();
           const cc = c();
-          const fd = (iso) => (iso ? fmtDate(iso).replace(/\//g, '.') : '—');
           const statusOf = { dar: 'DISCHARGED AT REQUEST', ama: 'AMA', absconded: 'ABSCOND', postop: 'TRANSFERRED TO POST-OP WARD' };
-          const want = [...($('#ppt-wound', el).checked ? [['wound', 'PRE-OP WOUND PIC']] : []), ['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY']];
+          const want = [['xray', 'PRE-OP X-RAY'], ['wound', 'WOUND PIC'], ['poxray', 'POST-OP X-RAY']];
           const slides = want.map(([k, label]) => ({ id: 'dc-' + k, label, images: caseImages(id, k).map((im) => im.id) })).filter((x) => x.images.length);
           const st = {
             noCover: true,
@@ -2188,10 +2186,10 @@ const App = (() => {
                 { k: 'NAME', v: DeckEngine.up(cc.name), kb: true, vb: true },
                 { k: 'AGE/SEX', v: DeckEngine.up(ageSex(cc)), vb: true },
                 { k: 'IP NO', v: DeckEngine.up(cc.ipNo) },
-                { k: 'DOA / DOS / DOD', v: `${fd(cc.doa)} / ${fd(d.dos)} / ${fd(d.dod)}` },
-                { k: 'DIAGNOSIS', v: DeckEngine.up(d.diagnosis), vb: true, diag: true },
-                { k: 'PROCEDURE', v: DeckEngine.up(d.procedure) },
-                { k: 'CONDITION AT DISCHARGE', v: DeckEngine.up(d.condition) },
+                { k: 'DIAGNOSIS', v: DeckEngine.up(d.diagnosis || cc.diagnosis), vb: true, diag: true },
+                { k: 'PROCEDURE DONE', v: DeckEngine.up(d.procedure || cc.plan) },
+                { k: 'PHONE NO', v: (cc.phone || '').trim() },
+                { k: 'ADDRESS', v: DeckEngine.up(cc.address).replace(/\s*\n\s*/g, ', ') },
               ],
               slides,
             }],
@@ -2202,7 +2200,9 @@ const App = (() => {
             await loadDeckImages(st);
             const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
             const blob = await pres.write({ outputType: 'blob' });
-            const name = `${DeckEngine.up(cc.name).replace(/[^A-Z0-9]+/g, '_')}_${(cc.ipNo || '').replace(/[^A-Za-z0-9]+/g, '')}_DISCHARGE.pptx`.replace(/__+/g, '_');
+            // NAME_AGE-SEX_IPNO.pptx — a "/" isn't allowed in file names, so 26/M is written 26-M.
+            const part = (x) => DeckEngine.up(x).replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+            const name = [part(cc.name) || 'PATIENT', [cc.age, cc.sex].map((x) => part(x)).filter(Boolean).join('-'), part(cc.ipNo)].filter(Boolean).join('_') + '.pptx';
             offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
             if (!slides.length) toast('No X-rays uploaded yet — the PowerPoint has only the summary slide.', 4000);
           } catch (err) {
