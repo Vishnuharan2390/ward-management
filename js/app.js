@@ -250,7 +250,6 @@ const App = (() => {
     return list.map((c) => {
       const r = readiness(c);
       const pend = pendingList(c);
-      const flags = abnormalList(c);
       const d = daysSince(c.doa);
       return `
         <a class="card case-card" href="#/case/${c.id}">
@@ -265,7 +264,6 @@ const App = (() => {
           ${c.plan ? `<div class="cc-plan">▸ ${esc(c.plan)}</div>` : ''}
           <div class="progress" title="${r.done}/${r.total} done"><i style="width:${r.total ? Math.round((r.done / r.total) * 100) : 0}%" class="${r.ready ? 'ok' : ''}"></i></div>
           <div class="pend">
-            ${flags.map(tagHTML).join('')}
             ${r.ready && !pend.length ? '<span class="tag ok">✓ Work-up complete</span>' : ''}
             ${pend.slice(0, 8).map(tagHTML).join('')}${pend.length > 8 ? `<span class="tag">+${pend.length - 8} more</span>` : ''}
           </div>
