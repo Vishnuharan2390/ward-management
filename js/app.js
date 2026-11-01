@@ -436,7 +436,7 @@ const App = (() => {
             name: c.name.trim().toUpperCase(), age: String(c.age).trim(), sex: c.sex, ipNo: (c.ipNo || '').trim(), ward: (c.ward || '').trim().toUpperCase(),
             mode: c.mode.trim().toUpperCase(), diagnosis, plan, doa: c.doa || todayISO(),
             implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
-            status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'), writtenBy: Store.meta.lastPg || '',
+            status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'), writtenBy: '',
           });
           for (const ph of c.photos.filter((x) => x.kind !== 'skip')) {
             toast(`Saving photos… ${++photos}`, 8000);
@@ -580,7 +580,7 @@ const App = (() => {
               <label>Scheme status<select name="scheme">${schemeOpts(c.scheme)}</select></label>
               <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>
               <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}"></label>
-              <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(id ? c.writtenBy : (c.writtenBy || Store.meta.lastPg || ''))}"></label>
+              <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(c.writtenBy || '')}"></label>
               <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3">${esc(id ? c.treatment : (c.treatment ?? STANDARD_TREATMENT.join('\n')))}</textarea></label>
               <label class="span2">Implants
                 <textarea name="implants" rows="2">${esc(c.implants)}</textarea>
@@ -1651,10 +1651,9 @@ const App = (() => {
       // A case added here is a real ward case: admitted on the deck's date.
       $('#deck-new', el).onclick = () => {
         const nid = uid();
-        const last = deckCases(date, cfg).at(-1);
         Store.create('cases', nid, {
           name: '', doa: date, status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'),
-          writtenBy: (last && Store.cases[last.id]?.writtenBy) || Store.meta.lastPg || '',
+          writtenBy: '',
         });
         save((x) => { x.order = [...deckCases(date, x).map((c) => c.id).filter((i) => i !== nid), nid]; });
         const card = $(`[data-dcase="${nid}"]`, App.el);
