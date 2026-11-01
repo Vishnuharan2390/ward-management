@@ -2707,11 +2707,56 @@ const App = (() => {
     return a && App.el?.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'file';
   };
 
+  // ---------------------------------------------------------------- CAPITALS
+  // Every typed text entry is stored in capitals. Left alone: email, password, dates,
+  // numbers, dropdowns, and anything marked data-nocaps.
+  const capsOK = (t) => (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && /^(text|search|tel|)$/.test(t.type)))
+    && !t.closest('[data-nocaps]') && !/email|password|username/i.test(t.autocomplete || '') && !/email/i.test(t.name || '');
+  function toCaps(t) {
+    const v = t.value;
+    const u = v.toUpperCase();
+    if (u === v) return;
+    const [a, b] = [t.selectionStart, t.selectionEnd];
+    t.value = u;
+    try { t.setSelectionRange(a, b); } catch { /* some input types have no caret */ }
+  }
+  document.addEventListener('focusin', (e) => { if (capsOK(e.target)) e.target.setAttribute('autocapitalize', 'characters'); });
+  // Capture phase: values are already in capitals when the app's own handlers read them.
+  document.addEventListener('input', (e) => { if (!e.isComposing && capsOK(e.target)) toCaps(e.target); }, true);
+  document.addEventListener('compositionend', (e) => { if (capsOK(e.target)) { toCaps(e.target); e.target.dispatchEvent(new Event('input', { bubbles: true })); } }, true);
+
+  // One-time: bring entries saved before this into capitals (free-text fields only;
+  // statuses and other internal values stay as they are).
+  const CAPS_FIELDS = ['name', 'ward', 'attender', 'address', 'diagnosis', 'plan', 'level', 'scheme', 'comorbid', 'implants', 'mode', 'treatment', 'writtenBy', 'ipNo'];
+  let capsChecked = false;
+  function capsMigrate() {
+    if (Store.meta.capsV1) return;
+    const U = (x) => (typeof x === 'string' ? x.toUpperCase() : x);
+    for (const [id, c] of Object.entries(Store.cases)) {
+      const ch = {};
+      for (const k of CAPS_FIELDS) if (typeof c[k] === 'string' && c[k] !== c[k].toUpperCase()) ch[k] = c[k].toUpperCase();
+      const lists = { tasks: ['text', 'to'], opinions: ['dept', 'note'] };
+      for (const [k, keys] of Object.entries(lists)) {
+        for (const [iid, item] of Object.entries(c[k] || {})) {
+          for (const f of keys) if (typeof item?.[f] === 'string' && item[f] !== U(item[f])) ch[`${k}.${iid}.${f}`] = U(item[f]);
+        }
+      }
+      for (const f of ['organism', 'sensitive']) if (typeof c.pus?.[f] === 'string' && c.pus[f] !== U(c.pus[f])) ch['pus.' + f] = U(c.pus[f]);
+      for (const f of ['echo', 'anaesPending']) if (typeof c.work?.[f] === 'string' && c.work[f] !== U(c.work[f])) ch['work.' + f] = U(c.work[f]);
+      if (Object.keys(ch).length) Store.patch('cases', id, ch);
+    }
+    Store.setMeta({ capsV1: true });
+  }
+
   function onStoreChange() {
     const gateNeeded = Store.mode === 'firebase' && Store.status !== 'ok';
     if (gateNeeded !== (current?.view === Gate)) {
       current = null;
       return render();
+    }
+    if (!capsChecked && (Store.status === 'ok' || Store.mode === 'local') && Object.keys(Store.cases).length) {
+      capsChecked = true;
+      setTimeout(capsMigrate, 1500);
     }
     if (!current) return render();
     if (!current.view.live && !current.loading) return updateSync();

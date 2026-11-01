@@ -1197,3 +1197,6 @@ html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, htm
 .xr-page .ip-title { margin: 0 0 3mm; }
 .xr-part { font-size: 11pt; font-weight: normal; text-decoration: none; }
 .xr-page .ip-imgs img { height: 222mm; }
+input:not([type]), input[type="text"], input[type="search"], textarea { text-transform: uppercase; }
+input[type="email"], input[autocomplete="username"], [data-nocaps] input, [data-nocaps] textarea { text-transform: none; }
+input::placeholder, textarea::placeholder { text-transform: none; }
