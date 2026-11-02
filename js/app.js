@@ -1512,7 +1512,7 @@ const App = (() => {
       daos: cfg.daos || '',
       cons: cfg.cons,
       cases: deckCases(date, cfg).map((c) => ({
-        id: c.id, status: c.deckStatus || '', name: c.name, ageSex: ageSex(c), mode: c.mode, diagnosis: c.diagnosis,
+        id: c.id, status: c.deckStatus || '', name: c.name, ageSex: ageSex(c), ipNo: c.ipNo, phone: c.phone, address: c.address, mode: c.mode, diagnosis: c.diagnosis,
         treatment: c.treatment, writtenBy: c.writtenBy, slides: deckSlides(c, cfg),
       })),
     };
@@ -1596,9 +1596,12 @@ const App = (() => {
               <div class="deck-fields">
                 <label>Name<input data-cf="name" value="${esc(cc.name)}" autocomplete="off"></label>
                 <label>Age/Sex<input data-agesex value="${esc(ageSex(cc))}" autocomplete="off"></label>
+                <label>IP number <span class="hint">shown next to age/sex</span><input data-cf="ipNo" inputmode="numeric" value="${esc(cc.ipNo)}" autocomplete="off"></label>
                 <label>Status<select data-cf="deckStatus"><option value="">No status</option>${opts(DeckEngine.STATUSES, cc.deckStatus || '')}</select></label>
                 <label>Mode<input data-cf="mode" list="dl-mode" value="${esc(cc.mode)}"></label>
                 <label class="span2">Diagnosis<textarea data-cf="diagnosis" rows="2">${esc(cc.diagnosis)}</textarea></label>
+                <label>Phone number<input data-cf="phone" type="tel" inputmode="tel" value="${esc(cc.phone)}" autocomplete="off"></label>
+                <label>Address<input data-cf="address" value="${esc(cc.address)}" autocomplete="off"></label>
                 <label class="span2">Treatment <span class="hint">one item per line</span><textarea data-cf="treatment" rows="3">${esc(cc.treatment)}</textarea></label>
                 <label class="span2">Case sheet written by<input data-cf="writtenBy" list="dl-pg" value="${esc(cc.writtenBy)}"></label>
               </div>

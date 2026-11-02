@@ -43,7 +43,9 @@ function caseRows(c) {
   if (c.rows) return c.rows; // ward app: custom rows (discharge deck)
   return [
     { k: 'NAME', v: up(c.name), kb: true, vb: true },
-    { k: 'AGE/SEX', v: up(c.ageSex), vb: true },
+    // IP number rides on the age/sex row; phone + address make one "contact details" row.
+    { k: 'AGE/SEX', v: [up(c.ageSex), c.ipNo ? `IP NO: ${up(c.ipNo)}` : ''].filter(Boolean).join('     '), vb: true },
+    ...((c.phone || c.address) ? [{ k: 'CONTACT DETAILS', v: [String(c.phone || '').trim(), up(c.address).replace(/\s*\n\s*/g, ', ')].filter(Boolean).join(', ') }] : []),
     { k: 'MODE', v: up(c.mode) },
     { k: 'DIAGNOSIS', v: up(c.diagnosis), vb: true, diag: true },
     { k: 'TREATMENT', v: up(c.treatment) },
