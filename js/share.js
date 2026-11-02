@@ -52,5 +52,41 @@ const Share = (() => {
     window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
   }
 
-  return { otText, wardText, pendingText, caseText, send };
+  // Case photos as files for the share sheet: NAME_XRAY_1.jpg, NAME_WOUND_PIC_1.jpg…
+  function dataUrlToFile(dataUrl, name) {
+    const [head, b64] = dataUrl.split(',');
+    const type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], name, { type });
+  }
+  function imageFiles(c, images) {
+    const base = U(c.name).replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'PATIENT';
+    const n = {};
+    return images.map(({ kind, data }) => {
+      const k = U(imageKind(kind).deck).replace(/[^A-Z0-9]+/g, '_');
+      n[k] = (n[k] || 0) + 1;
+      const ext = /^data:image\/png/.test(data) ? 'png' : 'jpg';
+      return dataUrlToFile(data, `${base}_${k}_${n[k]}.${ext}`);
+    });
+  }
+
+  // Text + photos together through the share sheet (pick WhatsApp → chat). Must run straight
+  // from the tap (Safari refuses a share after waiting), so the files are prepared beforehand.
+  // WhatsApp sometimes drops the text when photos are attached, so it's also copied to the
+  // clipboard to paste as the caption.
+  function sendWithFiles(text, files) {
+    let ok = false;
+    try { ok = !!(files.length && navigator.share && navigator.canShare && navigator.canShare({ files })); } catch { ok = false; }
+    if (!ok) {
+      if (files.length) toast('This browser can\'t share photos — sending the text only. Use the iPhone app (Safari) to send photos.', 5000);
+      return send(text);
+    }
+    navigator.clipboard?.writeText(text).catch(() => {});
+    navigator.share({ files, text }).then(() => toast('Shared. If the text is missing in WhatsApp, paste it as the caption — it\'s copied.', 5000))
+      .catch((e) => { if (e.name !== 'AbortError') { toast('Couldn\'t share the photos — sending the text only.', 4000); send(text); } });
+  }
+
+  return { otText, wardText, pendingText, caseText, send, imageFiles, sendWithFiles };
 })();

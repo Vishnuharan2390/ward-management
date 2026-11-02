@@ -899,7 +899,7 @@ const App = (() => {
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
-              <button class="btn wa" id="wa-case">WhatsApp</button>
+              <button class="btn wa" id="wa-case">WhatsApp${caseImages(id).length ? ` + ${caseImages(id).length} photo${caseImages(id).length === 1 ? '' : 's'}` : ''}</button>
               <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
             </div>
           </div>
@@ -1008,7 +1008,18 @@ const App = (() => {
           }
         });
         $('#add-set', el).onclick = () => openLabModal(id);
-        $('#wa-case', el).onclick = () => Share.send(Share.caseText({ id, ...Store.cases[id] }));
+        // Photos are turned into files as soon as the page opens, so the tap can share at once.
+        let waFiles = null;
+        const imgs = caseImages(id);
+        Promise.all(imgs.map(async (im) => ({ kind: im.kind, data: await Store.getImage(im.id) })))
+          .then((list) => { waFiles = Share.imageFiles(Store.cases[id], list.filter((x) => x.data)); })
+          .catch(() => { waFiles = []; });
+        $('#wa-case', el).onclick = () => {
+          const text = Share.caseText({ id, ...Store.cases[id] });
+          if (!imgs.length) return Share.send(text);
+          if (!waFiles) return toast('Still loading the photos — tap again in a moment');
+          Share.sendWithFiles(text, waFiles);
+        };
         $('#ot-toggle', el).onclick = () => {
           const hide = !Store.cases[id].otHidden;
           Store.patch('cases', id, { otHidden: hide });
