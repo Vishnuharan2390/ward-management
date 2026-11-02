@@ -37,7 +37,7 @@ const Share = (() => {
     return s.trim();
   }
 
-  // One case for WhatsApp: just the identifying details, diagnosis and plan (photos go with it).
+  // One case for WhatsApp: the identifying details, diagnosis, plan and procedure done (photos go with it).
   function caseText(c) {
     const row = (k, v) => (String(v ?? '').trim() ? `${k}: ${one(v)}\n` : '');
     return (`*${U(c.name)}*\n`
@@ -46,7 +46,8 @@ const Share = (() => {
       + row('DOA', c.doa ? fmtDate(c.doa) : '')
       + row('Unit', `ORTHO UNIT ${unitOf(Store.meta.unitId).id}`)
       + row('Diagnosis', U(c.diagnosis))
-      + row('Plan', U(c.plan))).trim();
+      + row('Plan', U(c.plan))
+      + row('Procedure done', U(c.procedureDone || c.discharge?.procedure))).trim();
   }
 
   // Phone: share sheet (WhatsApp, a group, anything). Computer: WhatsApp Web.
