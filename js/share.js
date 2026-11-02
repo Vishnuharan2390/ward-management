@@ -37,11 +37,16 @@ const Share = (() => {
     return s.trim();
   }
 
+  // One case for WhatsApp: just the identifying details, diagnosis and plan (photos go with it).
   function caseText(c) {
-    const ab = abnormalList(c).map((x) => x.text);
-    const pend = pendingList(c).map((x) => x.text);
-    return (`*${who(c)}*\n` + line('Dx', U(c.diagnosis)) + line('Plan', U(c.plan)) + line('Level', c.level) + line('Implants', U(c.implants))
-      + line('Scheme', U(c.scheme)) + (ab.length ? `   ⚠️ ${ab.join(', ')}\n` : '') + (pend.length ? `   ⏳ ${pend.join(', ')}` : '   ✅ Work-up complete')).trim();
+    const row = (k, v) => (String(v ?? '').trim() ? `${k}: ${one(v)}\n` : '');
+    return (`*${U(c.name)}*\n`
+      + row('Age/Sex', U(ageSex(c)))
+      + row('IP No', c.ipNo)
+      + row('DOA', c.doa ? fmtDate(c.doa) : '')
+      + row('Unit', `ORTHO UNIT ${unitOf(Store.meta.unitId).id}`)
+      + row('Diagnosis', U(c.diagnosis))
+      + row('Plan', U(c.plan))).trim();
   }
 
   // Phone: share sheet (WhatsApp, a group, anything). Computer: WhatsApp Web.
