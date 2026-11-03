@@ -1025,7 +1025,8 @@ const App = (() => {
             <ul class="tasks">
               ${tasks.map((t) => `
                 <li class="${t.done ? 'done' : ''}">
-                  <label><input type="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''}> <span>${esc(t.text)}</span></label>
+                  <div class="task-line"><input type="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''} aria-label="Done">
+                    <input class="task-text" data-bind="tasks.${t.id}.text" value="${esc(t.text)}" aria-label="Pending work — tap to edit"></div>
                   ${t.to ? `<span class="tag">${esc(t.to)}</span>` : ''}
                   <div class="muted small">Added by ${esc(t.by)} · ${fmtTime(t.at)}${t.done ? ` — done by ${esc(t.doneBy)} · ${fmtTime(t.doneAt)}` : ''}</div>
                   <button class="icon" data-del-task="${t.id}" title="Delete">✕</button>
