@@ -1280,7 +1280,7 @@ const App = (() => {
     render() {
       const d = otDraft();
       d.selected = d.selected.filter((id) => Store.cases[id]);
-      const pool = caseList().filter((c) => !c.otHidden && (OT.showAll || d.selected.includes(c.id) || isActive(c))).sort(byWard);
+      const pool = inOrder(caseList().filter((c) => !c.otHidden && (OT.showAll || d.selected.includes(c.id) || isActive(c))));
       const hidden = caseList().filter((c) => c.otHidden && (OT.showAll || isActive(c))).sort(byWard);
       const sel = d.selected.map((id) => ({ id, ...Store.cases[id] }));
       // Selected unit's staff first, then everyone else.
@@ -1296,13 +1296,19 @@ const App = (() => {
         <div class="card">
           <div class="row-between"><p class="muted small">Tap a row to add it to the list. Radiographs open in a viewer; use → to step through X-ray, CT and MRI.</p>
             <label class="small nowrap"><input type="checkbox" id="ot-all" ${OT.showAll ? 'checked' : ''}> show all statuses</label></div>
+          <div class="order-bar">
+            <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order (same as the Cases page)' : 'Earliest admitted first'}</span>
+            <button class="btn small${OT.arrange ? ' primary' : ''}" id="ot-arrange">${OT.arrange ? 'Done' : '↕ Rearrange'}</button>
+            ${Store.meta.caseOrder?.length ? '<button class="btn small" id="ot-order-reset">Back to DOA order</button>' : ''}
+          </div>
           <div class="table-wrap">
             <table class="board picker">
-              <thead><tr><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th>Radiographs</th><th></th></tr></thead>
+              <thead><tr>${OT.arrange ? '<th>Move</th>' : ''}<th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th>Radiographs</th><th></th></tr></thead>
               <tbody>
-                ${pool.map((c) => {
+                ${pool.map((c, pi) => {
                   const n = listOf(c.images).length;
                   return `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}" data-case="${c.id}">
+                  ${OT.arrange ? `<td class="nowrap"><button class="icon" data-omove="-1" ${pi ? '' : 'disabled'} aria-label="Move up">↑</button><button class="icon" data-omove="1" ${pi < pool.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button></td>` : ''}
                   <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
                   <td><b>${esc(c.name)}</b></td><td class="nowrap">${esc(ageSex(c))}</td>
                   <td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
@@ -1312,7 +1318,7 @@ const App = (() => {
                   <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
                   <td><button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button></td>
                 </tr>`;
-                }).join('') || `<tr><td colspan="10" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
+                }).join('') || `<tr><td colspan="${OT.arrange ? 11 : 10}" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
               </tbody>
             </table>
           </div>
@@ -1409,7 +1415,18 @@ const App = (() => {
         }
       });
 
+      const arr = $('#ot-arrange', el);
+      if (arr) arr.onclick = () => { OT.arrange = !OT.arrange; render(); };
+      const ores = $('#ot-order-reset', el);
+      if (ores) ores.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); render(); };
       el.addEventListener('click', (e) => {
+        const om = e.target.closest('[data-omove]');
+        if (om) {
+          const shown = $$('[data-row]', el).map((r) => r.dataset.row);
+          moveCase(om.closest('[data-row]').dataset.row, +om.dataset.omove, shown);
+          render();
+          return;
+        }
         const hideB = e.target.closest('[data-ot-hide]');
         if (hideB) {
           const cid = hideB.dataset.otHide;
