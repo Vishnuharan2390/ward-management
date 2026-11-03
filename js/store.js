@@ -152,6 +152,7 @@ const Store = (() => {
     status = 'connecting';
     let seededLevels = false;
     const fresh = syncFresh;
+    const seen = {};
     let implantSeedChecked = false;
     const maybeSeedImplants = () => {
       if (implantSeedChecked || !fresh.implants || !fresh.meta) return;
@@ -163,10 +164,19 @@ const Store = (() => {
       fb.fsM.setDoc(ref('meta', 'main'), { implantSeed: UNIT_IMPLANTS_VERSION }, { merge: true });
     };
     for (const coll of [...COLLS, 'members']) {
-      unsubs.push(fb.fsM.onSnapshot(collRef(coll), { includeMetadataChanges: false }, (snap) => {
+      // includeMetadataChanges: with the offline cache, the first snapshot comes from the cache
+      // and, if nothing changed, the server's confirmation arrives only as a metadata change.
+      // That is how we learn the data is current (Store.synced); data-free updates are not re-rendered.
+      unsubs.push(fb.fsM.onSnapshot(collRef(coll), { includeMetadataChanges: true }, (snap) => {
+        const metaOnly = seen[coll] && snap.docChanges().length === 0;
+        if (metaOnly) {
+          if (!snap.metadata.fromCache && !fresh[coll]) { fresh[coll] = true; maybeSeedImplants(); emit(); }
+          return;
+        }
         const m = {};
         snap.forEach((d) => { m[d.id] = coll === 'cases' ? migrateCase(d.data()) : d.data(); });
         state[coll] = m;
+        seen[coll] = true;
         status = 'ok';
         if (!snap.metadata.fromCache) { fresh[coll] = true; maybeSeedImplants(); }
         // First connection for the unit: load the WOPL level list once.
