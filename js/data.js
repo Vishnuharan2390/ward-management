@@ -226,6 +226,46 @@ function pendingList(c) {
   return out;
 }
 
+// Ward notebook "To do's", two editable boxes shared with the e-case sheet.
+// 1. Investigation: the case's own text (invTodo); until someone types in it, the deranged
+//    investigations to repeat, e.g. "REPEAT HB, WBC".
+function invTodoText(c) {
+  if (c.invTodo != null) return c.invTodo;
+  const rep = [...new Set(abnormalList(c).map((x) => x.label))];
+  return rep.length ? 'REPEAT ' + rep.join(', ').toUpperCase() : '';
+}
+// 2. Opinion / to-do: pending opinions ("CARDIOLOGY OPINION") and open pending works, one per line.
+const opLine = (o) => `${String(o.dept || '').toUpperCase()} OPINION`;
+const taskLine = (t) => String(t.text || '').toUpperCase();
+function opTodoText(c) {
+  return [...listOf(c.opinions).filter((o) => !hasText(o.note)).map(opLine), ...listOf(c.tasks).filter((t) => !t.done).map(taskLine)].join('\n');
+}
+// Edited box → case changes: a removed line marks that opinion obtained / that work done; a new
+// line becomes an opinion if it says OPINION or starts with a department, otherwise a pending work.
+function opTodoChanges(c, text, who) {
+  const lines = String(text || '').split('\n').map((l) => l.trim().toUpperCase().replace(/\s+/g, ' ')).filter(Boolean);
+  const left = [...lines];
+  const ch = {};
+  const now = Date.now();
+  const take = (line) => { const i = left.indexOf(line); if (i < 0) return false; left.splice(i, 1); return true; };
+  for (const o of listOf(c.opinions).filter((x) => !hasText(x.note))) if (!take(opLine(o))) ch[`opinions.${o.id}.note`] = 'OPINION OBTAINED';
+  for (const t of listOf(c.tasks).filter((x) => !x.done)) {
+    if (!take(taskLine(t))) Object.assign(ch, { [`tasks.${t.id}.done`]: true, [`tasks.${t.id}.doneBy`]: who, [`tasks.${t.id}.doneAt`]: now });
+  }
+  const depts = OPINION_DEPTS.map((d) => d.toUpperCase());
+  left.forEach((line, i) => {
+    const id = now.toString(36) + i + Math.random().toString(36).slice(2, 6);
+    const isOp = /\b(OPINION|OPN|REFERRAL)\b/.test(line) || depts.some((d) => line.startsWith(d));
+    if (isOp) {
+      const dept = line.replace(/\b(OPINION|OPN|REFERRAL)\b\.?/g, ' ').replace(/^[\s:\-–]+|[\s:\-–]+$/g, '').replace(/\s+/g, ' ') || line;
+      ch['opinions.' + id] = { dept, note: '', at: now };
+    } else {
+      ch['tasks.' + id] = { text: line, to: '', done: false, by: who, at: now };
+    }
+  });
+  return ch;
+}
+
 // The ward notebook's "To do's": pending opinions, investigations to repeat (the deranged
 // ones, by name only), and the to-do list. Deranged values themselves are not listed.
 function notebookTodo(c) {

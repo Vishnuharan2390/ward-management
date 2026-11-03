@@ -1240,3 +1240,16 @@ html[data-ui="graphite"] .picker tr.picked, html[data-ui="graphite"] .board tr.p
 html.flat .board tr[data-go]:hover, html.flat .picker tr[data-row]:hover { background: color-mix(in srgb, var(--ink) 6%, var(--card)); }
 html.flat .picker tr.picked:hover { background: color-mix(in srgb, var(--primary-bg) 20%, var(--card)); }
 html[data-ui="graphite"] .picker tr.picked:hover { background: #2c2c33; }
+
+/* Ward notebook: editable To do's and Assessment / Scheme */
+.nb-search { width: 100%; max-width: 420px; margin: 0 0 .6rem; }
+.nb-edit td { vertical-align: top; }
+.nb-lab { display: flex; flex-direction: column; gap: .15rem; font-size: .72rem; color: var(--muted); font-weight: 600; margin-bottom: .35rem; }
+.nb-edit .nb-todo-cell { min-width: 240px; }
+.nb-edit .nb-as-cell { min-width: 190px; }
+.nb-edit textarea { width: 100%; min-height: 2.6em; resize: vertical; font-size: .85rem; line-height: 1.35; }
+.nb-edit select { width: 100%; font-size: .85rem; }
+.nb-edit tr[data-go] { cursor: default; }
+.nb-edit tr[data-go] td:nth-child(-n+3) { cursor: pointer; }
+.nb-edit tr[hidden] { display: none; }
+.kv-sel { width: auto; min-width: 11em; padding-top: .2rem; padding-bottom: .2rem; }

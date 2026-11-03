@@ -516,16 +516,25 @@ const App = (() => {
     render() {
       const list = activeCases();
       const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>` : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
+      // Notebook: To do's and Assessment / Scheme are edited right here and saved to the case
+      // (the e-case sheet and the OT list show the same values).
+      const lines = (t) => Math.max(2, String(t || '').split('\n').length);
       const notebook = `
-        <table class="board nb-screen">
+        <table class="board nb-screen nb-edit">
           <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
           <tbody>
-            ${list.map((c, i) => `<tr data-go="${c.id}">
+            ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
               <td>${c.status === 'posted' ? '<span class="tag task">BOT</span><br>' : ''}${i + 1}</td>
               <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
-              <td>${notebookTodo(c).map(tagHTML).join('') || '<span class="muted">—</span>'}</td>
-              <td>${esc(assessmentScheme(c))}</td>
+              <td class="nb-todo-cell">
+                <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}" placeholder="e.g. REPEAT HB, RFT">${esc(invTodoText(c))}</textarea></label>
+                <label class="nb-lab">Opinion / To-do<textarea data-nb="op" rows="${lines(opTodoText(c))}" placeholder="e.g. CARDIOLOGY OPINION&#10;CROSS MATCH 2 UNITS">${esc(opTodoText(c))}</textarea></label>
+              </td>
+              <td class="nb-as-cell">
+                <label class="nb-lab">Assessment<select data-nb="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
+                <label class="nb-lab">Scheme<select data-nb="scheme">${schemeOpts(c.scheme)}</select></label>
+              </td>
             </tr>`).join('') || '<tr><td colspan="5" class="empty">No active pre-op cases.</td></tr>'}
           </tbody>
         </table>`;
@@ -565,12 +574,13 @@ const App = (() => {
           <button class="btn small wa" id="wa-ward">WhatsApp: ward status</button>
           <button class="btn small wa" id="wa-pending">WhatsApp: pending works</button>
         </div>
+        <input type="search" id="nb-q" class="nb-search" placeholder="Search name, IP, ward, diagnosis…" value="${esc(Ward.q || '')}">
         <div class="chips">
           <button class="chip ${Ward.detailed ? '' : 'on'}" data-layout="0">Notebook</button>
           <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>
-        <p class="muted small">Tap a row to open the case. BOT = posted for OT. Notebook “To do’s” shows pending opinions, investigations to repeat (deranged ones) and the to-do list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
+        <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
       $('#print-ward', el).onclick = () => Print.wardBoard(activeCases(), Store.meta);
@@ -583,8 +593,29 @@ const App = (() => {
           sessionStorage.setItem('wm.wardDetailed', l.dataset.layout);
           return render();
         }
+        // Opening the case from the row, but not while using a box or dropdown in it.
+        if (e.target.closest('textarea, input, select, label, button')) return;
         const tr = e.target.closest('[data-go]');
         if (tr) location.hash = '#/case/' + tr.dataset.go;
+      });
+      // Search: hide rows that don't match (no re-render, so typing isn't interrupted).
+      const filter = () => {
+        const q = String(Ward.q || '').trim().toUpperCase();
+        $$('tbody tr[data-q]', el).forEach((tr) => { tr.hidden = !!q && !tr.dataset.q.includes(q); });
+      };
+      $('#nb-q', el).addEventListener('input', (e) => { Ward.q = e.target.value; filter(); });
+      filter();
+      el.addEventListener('change', (e) => {
+        const t = e.target;
+        const id = t.closest('[data-nbcase]')?.dataset.nbcase;
+        const f = t.dataset.nb;
+        if (!id || !f || !Store.cases[id]) return;
+        const c = { id, ...Store.cases[id] };
+        if (f === 'inv') Store.patch('cases', id, { invTodo: t.value.trim().toUpperCase() });
+        else if (f === 'op') {
+          const ch = opTodoChanges(c, t.value, Store.who());
+          if (Object.keys(ch).length) Store.patch('cases', id, ch);
+        } else Store.patch('cases', id, { [f]: t.value });
       });
     },
   };
@@ -935,7 +966,7 @@ const App = (() => {
               ${c.comorbid ? `<dt>Comorbid</dt><dd>${esc(c.comorbid)}</dd>` : ''}
               <dt>Level</dt><dd>${esc(c.level) || '—'}</dd>
               <dt>Implants</dt><dd class="pre">${esc(c.implants) || '—'}</dd>
-              <dt>Scheme</dt><dd>${esc(c.scheme) || '—'}</dd>
+              <dt>Scheme</dt><dd><select class="kv-sel" data-bind="scheme" aria-label="Scheme status">${schemeOpts(c.scheme)}</select></dd>
               ${c.mode ? `<dt>Mode</dt><dd>${esc(c.mode)}</dd>` : ''}
               ${c.treatment ? `<dt>Treatment</dt><dd class="pre">${esc(c.treatment)}</dd>` : ''}
               ${c.writtenBy ? `<dt>Case sheet</dt><dd>${esc(c.writtenBy)}</dd>` : ''}
@@ -982,6 +1013,11 @@ const App = (() => {
               <input name="dept" list="dl-depts" placeholder="Add opinion — department" required>
               <button class="btn small">Add</button>
             </form>
+          </section>
+
+          <section class="card">
+            <h3>Investigations to do</h3>
+            <label class="nb-lab">Same as the Investigation box in the ward notebook<textarea data-bind="invTodo" rows="2" placeholder="e.g. REPEAT HB, RFT">${esc(invTodoText({ id, ...c }))}</textarea></label>
           </section>
 
           <section class="card">
@@ -2626,7 +2662,7 @@ const App = (() => {
 
   // ---------------------------------------------------------------- Shell
   function notFound() {
-    return Store.status === 'connecting' ? '<div class="empty">Loading…</div>' : '<div class="empty">Case not found. <a href="#/">Back to cases</a></div>';
+    return Store.status === 'connecting' ? '<div class="empty">Loading…</div>' : '<div class="empty">Case not found. <a href="#/">Back to the e-case sheet</a></div>';
   }
 
   const Gate = {
@@ -2859,6 +2895,7 @@ const App = (() => {
   function doaFix() {
     if (!Store.synced) return setTimeout(doaFix, 2000); // only with the full, current case list
     if (Store.meta.doaFix1103) return;
+    if (todayISO() > '2026-11-04') return; // never on a later day: those dates are real admissions by then
     let n = 0;
     for (const [id, c] of Object.entries(Store.cases)) {
       if (c.doaFix === '1103' || !DOA_FIX[c.doa]) continue;
@@ -2901,11 +2938,15 @@ const App = (() => {
     }
     if (!current) return render();
     if (!current.view.live && !current.loading) return updateSync();
-    if (editing()) {
-      deferred = true;
-      return updateSync();
-    }
-    render();
+    // Wait a tick: a save fired by leaving one box arrives while focus is still moving to the
+    // next box. Re-rendering at that instant would destroy the box being tapped.
+    setTimeout(() => {
+      if (editing()) {
+        deferred = true;
+        return updateSync();
+      }
+      render();
+    }, 0);
   }
 
   function start() {
