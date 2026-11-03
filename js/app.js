@@ -227,7 +227,6 @@ const App = (() => {
       .filter((c) => (dashFilter === 'active' ? isActive(c) : dashFilter === 'all' || (c.status || 'preop') === dashFilter))
       .filter((c) => !q || [c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toLowerCase().includes(q)));
   }
-  let dashArrange = false;
 
   const Dashboard = {
     live: true,
@@ -259,17 +258,15 @@ const App = (() => {
         <div class="chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
         <div class="order-bar">
           <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order' : 'By date of admission (oldest first)'}</span>
-          <button class="btn small${dashArrange ? ' primary' : ''}" id="arrange">${dashArrange ? 'Done' : '↕ Rearrange'}</button>
           ${Store.meta.caseOrder?.length ? '<button class="btn small" id="order-reset">Back to DOA order</button>' : ''}
         </div>
-        <div class="cards${dashArrange ? ' arranging' : ''}">${cardsHTML(all.length)}</div>`;
+        <div class="cards">${cardsHTML(all.length)}</div>`;
     },
     mount(el) {
       $('#q', el).addEventListener('input', (e) => {
         dashQuery = e.target.value;
         $('.cards', el).innerHTML = cardsHTML(1);
       });
-      $('#arrange', el).onclick = () => { dashArrange = !dashArrange; render(); };
       const reset = $('#order-reset', el);
       if (reset) reset.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); };
       el.addEventListener('click', (e) => {
@@ -296,8 +293,9 @@ const App = (() => {
       const pend = pendingList(c);
       const d = daysSince(c.doa);
       return `
-        <${dashArrange ? 'div' : 'a'} class="card case-card" ${dashArrange ? `data-cid="${c.id}"` : `href="#/case/${c.id}"`}>
-          ${dashArrange ? `<div class="cc-move"><button class="icon" data-cmove="-1" ${i ? '' : 'disabled'} aria-label="Move up">↑</button><button class="icon" data-cmove="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button></div>` : ''}
+        <div class="case-row" data-cid="${c.id}">
+        <div class="cc-move"><button class="icon" data-cmove="-1" ${i ? '' : 'disabled'} aria-label="Move up" title="Move up">↑</button><button class="icon" data-cmove="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Move down" title="Move down">↓</button></div>
+        <a class="card case-card" href="#/case/${c.id}">
           <div class="row-between">
             <div>
               <div class="cc-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span></div>
@@ -312,7 +310,8 @@ const App = (() => {
             ${r.ready && !pend.length ? '<span class="tag ok">✓ Work-up complete</span>' : ''}
             ${pend.slice(0, 8).map(tagHTML).join('')}${pend.length > 8 ? `<span class="tag">+${pend.length - 8} more</span>` : ''}
           </div>
-        </${dashArrange ? 'div' : 'a'}>`;
+        </a>
+        </div>`;
     }).join('');
   }
 
@@ -1298,17 +1297,16 @@ const App = (() => {
             <label class="small nowrap"><input type="checkbox" id="ot-all" ${OT.showAll ? 'checked' : ''}> show all statuses</label></div>
           <div class="order-bar">
             <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order (same as the Cases page)' : 'Earliest admitted first'}</span>
-            <button class="btn small${OT.arrange ? ' primary' : ''}" id="ot-arrange">${OT.arrange ? 'Done' : '↕ Rearrange'}</button>
             ${Store.meta.caseOrder?.length ? '<button class="btn small" id="ot-order-reset">Back to DOA order</button>' : ''}
           </div>
           <div class="table-wrap">
             <table class="board picker">
-              <thead><tr>${OT.arrange ? '<th>Move</th>' : ''}<th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th>Radiographs</th><th></th></tr></thead>
+              <thead><tr><th title="Change the order">Order</th><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th>Radiographs</th><th></th></tr></thead>
               <tbody>
                 ${pool.map((c, pi) => {
                   const n = listOf(c.images).length;
                   return `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}" data-case="${c.id}">
-                  ${OT.arrange ? `<td class="nowrap"><button class="icon" data-omove="-1" ${pi ? '' : 'disabled'} aria-label="Move up">↑</button><button class="icon" data-omove="1" ${pi < pool.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button></td>` : ''}
+                  <td class="ot-move"><button class="icon" data-omove="-1" ${pi ? '' : 'disabled'} aria-label="Move up" title="Move up">↑</button><button class="icon" data-omove="1" ${pi < pool.length - 1 ? '' : 'disabled'} aria-label="Move down" title="Move down">↓</button></td>
                   <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
                   <td><b>${esc(c.name)}</b></td><td class="nowrap">${esc(ageSex(c))}</td>
                   <td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
@@ -1318,7 +1316,7 @@ const App = (() => {
                   <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
                   <td><button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button></td>
                 </tr>`;
-                }).join('') || `<tr><td colspan="${OT.arrange ? 11 : 10}" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
+                }).join('') || `<tr><td colspan="11" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
               </tbody>
             </table>
           </div>
@@ -1415,8 +1413,6 @@ const App = (() => {
         }
       });
 
-      const arr = $('#ot-arrange', el);
-      if (arr) arr.onclick = () => { OT.arrange = !OT.arrange; render(); };
       const ores = $('#ot-order-reset', el);
       if (ores) ores.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); render(); };
       el.addEventListener('click', (e) => {
