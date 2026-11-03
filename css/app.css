@@ -1215,3 +1215,12 @@ input::placeholder, textarea::placeholder { text-transform: none; }
 .picker select.ot-sel { width: auto; min-width: max-content; max-width: none; padding-right: 2rem; text-overflow: clip; }
 .picker select.ot-sel[data-f="work.anaes"] { min-width: 13.5em; }
 .picker select.ot-sel[data-f="scheme"] { min-width: 10.5em; }
+/* Ticked rows (OT pick list, ward board): a soft tint + accent bar, normal readable text */
+html.flat .picker tr.picked, html.flat .board tr.picked {
+  background: color-mix(in srgb, var(--primary-bg) 14%, var(--card));
+  color: var(--ink);
+  box-shadow: inset 4px 0 0 var(--primary-bg);
+}
+html.flat .picker tr.picked td, html.flat .board tr.picked td { color: var(--ink) !important; }
+html.flat .picker tr.picked .muted { color: var(--muted); }
+html[data-ui="graphite"] .picker tr.picked, html[data-ui="graphite"] .board tr.picked { background: #24242a; box-shadow: inset 4px 0 0 #f2f2f2; }
