@@ -187,17 +187,47 @@ const App = (() => {
       </div>`;
   }
 
+  // ---------------------------------------------------------------- Case order
+  // Date of admission (oldest first) unless someone rearranged: then the saved order (shared
+  // with the team), with newly added cases slotted in by their DOA.
+  const byDoa = (a, b) => (a.doa || '').localeCompare(b.doa || '') || (a.createdAt || 0) - (b.createdAt || 0);
+  function orderedAll() {
+    const all = caseList().sort(byDoa);
+    const ord = Store.meta.caseOrder;
+    if (!ord?.length) return all;
+    const pos = new Map(ord.map((id, i) => [id, i]));
+    const out = all.filter((c) => pos.has(c.id)).sort((a, b) => pos.get(a.id) - pos.get(b.id));
+    for (const c of all.filter((x) => !pos.has(x.id))) {
+      // just after the last case admitted on or before its date
+      let i = -1;
+      out.forEach((k, j) => { if ((k.doa || '') <= (c.doa || '')) i = j; });
+      out.splice(i + 1, 0, c);
+    }
+    return out;
+  }
+  const inOrder = (list) => { const ids = new Set(list.map((c) => c.id)); return orderedAll().filter((c) => ids.has(c.id)); };
+  // Move a case one place up/down among the cases currently shown.
+  function moveCase(id, dir, shown) {
+    const j = shown.indexOf(id) + dir;
+    if (j < 0 || j >= shown.length) return;
+    const full = orderedAll().map((c) => c.id);
+    const a = full.indexOf(id);
+    const b = full.indexOf(shown[j]);
+    [full[a], full[b]] = [full[b], full[a]];
+    Store.setMeta({ caseOrder: full });
+  }
+
   // ---------------------------------------------------------------- Dashboard
   let dashFilter = sessionStorage.getItem('wm.filter') || 'active';
   let dashQuery = '';
 
   function filteredCases() {
     const q = dashQuery.toLowerCase();
-    return caseList()
+    return inOrder(caseList()
       .filter((c) => (dashFilter === 'active' ? isActive(c) : dashFilter === 'all' || (c.status || 'preop') === dashFilter))
-      .filter((c) => !q || [c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toLowerCase().includes(q))
-      .sort(byWard);
+      .filter((c) => !q || [c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toLowerCase().includes(q)));
   }
+  let dashArrange = false;
 
   const Dashboard = {
     live: true,
@@ -227,14 +257,28 @@ const App = (() => {
           <a class="btn wa" href="#/import">From WhatsApp</a>
         </div>
         <div class="chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
-        <div class="cards">${cardsHTML(all.length)}</div>`;
+        <div class="order-bar">
+          <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order' : 'By date of admission (oldest first)'}</span>
+          <button class="btn small${dashArrange ? ' primary' : ''}" id="arrange">${dashArrange ? 'Done' : '↕ Rearrange'}</button>
+          ${Store.meta.caseOrder?.length ? '<button class="btn small" id="order-reset">Back to DOA order</button>' : ''}
+        </div>
+        <div class="cards${dashArrange ? ' arranging' : ''}">${cardsHTML(all.length)}</div>`;
     },
     mount(el) {
       $('#q', el).addEventListener('input', (e) => {
         dashQuery = e.target.value;
         $('.cards', el).innerHTML = cardsHTML(1);
       });
+      $('#arrange', el).onclick = () => { dashArrange = !dashArrange; render(); };
+      const reset = $('#order-reset', el);
+      if (reset) reset.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); };
       el.addEventListener('click', (e) => {
+        const mv = e.target.closest('[data-cmove]');
+        if (mv) {
+          e.preventDefault();
+          moveCase(mv.closest('[data-cid]').dataset.cid, +mv.dataset.cmove, filteredCases().map((c) => c.id));
+          return;
+        }
         const f = e.target.closest('[data-filter]');
         if (!f) return;
         dashFilter = f.dataset.filter;
@@ -247,12 +291,13 @@ const App = (() => {
   function cardsHTML(total) {
     const list = filteredCases();
     if (!list.length) return `<div class="empty">${total ? 'No cases match.' : 'No cases yet. Tap “+ New case” to add your first patient.'}</div>`;
-    return list.map((c) => {
+    return list.map((c, i) => {
       const r = readiness(c);
       const pend = pendingList(c);
       const d = daysSince(c.doa);
       return `
-        <a class="card case-card" href="#/case/${c.id}">
+        <${dashArrange ? 'div' : 'a'} class="card case-card" ${dashArrange ? `data-cid="${c.id}"` : `href="#/case/${c.id}"`}>
+          ${dashArrange ? `<div class="cc-move"><button class="icon" data-cmove="-1" ${i ? '' : 'disabled'} aria-label="Move up">↑</button><button class="icon" data-cmove="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button></div>` : ''}
           <div class="row-between">
             <div>
               <div class="cc-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span></div>
@@ -267,7 +312,7 @@ const App = (() => {
             ${r.ready && !pend.length ? '<span class="tag ok">✓ Work-up complete</span>' : ''}
             ${pend.slice(0, 8).map(tagHTML).join('')}${pend.length > 8 ? `<span class="tag">+${pend.length - 8} more</span>` : ''}
           </div>
-        </a>`;
+        </${dashArrange ? 'div' : 'a'}>`;
     }).join('');
   }
 
@@ -455,7 +500,7 @@ const App = (() => {
   };
 
   // ---------------------------------------------------------------- Ward board
-  const activeCases = () => caseList().filter(isActive).sort(byWard);
+  const activeCases = () => inOrder(caseList().filter(isActive));
 
   // Latest value of one parameter, flagged; the date shows on hover.
   function paramCell(c, p) {

@@ -1203,3 +1203,10 @@ input::placeholder, textarea::placeholder { text-transform: none; }
 /* page wrapper for prints without browser header/footer */
 .pg-wrap { width: 100%; border-collapse: collapse; }
 .pg-wrap > thead > tr > td, .pg-wrap > tfoot > tr > td, .pg-wrap > tbody > tr > td { padding: 0; border: 0; }
+/* case order */
+.order-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 0 0 .6rem; }
+.order-bar .muted { margin-right: auto; }
+.cards.arranging .case-card { cursor: default; padding-right: 3.2rem; }
+.cc-move { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: .3rem; z-index: 2; }
+.cc-move .icon { width: 2.2rem; height: 2.2rem; font-size: 1.1rem; }
+.case-card { position: relative; }
