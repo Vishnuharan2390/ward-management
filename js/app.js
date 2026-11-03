@@ -54,10 +54,10 @@ const App = (() => {
 
   const customRow = () => `
     <div class="custom-row">
-      <input data-cn placeholder="Investigation">
-      <input data-cv placeholder="Value" inputmode="decimal">
-      <input data-cr placeholder="Normal range">
-      <input data-cu placeholder="Units">
+      <label class="mini-lab">Investigation<input data-cn></label>
+      <label class="mini-lab">Value<input data-cv inputmode="decimal"></label>
+      <label class="mini-lab">Normal range<input data-cr></label>
+      <label class="mini-lab">Units<input data-cu></label>
       <button type="button" class="icon" data-rm-custom title="Remove">✕</button>
     </div>`;
 
@@ -259,7 +259,7 @@ const App = (() => {
           <div><b>${cnt('postop')}</b><span>Post-op</span></div>
         </div>
         <div class="toolbar">
-          <input type="search" id="q" placeholder="Search name, IP, ward, diagnosis…" value="${esc(dashQuery)}">
+          <label class="search-lab">Search<input type="search" id="q" aria-label="Search name, IP, ward, diagnosis" value="${esc(dashQuery)}"></label>
           <a class="btn primary" href="#/new">+ New case</a>
           <a class="btn wa" href="#/import">From WhatsApp</a>
         </div>
@@ -394,7 +394,7 @@ const App = (() => {
         <section class="card">
           <h3>One case (text only)</h3>
           <p class="small muted">Long-press the case message in WhatsApp → Copy → paste here.</p>
-          <textarea id="imp-text" rows="6" placeholder="Case 11&#10;Udayakumar 26/M&#10;MLC/RTA&#10;&#10;COMPOUND GRADE IIIB FRACTURE BOTH BONE LEG LEFT"></textarea>
+          <textarea id="imp-text" rows="6"></textarea>
           <div class="form-actions"><button class="btn primary" id="imp-read">Read message</button></div>
         </section>`}`;
     },
@@ -526,7 +526,7 @@ const App = (() => {
       const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>` : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
       // Notebook: To do's and Assessment / Scheme are edited right here and saved to the case
       // (the e-case sheet and the OT list show the same values).
-      const lines = (t) => Math.max(2, String(t || '').split('\n').length);
+      const lines = (t) => Math.max(1, String(t || '').split('\n').length);
       const notebook = `
         <table class="board nb-screen nb-edit">
           <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
@@ -536,8 +536,8 @@ const App = (() => {
               <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
               <td class="nb-todo-cell">
-                <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}" placeholder="e.g. REPEAT HB, RFT">${esc(invTodoText(c))}</textarea></label>
-                <label class="nb-lab">Opinion / To-do<textarea data-nb="op" rows="${lines(opTodoText(c))}" placeholder="e.g. CARDIOLOGY OPINION&#10;CROSS MATCH 2 UNITS">${esc(opTodoText(c))}</textarea></label>
+                <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea></label>
+                <label class="nb-lab">Opinion / To-do<textarea data-nb="op" rows="${lines(opTodoText(c))}">${esc(opTodoText(c))}</textarea></label>
               </td>
               <td class="nb-as-cell">
                 <label class="nb-lab">Assessment<select data-nb="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
@@ -582,7 +582,7 @@ const App = (() => {
           <button class="btn small wa" id="wa-ward">WhatsApp: ward status</button>
           <button class="btn small wa" id="wa-pending">WhatsApp: pending works</button>
         </div>
-        <input type="search" id="nb-q" class="nb-search" placeholder="Search name, IP, ward, diagnosis…" value="${esc(Ward.q || '')}">
+        <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(Ward.q || '')}"></label>
         <div class="chips">
           <button class="chip ${Ward.detailed ? '' : 'on'}" data-layout="0">Notebook</button>
           <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
@@ -643,6 +643,10 @@ const App = (() => {
         window.addEventListener('pointerup', end);
         window.addEventListener('pointercancel', end);
       });
+      // Boxes grow with what's typed (no scrolling inside a small box on rounds).
+      const fit = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
+      $$('.nb-edit textarea', el).forEach(fit);
+      el.addEventListener('input', (e) => { if (e.target.matches('.nb-edit textarea')) fit(e.target); });
       // Search: hide rows that don't match (no re-render, so typing isn't interrupted).
       const filter = () => {
         const q = String(Ward.q || '').trim().toUpperCase();
@@ -943,9 +947,9 @@ const App = (() => {
   function openCustomChartModal(caseId) {
     const m = $('#modal');
     const colRow = () => `<div class="custom-row cc-row">
-      <input data-cc="label" placeholder="Column">
-      <input data-cc="unit" placeholder="Unit">
-      <input data-cc="range" placeholder="Normal range">
+      <label class="mini-lab">Column<input data-cc="label"></label>
+      <label class="mini-lab">Unit<input data-cc="unit"></label>
+      <label class="mini-lab">Normal range<input data-cc="range"></label>
       <label class="small nowrap"><input type="checkbox" data-cc="text"> text</label>
       <button type="button" class="icon" data-rm-custom title="Remove">✕</button>
     </div>`;
@@ -1052,19 +1056,19 @@ const App = (() => {
             <div class="work">
               ${opinions.map((o) => `
                 <div class="work-row ${hasText(o.note) ? '' : 'missing'}">
-                  <label>${esc(o.dept)}<input data-bind="opinions.${o.id}.note" value="${esc(o.note)}" placeholder="Pending — type advice"></label>
+                  <label>${esc(o.dept)}<input data-bind="opinions.${o.id}.note" value="${esc(o.note)}"></label>
                   <button class="icon" data-del-op="${o.id}" title="Remove">✕</button>
                 </div>`).join('') || '<div class="muted small">No opinions sought.</div>'}
             </div>
             <form class="inline-add" id="add-op">
-              <input name="dept" list="dl-depts" placeholder="Add opinion — department" required>
+              <label class="mini-lab">Add opinion — department<input name="dept" list="dl-depts" required></label>
               <button class="btn small">Add</button>
             </form>
           </section>
 
           <section class="card">
             <h3>Investigations to do</h3>
-            <label class="nb-lab">Same as the Investigation box in the ward notebook<textarea data-bind="invTodo" rows="2" placeholder="e.g. REPEAT HB, RFT">${esc(invTodoText({ id, ...c }))}</textarea></label>
+            <label class="nb-lab">Same as the Investigation box in the ward notebook<textarea data-bind="invTodo" rows="2">${esc(invTodoText({ id, ...c }))}</textarea></label>
           </section>
 
           <section class="card">
@@ -1080,7 +1084,7 @@ const App = (() => {
                 </li>`).join('') || '<li class="muted small">Nothing pending. Add works for your HS / co-PGs below.</li>'}
             </ul>
             <form class="inline-add" id="add-task">
-              <input name="text" placeholder="New pending work" required>
+              <label class="mini-lab">New pending work<input name="text" required></label>
               <select name="to"><option value="">Anyone</option>${opts(ROLES)}</select>
               <button class="btn small primary">Add</button>
             </form>
@@ -2452,7 +2456,7 @@ const App = (() => {
               <tr id="level-add">
                 <td><select name="level" aria-label="New level">${levelOpts('II')}</select></td>
                 <td><input name="category" aria-label="New category"></td>
-                <td><input name="name" placeholder="Procedure" aria-label="New procedure"></td>
+                <td><input name="name" aria-label="New procedure"></td>
                 <td><input name="keywords" aria-label="New match words"></td>
                 <td><button class="btn small primary" id="level-add-btn">Add</button></td>
               </tr>
@@ -2538,8 +2542,8 @@ const App = (() => {
                <h4>Team</h4>
                <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> <span class="muted">${esc(x.role)} · ${esc(x.email)}</span>${Store.isOwner() ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">Only owners so far.</li>'}</ul>
                ${Store.isOwner() ? `<form class="inline-add" id="add-member">
-                 <input name="email" type="email" placeholder="Gmail of HS / PG" required>
-                 <input name="name" placeholder="Name">
+                 <label class="mini-lab">Gmail of HS / PG<input name="email" type="email" required></label>
+                 <label class="mini-lab">Name<input name="name"></label>
                  <select name="role">${opts(ROLES, 'PG')}</select>
                  <button class="btn small primary">Add</button></form>` : '<p class="muted small">Ask the unit owner to add people.</p>'}`}
         </div>

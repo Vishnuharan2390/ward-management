@@ -227,12 +227,9 @@ function pendingList(c) {
 }
 
 // Ward notebook "To do's", two editable boxes shared with the e-case sheet.
-// 1. Investigation: the case's own text (invTodo); until someone types in it, the deranged
-//    investigations to repeat, e.g. "REPEAT HB, WBC".
+// 1. Investigation: only what someone typed (no automatic suggestions).
 function invTodoText(c) {
-  if (c.invTodo != null) return c.invTodo;
-  const rep = [...new Set(abnormalList(c).map((x) => x.label))];
-  return rep.length ? 'REPEAT ' + rep.join(', ').toUpperCase() : '';
+  return c.invTodo || '';
 }
 // 2. Opinion / to-do: pending opinions ("CARDIOLOGY OPINION") and open pending works, one per line.
 const opLine = (o) => `${String(o.dept || '').toUpperCase()} OPINION`;
