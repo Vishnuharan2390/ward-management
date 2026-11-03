@@ -13,6 +13,7 @@ const Store = (() => {
   let fb = null;
   let user = null;
   let status = 'local';
+  const syncFresh = {}; // collections that have arrived from the server (not just the offline cache)
   let unsubs = [];
 
   // Firebase sign-in needs a real web address; a downloaded copy opened as a
@@ -150,7 +151,7 @@ const Store = (() => {
   function listen() {
     status = 'connecting';
     let seededLevels = false;
-    const fresh = {};
+    const fresh = syncFresh;
     let implantSeedChecked = false;
     const maybeSeedImplants = () => {
       if (implantSeedChecked || !fresh.implants || !fresh.meta) return;
@@ -365,6 +366,8 @@ const Store = (() => {
     subscribe: (f) => subs.add(f),
     get mode() { return mode; },
     get status() { return status; },
+    // true once cases and meta are known up to date (always in local mode)
+    get synced() { return mode === 'local' || !!(syncFresh.cases && syncFresh.meta); },
     get user() { return user; },
     get cases() { return state.cases; },
     get implants() { return state.implants; },

@@ -2838,6 +2838,43 @@ const App = (() => {
     Store.setMeta({ capsV1: true });
   }
 
+  // One-time correction (3 Nov 2026): cases entered with DOA 02/11/2026 were admitted on
+  // 01/11/2026, and those with 03/11/2026 on 02/11/2026. Each corrected case is marked, so a
+  // second phone running this at the same moment can't shift it twice. The admission day PPT
+  // settings move with them.
+  const DOA_FIX = { '2026-11-02': '2026-11-01', '2026-11-03': '2026-11-02' };
+  function doaFix() {
+    if (!Store.synced) return setTimeout(doaFix, 2000); // only with the full, current case list
+    if (Store.meta.doaFix1103) return;
+    let n = 0;
+    for (const [id, c] of Object.entries(Store.cases)) {
+      if (c.doaFix === '1103' || !DOA_FIX[c.doa]) continue;
+      Store.patch('cases', id, { doa: DOA_FIX[c.doa], doaFix: '1103' });
+      n++;
+    }
+    const cfg = (d) => Store.meta[DECK_KEY(d)] || null;
+    const merge = (a, b) => {
+      if (!a) return b;
+      if (!b) return a;
+      return {
+        ...b, ...a,
+        order: [...(a.order || []), ...(b.order || []).filter((x) => !(a.order || []).includes(x))],
+        extra: [...new Set([...(a.extra || []), ...(b.extra || [])])],
+        skip: [...new Set([...(a.skip || []), ...(b.skip || [])])],
+        labels: { ...(b.labels || {}), ...(a.labels || {}) },
+        split: { ...(b.split || {}), ...(a.split || {}) },
+        skipImg: { ...(b.skipImg || {}), ...(a.skipImg || {}) },
+      };
+    };
+    const [d1, d2, d3] = [cfg('2026-11-01'), cfg('2026-11-02'), cfg('2026-11-03')];
+    const ch = { doaFix1103: true };
+    if (d2 || d1) ch[DECK_KEY('2026-11-01')] = merge(d1, d2);
+    if (d2 || d3) ch[DECK_KEY('2026-11-02')] = d3 || null;
+    if (d3) ch[DECK_KEY('2026-11-03')] = null;
+    Store.setMeta(ch);
+    if (n) toast(`Admission dates corrected for ${n} case(s): 02/11 → 01/11, 03/11 → 02/11`, 5000);
+  }
+
   function onStoreChange() {
     const gateNeeded = Store.mode === 'firebase' && Store.status !== 'ok';
     if (gateNeeded !== (current?.view === Gate)) {
@@ -2847,6 +2884,7 @@ const App = (() => {
     if (!capsChecked && (Store.status === 'ok' || Store.mode === 'local') && Object.keys(Store.cases).length) {
       capsChecked = true;
       setTimeout(capsMigrate, 1500);
+      setTimeout(doaFix, 2500);
     }
     if (!current) return render();
     if (!current.view.live && !current.loading) return updateSync();
