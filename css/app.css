@@ -1285,3 +1285,52 @@ main[data-quick="1"] #dc-form > label.small,
 main[data-quick="1"] #dc-form + .card { display: none; }
 .dc-quick-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem; }
 .dc-quick-row label { display: flex; flex-direction: column; font-size: .8rem; }
+
+/* ---- Bed number ---- */
+.bed-lab { display: inline-flex; align-items: center; gap: .3rem; font-size: .7rem; font-weight: 700; color: var(--muted); margin-bottom: .25rem; }
+.bed-lab input { width: 4.2em; padding: .15rem .35rem; font-size: .85rem; font-weight: 700; text-align: center; }
+.nb-name .bed-lab { display: flex; }
+.nb-edit.by-bed .drag-handle { display: none; }
+
+/* ---- Rounds view: one patient per screen ---- */
+.rounds { max-width: 760px; margin: 0 auto; }
+.rd-nav { display: flex; align-items: center; gap: .5rem; margin: .4rem 0 .6rem; }
+.rd-nav select { flex: 1; min-width: 0; font-size: .95rem; }
+.rd-nav.rd-bottom { justify-content: space-between; margin-top: .6rem; }
+.rd-btn { min-width: 6.5rem; min-height: 2.8rem; font-size: 1rem; font-weight: 700; }
+.rd-card { padding: 14px; }
+.rd-head { display: flex; align-items: flex-start; gap: .7rem; }
+.rd-who { flex: 1; min-width: 0; }
+.rd-name { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+.rd-bed { flex-direction: column; align-items: stretch; margin: 0; }
+.rd-bed input { width: 4.6em; font-size: 1.15rem; padding: .3rem; }
+.rd-dx { margin-top: .6rem; font-weight: 600; }
+.rd-plan { color: var(--brand); font-weight: 600; margin-top: .15rem; }
+.rd-sec { margin-top: .9rem; }
+.rd-lab { font-size: .75rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+.rounds textarea { width: 100%; font-size: 1rem; line-height: 1.4; resize: none; overflow: hidden; min-height: 2.8em; }
+.rd-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .4rem; }
+.rd-chips .chip { font-size: .8rem; padding: .35rem .6rem; }
+.rd-seg { display: flex; flex-wrap: wrap; gap: .35rem; }
+.rd-seg .seg { border: 1px solid var(--line); background: var(--btn-bg, var(--face)); color: var(--btn-ink, var(--ink)); border-radius: var(--rb, 8px); padding: .5rem .75rem; font: inherit; font-size: .85rem; font-weight: 600; cursor: pointer; min-height: 2.5rem; }
+.rd-seg .seg.on { background: var(--primary-bg, var(--brand)); color: var(--primary-ink, #fff); border-color: transparent; }
+
+/* ---- Ward notebook on phones: one compact card per case instead of five columns ---- */
+@media (max-width: 640px) {
+  .nb-edit { min-width: 0 !important; width: 100%; }
+  .nb-edit thead { display: none; }
+  .nb-edit tbody, .nb-edit tr[data-nbcase] { display: block; }
+  .nb-edit tr[data-nbcase] { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "sno name" "dx dx" "todo todo" "as as"; gap: .25rem .55rem; padding: .7rem .55rem; border-bottom: 1px solid var(--line); }
+  .nb-edit tr[data-nbcase] > td { border: 0; padding: 0; min-width: 0 !important; }
+  .nb-edit td.nb-sno { grid-area: sno; }
+  .nb-edit td.nb-name { grid-area: name; }
+  .nb-edit td.nb-name .bed-lab { display: inline-flex; margin-right: .5rem; }
+  .nb-edit td.nb-dx { grid-area: dx; }
+  .nb-edit td.nb-todo-cell { grid-area: todo; }
+  .nb-edit td.nb-as-cell { grid-area: as; display: flex; gap: .5rem; }
+  .nb-edit td.nb-as-cell .nb-lab { flex: 1; min-width: 0; }
+  .rd-btn { min-width: 5.5rem; }
+}
+/* Rounds: sideways swipes on the card change patient — not the browser's back gesture */
+.rd-card { touch-action: pan-y; }
+html, body { overscroll-behavior-x: none; }

@@ -137,7 +137,7 @@ const Print = (() => {
     const rows = cases.map((c, i) => `
       <tr>
         <td class="nb-sno">${c.status === 'posted' ? '<span class="nb-bot">BOT</span>' : ''}${i + 1}</td>
-        <td><b>${esc(c.name)}</b><div class="pr-sub">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
+        <td><b>${esc(c.name)}</b><div class="pr-sub">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}${c.bed ? ' · BED ' + esc(c.bed) : ''}</div></td>
         <td>${nl(c.diagnosis)}${c.plan ? `<div class="pr-sub">▸ ${esc(c.plan)}</div>` : ''}</td>
         <td class="nb-todo">${invTodoText(c).trim() ? `<b class="pr-flag">${nl(invTodoText(c).trim())}</b>` : ''}${opTodoText(c).split('\n').filter(Boolean).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
         <td>${esc(assessmentScheme(c))}</td>

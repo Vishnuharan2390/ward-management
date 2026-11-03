@@ -227,6 +227,10 @@ function pendingList(c) {
 }
 
 // Ward notebook "To do's", two editable boxes shared with the e-case sheet.
+// Rounds view quick-tap chips (each adds one line to the box).
+const ROUND_INV_CHIPS = ['CBC', 'RFT', 'LFT', 'SERUM ELECTROLYTES', 'RBS', 'COAGULATION PROFILE', 'ECG', 'ECHO', 'CXR', 'X-RAY', 'CT', 'MRI'];
+const ROUND_OP_CHIPS = ['CARDIOLOGY OPINION', 'GENERAL MEDICINE OPINION', 'PULMONOLOGY OPINION', 'NEPHROLOGY OPINION', 'DIABETOLOGY OPINION', 'NEUROSURGERY OPINION', 'PAC', 'CROSS MATCH', 'DRESSING', 'WOUND WASH'];
+
 // 1. Investigation: only what someone typed (no automatic suggestions).
 function invTodoText(c) {
   return c.invTodo || '';

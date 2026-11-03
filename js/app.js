@@ -15,7 +15,7 @@ const App = (() => {
   const isActive = (c) => ['preop', 'posted', undefined, ''].includes(c.status);
   const byWard = (a, b) => String(a.ward || '').localeCompare(String(b.ward || ''), undefined, { numeric: true }) || (a.doa || '').localeCompare(b.doa || '');
   const flagged = (text, f) => (f ? `<b class="flag">${esc(text)}${FLAG_MARK[f]}</b>` : esc(text));
-  const metaLine = (c) => [ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · ');
+  const metaLine = (c) => [ageSex(c), c.ipNo, c.ward, c.bed && 'BED ' + c.bed].filter(Boolean).join(' · ');
   const tagHTML = (p) => `<span class="tag ${p.kind}">${esc(p.text)}</span>`;
 
   // ---------------------------------------------------------------- Lab entry
@@ -518,23 +518,80 @@ const App = (() => {
     return `<td class="v${f ? ' flag' : ''}" title="${esc(fmtDate(l.date))}">${esc(shown)}${FLAG_MARK[f]}</td>`;
   }
 
+  // Ward order: by bed number (default — follows the walk round the ward), or the shared list order.
+  const bedKey = (c) => String(c.bed || '').trim();
+  function wardCases() {
+    const list = activeCases();
+    if (Ward.sort !== 'bed') return list;
+    const pos = new Map(list.map((c, i) => [c.id, i]));
+    return [...list].sort((a, b) => {
+      const A = bedKey(a);
+      const B = bedKey(b);
+      if (!A || !B) return (!A) - (!B) || pos.get(a.id) - pos.get(b.id); // no bed yet → end, in list order
+      return A.localeCompare(B, undefined, { numeric: true, sensitivity: 'base' }) || pos.get(a.id) - pos.get(b.id);
+    });
+  }
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
+
+  // Rounds view: one patient per screen.
+  function roundsHTML(list) {
+    if (!list.length) return '<div class="empty">No active pre-op cases.</div>';
+    let i = list.findIndex((c) => c.id === Ward.roundId);
+    if (i < 0) i = 0;
+    const c = list[i];
+    Ward.roundId = c.id;
+    const lines = (t) => Math.max(2, String(t || '').split('\n').length);
+    const seg = (field, cur, values) => values.map((v) => `<button type="button" class="seg${cur === v ? ' on' : ''}" data-set="${field}" data-val="${esc(v)}">${esc(v)}</button>`).join('');
+    const chips = (box, list2) => list2.map((x) => `<button type="button" class="chip" data-add="${box}" data-text="${esc(x)}">+ ${esc(x)}</button>`).join('');
+    const nav = (where) => `<div class="rd-nav rd-${where}">
+        <button class="btn rd-btn" data-rd="-1" ${i ? '' : 'disabled'}>‹ Prev</button>
+        ${where === 'top' ? `<select id="rd-jump" aria-label="Go to patient">${list.map((x, j) => `<option value="${x.id}"${j === i ? ' selected' : ''}>${j + 1}. ${x.bed ? 'BED ' + esc(x.bed) + ' · ' : ''}${esc(x.name)}</option>`).join('')}</select>` : `<span class="muted small">${i + 1} of ${list.length}</span>`}
+        <button class="btn primary rd-btn" data-rd="1" ${i < list.length - 1 ? '' : 'disabled'}>Next ›</button>
+      </div>`;
+    return `<div class="rounds" data-nbcase="${c.id}">
+      ${nav('top')}
+      <div class="card rd-card">
+        <div class="rd-head">
+          <label class="bed-lab rd-bed">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label>
+          <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="tag task">BOT</span>' : ''}</div>
+            <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa)].filter(Boolean).join(' · '))}</div></div>
+          <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
+        </div>
+        <div class="rd-dx">${esc(c.diagnosis)}</div>${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}
+        <div class="rd-sec"><div class="rd-lab">Investigation</div>
+          <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
+          <div class="rd-chips">${chips('inv', ROUND_INV_CHIPS)}</div></div>
+        <div class="rd-sec"><div class="rd-lab">Opinion / To-do</div>
+          <textarea data-nb="op" rows="${lines(opTodoText(c))}">${esc(opTodoText(c))}</textarea>
+          <div class="rd-chips">${chips('op', ROUND_OP_CHIPS)}</div></div>
+        <div class="rd-sec"><div class="rd-lab">Assessment</div><div class="rd-seg">${seg('work.anaes', c.work?.anaes || '', PAC_OPTIONS)}</div></div>
+        <div class="rd-sec"><div class="rd-lab">Scheme</div><div class="rd-seg">${seg('scheme', c.scheme || '', SCHEMES)}</div></div>
+      </div>
+      ${nav('bottom')}
+    </div>`;
+  }
+
   const Ward = {
     live: true,
-    detailed: sessionStorage.getItem('wm.wardDetailed') === '1',
+    layout: sessionStorage.getItem('wm.wardLayout') || (sessionStorage.getItem('wm.wardDetailed') === '1' ? '1' : '0'), // 0 notebook · 1 detailed · 2 rounds
+    get detailed() { return this.layout === '1'; },
+    sort: lsGet('wm.wardSort') || 'bed',
+    roundId: null,
     render() {
-      const list = activeCases();
+      const list = wardCases();
       const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>` : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
       // Notebook: To do's and Assessment / Scheme are edited right here and saved to the case
       // (the e-case sheet and the OT list show the same values).
       const lines = (t) => Math.max(1, String(t || '').split('\n').length);
       const notebook = `
-        <table class="board nb-screen nb-edit">
+        <table class="board nb-screen nb-edit${Ward.sort === 'bed' ? ' by-bed' : ''}">
           <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
           <tbody>
-            ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
+            ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
               <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span>${c.status === 'posted' ? '<br><span class="tag task">BOT</span>' : ''}</td>
-              <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
-              <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
+              <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b><div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
+              <td class="nb-dx">${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
               <td class="nb-todo-cell">
                 <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea></label>
                 <label class="nb-lab">Opinion / To-do<textarea data-nb="op" rows="${lines(opTodoText(c))}">${esc(opTodoText(c))}</textarea></label>
@@ -584,23 +641,86 @@ const App = (() => {
         </div>
         <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(Ward.q || '')}"></label>
         <div class="chips">
-          <button class="chip ${Ward.detailed ? '' : 'on'}" data-layout="0">Notebook</button>
-          <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
+          <button class="chip ${Ward.layout === '0' ? 'on' : ''}" data-layout="0">Notebook</button>
+          <button class="chip ${Ward.layout === '2' ? 'on' : ''}" data-layout="2">Rounds</button>
+          <button class="chip ${Ward.layout === '1' ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
-        ${Ward.detailed ? '' : `<div class="order-bar"><span class="muted small">Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}</span>${Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}</div>`}
-        <div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>
+        <div class="order-bar">
+          <span class="muted small">Order</span>
+          <button class="chip ${Ward.sort === 'bed' ? 'on' : ''}" data-wsort="bed">By bed</button>
+          <button class="chip ${Ward.sort !== 'bed' ? 'on' : ''}" data-wsort="list">List order</button>
+          <span class="muted small">${Ward.sort === 'bed' ? 'Type each patient’s bed number once — cases without one go to the end.' : `Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}`}</span>
+          ${Ward.sort !== 'bed' && Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}
+        </div>
+        ${Ward.layout === '2' ? roundsHTML(list) : `<div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>`}
         <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
-      $('#print-ward', el).onclick = () => Print.wardBoard(activeCases(), Store.meta);
-      $('#wa-ward', el).onclick = () => Share.send(Share.wardText(activeCases()));
-      $('#wa-pending', el).onclick = () => Share.send(Share.pendingText(activeCases()));
+      $('#print-ward', el).onclick = () => Print.wardBoard(wardCases(), Store.meta);
+      $('#wa-ward', el).onclick = () => Share.send(Share.wardText(wardCases()));
+      $('#wa-pending', el).onclick = () => Share.send(Share.pendingText(wardCases()));
+      // Rounds: go to the previous / next patient (saving the box being typed in first).
+      const goRound = (id) => {
+        document.activeElement?.blur?.();
+        Ward.roundId = id;
+        render();
+        window.scrollTo(0, 0);
+      };
+      const step = (dir) => {
+        const ids = wardCases().map((c) => c.id);
+        const j = ids.indexOf(Ward.roundId) + dir;
+        if (j >= 0 && j < ids.length) goRound(ids[j]);
+      };
+      const jump = $('#rd-jump', el);
+      if (jump) jump.onchange = () => goRound(jump.value);
+      const card = $('.rd-card', el);
+      if (card) {
+        let sx = null;
+        let sy = 0;
+        card.addEventListener('touchstart', (e) => {
+          if (e.target.closest('textarea, input, select')) { sx = null; return; }
+          sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+        }, { passive: true });
+        card.addEventListener('touchend', (e) => {
+          if (sx == null) return;
+          const dx = e.changedTouches[0].clientX - sx;
+          const dy = e.changedTouches[0].clientY - sy;
+          sx = null;
+          if (Math.abs(dx) > 70 && Math.abs(dy) < 60) step(dx < 0 ? 1 : -1); // swipe left = next
+        });
+      }
       el.addEventListener('click', (e) => {
         const l = e.target.closest('[data-layout]');
         if (l) {
-          Ward.detailed = l.dataset.layout === '1';
-          sessionStorage.setItem('wm.wardDetailed', l.dataset.layout);
+          Ward.layout = l.dataset.layout;
+          sessionStorage.setItem('wm.wardLayout', Ward.layout);
           return render();
+        }
+        const ws = e.target.closest('[data-wsort]');
+        if (ws) {
+          Ward.sort = ws.dataset.wsort;
+          lsSet('wm.wardSort', Ward.sort);
+          return render();
+        }
+        const rd = e.target.closest('[data-rd]');
+        if (rd) return step(+rd.dataset.rd);
+        // Quick-tap chip: add the line to the box and save it.
+        const add = e.target.closest('[data-add]');
+        if (add) {
+          const box = $(`.rounds textarea[data-nb="${add.dataset.add}"]`, el);
+          const have = box.value.split('\n').map((x) => x.trim().toUpperCase());
+          if (!have.includes(add.dataset.text)) box.value = (box.value.trim() ? box.value.trim() + '\n' : '') + add.dataset.text;
+          box.dispatchEvent(new Event('input', { bubbles: true }));
+          box.dispatchEvent(new Event('change', { bubbles: true }));
+          return;
+        }
+        // Assessment / scheme buttons (tap again to clear).
+        const set = e.target.closest('[data-set]');
+        if (set) {
+          const id = set.closest('[data-nbcase]').dataset.nbcase;
+          const cur = set.dataset.set === 'scheme' ? Store.cases[id].scheme : Store.cases[id].work?.anaes;
+          Store.patch('cases', id, { [set.dataset.set]: cur === set.dataset.val ? '' : set.dataset.val });
+          return;
         }
         // Opening the case from the row, but not while using a box or dropdown in it.
         if (e.target.closest('textarea, input, select, label, button')) return;
@@ -645,8 +765,8 @@ const App = (() => {
       });
       // Boxes grow with what's typed (no scrolling inside a small box on rounds).
       const fit = (ta) => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 2 + 'px'; };
-      $$('.nb-edit textarea', el).forEach(fit);
-      el.addEventListener('input', (e) => { if (e.target.matches('.nb-edit textarea')) fit(e.target); });
+      $$('.nb-edit textarea, .rounds textarea', el).forEach(fit);
+      el.addEventListener('input', (e) => { if (e.target.matches('.nb-edit textarea, .rounds textarea')) fit(e.target); });
       // Search: hide rows that don't match (no re-render, so typing isn't interrupted).
       const filter = () => {
         const q = String(Ward.q || '').trim().toUpperCase();
@@ -663,6 +783,7 @@ const App = (() => {
         if (!id || !f || !Store.cases[id]) return;
         const c = { id, ...Store.cases[id] };
         if (f === 'inv') Store.patch('cases', id, { invTodo: t.value.trim().toUpperCase() });
+        else if (f === 'bed') Store.patch('cases', id, { bed: t.value.trim().toUpperCase() });
         else if (f === 'op') {
           const ch = opTodoChanges(c, t.value, Store.who());
           if (Object.keys(ch).length) Store.patch('cases', id, ch);
@@ -694,6 +815,7 @@ const App = (() => {
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
               <label>IP number<input name="ipNo" value="${esc(c.ipNo)}"></label>
               <label>Ward<input name="ward" value="${esc(c.ward)}"></label>
+              <label>Bed<input name="bed" value="${esc(c.bed)}" autocomplete="off"></label>
               <label>Date of admission<input type="date" name="doa" value="${esc(c.doa)}"></label>
               <label>Attender<input name="attender" value="${esc(c.attender)}"></label>
               <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
@@ -781,7 +903,7 @@ const App = (() => {
         $('#impl-fill', el).onclick = () => fill(true);
         hint();
 
-        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'scheme', 'comorbid', 'implants', 'mode', 'treatment', 'writtenBy'];
+        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'bed', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'scheme', 'comorbid', 'implants', 'mode', 'treatment', 'writtenBy'];
 
         // Images picked before the case exists are held here and saved with it.
         const pending = [];
