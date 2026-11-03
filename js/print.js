@@ -133,7 +133,7 @@ const Print = (() => {
 
   // ---------------------------------------------------------------- Ward board
   // The ward notebook: S.NO | NAME | DIAGNOSIS | TO DO'S | ASSESSMENT/SCHEME.
-  function wardBoard(cases, meta) {
+  function wardBoard(cases, meta, title = 'PRE-OP WARD') {
     const rows = cases.map((c, i) => `
       <tr>
         <td class="nb-sno">${c.status === 'posted' ? '<span class="nb-bot">BOT</span>' : ''}${i + 1}</td>
@@ -144,7 +144,7 @@ const Print = (() => {
       </tr>`).join('');
     const html = `
       <div class="pr nb">
-        <div class="nb-head"><b>${esc(unitName(meta.unitId))} — PRE-OP WARD</b><span>${fmtDate(todayISO())} · ${cases.length} cases</span></div>
+        <div class="nb-head"><b>${esc(unitName(meta.unitId))} — ${esc(title)}</b><span>${fmtDate(todayISO())} · ${cases.length} cases</span></div>
         <table class="nb-table">
           <colgroup><col style="width:6%"><col style="width:17%"><col style="width:30%"><col style="width:32%"><col style="width:15%"></colgroup>
           <thead><tr><th>S.NO</th><th>NAME</th><th>DIAGNOSIS</th><th>TO DO'S</th><th>ASSESSMENT / SCHEME</th></tr></thead>

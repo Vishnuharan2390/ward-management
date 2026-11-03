@@ -1334,3 +1334,9 @@ main[data-quick="1"] #dc-form + .card { display: none; }
 /* Rounds: sideways swipes on the card change patient — not the browser's back gesture */
 .rd-card { touch-action: pan-y; }
 html, body { overscroll-behavior-x: none; }
+
+/* Post-op ward: incoming transfers */
+.incoming { border-left: 4px solid var(--primary-bg, var(--brand)); }
+.inc-row { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
+.inc-row:first-of-type { border-top: 0; }
+.inc-acts { display: flex; gap: .4rem; flex: none; }

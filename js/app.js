@@ -225,6 +225,12 @@ const App = (() => {
     Store.setMeta({ caseOrder: full });
   }
 
+  // Pre-op → post-op handover: the case (with everything in it) leaves the pre-op ward and
+  // waits in the post-op ward's Incoming list until the post-op PG taps Receive.
+  function transferToPostop(id) {
+    Store.patch('cases', id, { status: 'postop', transfer: { by: Store.who(), at: Date.now(), received: false } });
+  }
+
   // ---------------------------------------------------------------- Dashboard
   let dashFilter = sessionStorage.getItem('wm.filter') || 'active';
   let dashQuery = '';
@@ -520,9 +526,13 @@ const App = (() => {
 
   // Ward order: by bed number (default — follows the walk round the ward), or the shared list order.
   const bedKey = (c) => String(c.bed || '').trim();
-  function wardCases() {
-    const list = activeCases();
-    if (Ward.sort !== 'bed') return list;
+  // Post-op ward: cases transferred out of the pre-op ward and received there.
+  const isIncoming = (c) => c.status === 'postop' && c.transfer && c.transfer.received === false;
+  const postWardCases = () => inOrder(caseList().filter((c) => c.status === 'postop' && !isIncoming(c)));
+  const podOf = (c) => { const d = c.surgeryDate || c.otDate; return d ? daysSince(d) : null; };
+  function wardCases(W) {
+    const list = W.kind === 'post' ? postWardCases() : activeCases();
+    if (W.sort !== 'bed') return list;
     const pos = new Map(list.map((c, i) => [c.id, i]));
     return [...list].sort((a, b) => {
       const A = bedKey(a);
@@ -535,12 +545,13 @@ const App = (() => {
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
 
   // Rounds view: one patient per screen.
-  function roundsHTML(list) {
+  function roundsHTML(W, list) {
+    const post = W.kind === 'post';
     if (!list.length) return '<div class="empty">No active pre-op cases.</div>';
-    let i = list.findIndex((c) => c.id === Ward.roundId);
+    let i = list.findIndex((c) => c.id === W.roundId);
     if (i < 0) i = 0;
     const c = list[i];
-    Ward.roundId = c.id;
+    W.roundId = c.id;
     const lines = (t) => Math.max(2, String(t || '').split('\n').length);
     const seg = (field, cur, values) => values.map((v) => `<button type="button" class="seg${cur === v ? ' on' : ''}" data-set="${field}" data-val="${esc(v)}">${esc(v)}</button>`).join('');
     const chips = (box, list2) => list2.map((x) => `<button type="button" class="chip" data-add="${box}" data-text="${esc(x)}">+ ${esc(x)}</button>`).join('');
@@ -555,52 +566,58 @@ const App = (() => {
         <div class="rd-head">
           <label class="bed-lab rd-bed">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label>
           <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="tag task">BOT</span>' : ''}</div>
-            <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa)].filter(Boolean).join(' · '))}</div></div>
+            <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
           <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
         </div>
-        <div class="rd-dx">${esc(c.diagnosis)}</div>${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}
+        <div class="rd-dx">${esc(c.diagnosis)}</div>${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : (c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : '')}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
           <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
-          <div class="rd-chips">${chips('inv', ROUND_INV_CHIPS)}</div></div>
+          <div class="rd-chips">${chips('inv', post ? POST_INV_CHIPS : ROUND_INV_CHIPS)}</div></div>
         <div class="rd-sec"><div class="rd-lab">Opinion / To-do</div>
           <textarea data-nb="op" rows="${lines(opTodoText(c))}">${esc(opTodoText(c))}</textarea>
-          <div class="rd-chips">${chips('op', ROUND_OP_CHIPS)}</div></div>
-        <div class="rd-sec"><div class="rd-lab">Assessment</div><div class="rd-seg">${seg('work.anaes', c.work?.anaes || '', PAC_OPTIONS)}</div></div>
+          <div class="rd-chips">${chips('op', post ? POST_OP_CHIPS : ROUND_OP_CHIPS)}</div></div>
+        ${post ? '' : `<div class="rd-sec"><div class="rd-lab">Assessment</div><div class="rd-seg">${seg('work.anaes', c.work?.anaes || '', PAC_OPTIONS)}</div></div>`}
         <div class="rd-sec"><div class="rd-lab">Scheme</div><div class="rd-seg">${seg('scheme', c.scheme || '', SCHEMES)}</div></div>
       </div>
       ${nav('bottom')}
     </div>`;
   }
 
-  const Ward = {
+  function makeWard(kind) {
+  const post = kind === 'post';
+  const K = post ? 'wm.postWard' : 'wm.ward'; // per-ward settings on this phone
+  const W = {
     live: true,
-    layout: sessionStorage.getItem('wm.wardLayout') || (sessionStorage.getItem('wm.wardDetailed') === '1' ? '1' : '0'), // 0 notebook · 1 detailed · 2 rounds
+    kind,
+    layout: sessionStorage.getItem(K + 'Layout') || (!post && sessionStorage.getItem('wm.wardDetailed') === '1' ? '1' : '0'), // 0 notebook · 1 detailed · 2 rounds
     get detailed() { return this.layout === '1'; },
-    sort: lsGet('wm.wardSort') || 'bed',
+    sort: lsGet(K + 'Sort') || 'bed',
     roundId: null,
     render() {
-      const list = wardCases();
+      const list = wardCases(W);
       const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>` : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
       // Notebook: To do's and Assessment / Scheme are edited right here and saved to the case
       // (the e-case sheet and the OT list show the same values).
       const lines = (t) => Math.max(1, String(t || '').split('\n').length);
       const notebook = `
-        <table class="board nb-screen nb-edit${Ward.sort === 'bed' ? ' by-bed' : ''}">
-          <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
+        <table class="board nb-screen nb-edit${W.sort === 'bed' ? ' by-bed' : ''}">
+          <thead><tr><th>S.No</th><th>Name</th><th>${post ? 'Diagnosis / procedure' : 'Diagnosis'}</th><th>To do's</th><th>${post ? 'Scheme' : 'Assessment / Scheme'}</th></tr></thead>
           <tbody>
             ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
               <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span>${c.status === 'posted' ? '<br><span class="tag task">BOT</span>' : ''}</td>
               <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b><div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
-              <td class="nb-dx">${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
+              <td class="nb-dx">${esc(c.diagnosis)}${post
+                ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}${podOf(c) != null ? `<span class="tag task">POD ${podOf(c)}</span>` : ''}`
+                : (c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : '')}</td>
               <td class="nb-todo-cell">
                 <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea></label>
                 <label class="nb-lab">Opinion / To-do<textarea data-nb="op" rows="${lines(opTodoText(c))}">${esc(opTodoText(c))}</textarea></label>
               </td>
               <td class="nb-as-cell">
-                <label class="nb-lab">Assessment<select data-nb="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
+                ${post ? '' : `<label class="nb-lab">Assessment<select data-nb="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>`}
                 <label class="nb-lab">Scheme<select data-nb="scheme">${schemeOpts(c.scheme)}</select></label>
               </td>
-            </tr>`).join('') || '<tr><td colspan="5" class="empty">No active pre-op cases.</td></tr>'}
+            </tr>`).join('') || `<tr><td colspan="5" class="empty">${post ? 'No post-op cases yet.' : 'No active pre-op cases.'}</td></tr>`}
           </tbody>
         </table>`;
       const detailed = `
@@ -632,43 +649,52 @@ const App = (() => {
         </table>`;
       return `
         <div class="toolbar">
-          <h2>Ward status <span class="muted small">${fmtDate(todayISO())}</span></h2>
+          <h2>${post ? 'Post-op ward' : 'Pre-op ward'} <span class="muted small">${fmtDate(todayISO())}</span></h2>
           <button class="btn" id="print-ward">Print / PDF</button>
         </div>
         <div class="row wa-row">
           <button class="btn small wa" id="wa-ward">WhatsApp: ward status</button>
           <button class="btn small wa" id="wa-pending">WhatsApp: pending works</button>
         </div>
-        <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(Ward.q || '')}"></label>
+        ${post ? incomingHTML() : ''}
+        <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(W.q || '')}"></label>
         <div class="chips">
-          <button class="chip ${Ward.layout === '0' ? 'on' : ''}" data-layout="0">Notebook</button>
-          <button class="chip ${Ward.layout === '2' ? 'on' : ''}" data-layout="2">Rounds</button>
-          <button class="chip ${Ward.layout === '1' ? 'on' : ''}" data-layout="1">Detailed</button>
+          <button class="chip ${W.layout === '0' ? 'on' : ''}" data-layout="0">Notebook</button>
+          <button class="chip ${W.layout === '2' ? 'on' : ''}" data-layout="2">Rounds</button>
+          <button class="chip ${W.layout === '1' ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="order-bar">
           <span class="muted small">Order</span>
-          <button class="chip ${Ward.sort === 'bed' ? 'on' : ''}" data-wsort="bed">By bed</button>
-          <button class="chip ${Ward.sort !== 'bed' ? 'on' : ''}" data-wsort="list">List order</button>
-          <span class="muted small">${Ward.sort === 'bed' ? 'Type each patient’s bed number once — cases without one go to the end.' : `Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}`}</span>
-          ${Ward.sort !== 'bed' && Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}
+          <button class="chip ${W.sort === 'bed' ? 'on' : ''}" data-wsort="bed">By bed</button>
+          <button class="chip ${W.sort !== 'bed' ? 'on' : ''}" data-wsort="list">List order</button>
+          <span class="muted small">${W.sort === 'bed' ? 'Type each patient’s bed number once — cases without one go to the end.' : `Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}`}</span>
+          ${W.sort !== 'bed' && Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}
         </div>
-        ${Ward.layout === '2' ? roundsHTML(list) : `<div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>`}
+        ${W.layout === '2' ? roundsHTML(W, list) : `<div class="table-wrap">${W.detailed ? detailed : notebook}</div>`}
         <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
-      $('#print-ward', el).onclick = () => Print.wardBoard(wardCases(), Store.meta);
-      $('#wa-ward', el).onclick = () => Share.send(Share.wardText(wardCases()));
-      $('#wa-pending', el).onclick = () => Share.send(Share.pendingText(wardCases()));
+      $('#print-ward', el).onclick = () => Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD');
+      // Post-op PG receives a case transferred from the pre-op ward.
+      el.addEventListener('click', (e) => {
+        const r = e.target.closest('[data-receive]');
+        if (!r) return;
+        const id = r.dataset.receive;
+        Store.patch('cases', id, { 'transfer.received': true, 'transfer.receivedBy': Store.who(), 'transfer.receivedAt': Date.now() });
+        toast(`${Store.cases[id]?.name || 'Case'} received into the post-op ward`);
+      });
+      $('#wa-ward', el).onclick = () => Share.send(Share.wardText(wardCases(W)));
+      $('#wa-pending', el).onclick = () => Share.send(Share.pendingText(wardCases(W)));
       // Rounds: go to the previous / next patient (saving the box being typed in first).
       const goRound = (id) => {
         document.activeElement?.blur?.();
-        Ward.roundId = id;
+        W.roundId = id;
         render();
         window.scrollTo(0, 0);
       };
       const step = (dir) => {
-        const ids = wardCases().map((c) => c.id);
-        const j = ids.indexOf(Ward.roundId) + dir;
+        const ids = wardCases(W).map((c) => c.id);
+        const j = ids.indexOf(W.roundId) + dir;
         if (j >= 0 && j < ids.length) goRound(ids[j]);
       };
       const jump = $('#rd-jump', el);
@@ -692,14 +718,14 @@ const App = (() => {
       el.addEventListener('click', (e) => {
         const l = e.target.closest('[data-layout]');
         if (l) {
-          Ward.layout = l.dataset.layout;
-          sessionStorage.setItem('wm.wardLayout', Ward.layout);
+          W.layout = l.dataset.layout;
+          sessionStorage.setItem(K + 'Layout', W.layout);
           return render();
         }
         const ws = e.target.closest('[data-wsort]');
         if (ws) {
-          Ward.sort = ws.dataset.wsort;
-          lsSet('wm.wardSort', Ward.sort);
+          W.sort = ws.dataset.wsort;
+          lsSet(K + 'Sort', W.sort);
           return render();
         }
         const rd = e.target.closest('[data-rd]');
@@ -769,10 +795,10 @@ const App = (() => {
       el.addEventListener('input', (e) => { if (e.target.matches('.nb-edit textarea, .rounds textarea')) fit(e.target); });
       // Search: hide rows that don't match (no re-render, so typing isn't interrupted).
       const filter = () => {
-        const q = String(Ward.q || '').trim().toUpperCase();
+        const q = String(W.q || '').trim().toUpperCase();
         $$('tbody tr[data-q]', el).forEach((tr) => { tr.hidden = !!q && !tr.dataset.q.includes(q); });
       };
-      $('#nb-q', el).addEventListener('input', (e) => { Ward.q = e.target.value; filter(); });
+      $('#nb-q', el).addEventListener('input', (e) => { W.q = e.target.value; filter(); });
       const nbReset = $('#nb-order-reset', el);
       if (nbReset) nbReset.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); };
       filter();
@@ -791,6 +817,25 @@ const App = (() => {
       });
     },
   };
+  return W;
+  }
+  const Ward = makeWard('pre');
+  const PostWard = makeWard('post');
+
+  // Cases transferred from the pre-op ward, waiting for the post-op PG to receive them.
+  function incomingHTML() {
+    const inc = caseList().filter(isIncoming).sort((a, b) => (a.transfer.at || 0) - (b.transfer.at || 0));
+    if (!inc.length) return '';
+    return `<div class="card incoming">
+      <h3>Incoming from the pre-op ward <span class="pill">${inc.length}</span></h3>
+      ${inc.map((c) => `<div class="inc-row">
+        <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}</span>
+          <div class="small">${esc(c.diagnosis)}${c.procedureDone || c.plan ? ` <span class="muted">✓ ${esc(c.procedureDone || c.plan)}</span>` : ''}</div>
+          <div class="muted small">Sent by ${esc(c.transfer.by || '—')} · ${fmtTime(c.transfer.at)}</div></div>
+        <span class="inc-acts"><a class="btn small" href="#/case/${c.id}">View</a><button class="btn small primary" data-receive="${c.id}">Receive</button></span>
+      </div>`).join('')}
+    </div>`;
+  }
 
   // ---------------------------------------------------------------- Case form
   // `deckDate`: opened from the admission day PPT — preset the DOA and go back there after saving.
@@ -1146,6 +1191,8 @@ const App = (() => {
             </dl>
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
+              ${isActive(c) ? '<button class="btn primary" id="to-postop">Transfer to post-op ward</button>' : ''}
+              ${c.status === 'postop' ? `<span class="tag ok">${isIncoming(c) ? 'Sent to post-op ward — waiting to be received' : 'In the post-op ward'}</span>` : ''}
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
               <button class="btn wa" id="wa-case">WhatsApp${caseImages(id).length ? ` + ${caseImages(id).length} photo${caseImages(id).length === 1 ? '' : 's'}` : ''}</button>
               <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
@@ -1262,6 +1309,14 @@ const App = (() => {
           }
         });
         $('#add-set', el).onclick = () => openLabModal(id);
+        const tp = $('#to-postop', el);
+        if (tp) tp.onclick = () => {
+          const cur = Store.cases[id];
+          if (!confirm(`Transfer ${cur.name || 'this case'} to the post-op ward?\n\nIt leaves the pre-op e-case sheet, ward and OT list, and waits in the post-op ward for the post-op PG to receive it.`)) return;
+          transferToPostop(id);
+          toast(`${cur.name || 'Case'} sent to the post-op ward`);
+          location.hash = '#/';
+        };
         // Photos are turned into files as soon as the page opens, so the tap can share at once.
         let waFiles = null;
         const imgs = caseImages(id);
@@ -2445,7 +2500,8 @@ const App = (() => {
           const d = save();
           if ($('#dc-status', el).checked) {
             const st = DISPOSITIONS[d.disposition].status;
-            if (c().status !== st) Store.patch('cases', id, { status: st });
+            if (st === 'postop' && c().status !== 'postop') transferToPostop(id);
+            else if (c().status !== st) Store.patch('cases', id, { status: st });
           }
           Print.discharge(c(), d, Store.meta);
         };
@@ -2644,6 +2700,15 @@ const App = (() => {
           </fieldset>
         </form>
 
+        <div class="card" id="myward">
+          <h3>This phone is for</h3>
+          <p class="muted small">Which ward the app opens on, on this device.</p>
+          <div class="chips">
+            <button class="chip${lsGet('wm.myWard') !== 'post' ? ' on' : ''}" data-myward="pre">Pre-op ward</button>
+            <button class="chip${lsGet('wm.myWard') === 'post' ? ' on' : ''}" data-myward="post">Post-op ward</button>
+          </div>
+        </div>
+
         <div class="card" id="look">
           <h3>Look</h3>
           <p class="muted small">How the app looks on this device. Printouts and PowerPoints are not affected.</p>
@@ -2703,6 +2768,13 @@ const App = (() => {
     },
     mount(el) {
       $('#prof', el).onchange = (e) => Store.setProfile({ [e.target.name]: e.target.value.trim() });
+      $('#myward', el).addEventListener('click', (e) => {
+        const k = e.target.closest('[data-myward]')?.dataset.myward;
+        if (!k) return;
+        lsSet('wm.myWard', k);
+        toast(k === 'post' ? 'This phone now opens on the Post-op Ward' : 'This phone now opens on the e-Case Sheet');
+        render();
+      });
       $('#look', el).addEventListener('click', (e) => {
         const k = e.target.closest('[data-ui-pick]')?.dataset.uiPick;
         if (!k) return;
@@ -2954,6 +3026,7 @@ const App = (() => {
   const ROUTES = [
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
+    [/^#\/postward$/, () => PostWard],
     [/^#\/new$/, () => CaseForm()],
     [/^#\/import$/, () => Import.open()],
     [/^#\/import\/deck\/([\d-]+)$/, (d) => Import.open(d)],
@@ -2978,7 +3051,7 @@ const App = (() => {
   }
 
   function section() {
-    const m = (location.hash || '#/').match(/^#\/(ward|ot|deck|postop|settings)\b/);
+    const m = (location.hash || '#/').match(/^#\/(ward|postward|ot|deck|postop|settings)\b/);
     return m ? '#/' + m[1] : '#/';
   }
 
@@ -3149,6 +3222,8 @@ const App = (() => {
 
   function start() {
     App.el = $('#view');
+    // A post-op PG's phone opens on the post-op ward.
+    if ((!location.hash || location.hash === '#/') && lsGet('wm.myWard') === 'post') location.replace('#/postward');
     Store.subscribe(onStoreChange);
     window.addEventListener('hashchange', () => {
       current = null;
