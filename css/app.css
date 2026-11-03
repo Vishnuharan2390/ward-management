@@ -1210,3 +1210,8 @@ input::placeholder, textarea::placeholder { text-transform: none; }
 .cc-move { position: absolute; right: .5rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: .3rem; z-index: 2; }
 .cc-move .icon { width: 2.2rem; height: 2.2rem; font-size: 1.1rem; }
 .case-card { position: relative; }
+/* OT pick list: anaesthesia + scheme dropdowns wide enough for the full wording */
+.picker td:has(> .ot-sel) { white-space: nowrap; }
+.picker select.ot-sel { width: auto; min-width: max-content; max-width: none; padding-right: 2rem; text-overflow: clip; }
+.picker select.ot-sel[data-f="work.anaes"] { min-width: 13.5em; }
+.picker select.ot-sel[data-f="scheme"] { min-width: 10.5em; }
