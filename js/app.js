@@ -2193,6 +2193,13 @@ const App = (() => {
           <form id="dc-form" class="card form" autocomplete="off">
             <fieldset><legend>Disposition</legend>
               <div class="span2 radios">${Object.entries(DISPOSITIONS).map(([k, v]) => `<label class="chip ${d.disposition === k ? 'on' : ''}"><input type="radio" name="disposition" value="${k}" ${d.disposition === k ? 'checked' : ''} hidden>${v.label}</label>`).join('')}</div>
+              <div class="span2 dc-quick">
+                <p class="muted small">No discharge summary for AMA, absconded or expired — the case is just closed.</p>
+                <div class="dc-quick-row">
+                  <label>Date<input type="date" id="dq-date" value="${esc(d.dod)}"></label>
+                  <button type="button" class="btn primary" id="dc-dispose">Dispose case</button>
+                </div>
+              </div>
             </fieldset>
             <fieldset><legend>Patient box</legend>
               <label>AR number<input name="arNo" value="${esc(d.arNo)}"></label>
@@ -2252,9 +2259,25 @@ const App = (() => {
           const ta = f.elements[name];
           if (!ta.value.split('\n').includes(line)) ta.value = (ta.value.trim() ? ta.value.trim() + '\n' : '') + line;
         };
+        const quickMode = () => {
+          const k = f.elements.disposition.value;
+          const q = !!DISPOSITIONS[k]?.quick;
+          el.dataset.quick = q ? '1' : '';
+          if (q) $('#dc-dispose', el).textContent = `Dispose as ${DISPOSITIONS[k].label}`;
+        };
+        quickMode();
+        $('#dc-dispose', el).onclick = () => {
+          const k = f.elements.disposition.value;
+          const dod = $('#dq-date', el).value || todayISO();
+          const cur = Store.cases[id];
+          Store.patch('cases', id, { status: DISPOSITIONS[k].status, discharge: { ...(cur.discharge || {}), disposition: k, dod } });
+          toast(`${cur.name || 'Case'} disposed — ${DISPOSITIONS[k].label}`, 3500);
+          location.hash = '#/';
+        };
         f.addEventListener('change', (e) => {
           if (e.target.name !== 'disposition') return;
           $$('.radios .chip', f).forEach((l) => l.classList.toggle('on', l.querySelector('input').checked));
+          quickMode();
           // Keep the closing line of the course in step with the disposition.
           const course = f.elements.course;
           const hit = Object.values(DISPOSITIONS).map((x) => x.course).find((x) => course.value.trim().endsWith(x));

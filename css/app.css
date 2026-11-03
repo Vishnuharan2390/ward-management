@@ -1275,3 +1275,13 @@ body.dragging, body.dragging * { cursor: grabbing !important; user-select: none 
 .search-lab { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; font-size: .85rem; font-weight: 600; color: var(--muted); }
 .search-lab input { flex: 1; min-width: 0; }
 .nb-search.search-lab { max-width: 460px; margin: 0 0 .6rem; }
+
+/* Discharge page: AMA / absconded / expired = just a dispose button, no summary */
+.dc-quick { display: none; }
+main[data-quick="1"] .dc-quick { display: block; }
+main[data-quick="1"] #dc-form > fieldset:not(:first-of-type),
+main[data-quick="1"] #dc-form > .form-actions,
+main[data-quick="1"] #dc-form > label.small,
+main[data-quick="1"] #dc-form + .card { display: none; }
+.dc-quick-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .6rem; }
+.dc-quick-row label { display: flex; flex-direction: column; font-size: .8rem; }

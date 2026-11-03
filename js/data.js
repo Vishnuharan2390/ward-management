@@ -651,8 +651,10 @@ const DISPOSITIONS = {
   discharge: { label: 'Discharge', title: '', status: 'discharged', course: 'PATIENT IS BEING DISCHARGED IN A STABLE CONDITION.' },
   dar: { label: 'Discharge at request', title: '', status: 'discharged', course: 'PATIENT DISCHARGED AT REQUEST.' },
   postop: { label: 'Transfer to Post-operative Ward', title: 'TRANSFER SUMMARY', status: 'postop', course: 'PATIENT IS BEING TRANSFERRED TO THE POST-OPERATIVE WARD FOR FURTHER MANAGEMENT.' },
-  ama: { label: 'AMA', title: 'DISCHARGED AGAINST MEDICAL ADVICE (AMA)', status: 'discharged', course: 'PATIENT LEFT AGAINST MEDICAL ADVICE. THE CONSEQUENCES WERE EXPLAINED TO THE PATIENT AND ATTENDERS.' },
-  absconded: { label: 'Absconded', title: 'ABSCONDED', status: 'discharged', course: 'PATIENT ABSCONDED FROM THE WARD.' },
+  // quick: no discharge summary — one tap closes the case.
+  ama: { label: 'AMA', title: 'DISCHARGED AGAINST MEDICAL ADVICE (AMA)', status: 'discharged', course: 'PATIENT LEFT AGAINST MEDICAL ADVICE. THE CONSEQUENCES WERE EXPLAINED TO THE PATIENT AND ATTENDERS.', quick: true },
+  absconded: { label: 'Absconded', title: 'ABSCONDED', status: 'discharged', course: 'PATIENT ABSCONDED FROM THE WARD.', quick: true },
+  expired: { label: 'Expired', title: 'EXPIRED', status: 'discharged', course: 'PATIENT EXPIRED.', quick: true },
 };
 
 
