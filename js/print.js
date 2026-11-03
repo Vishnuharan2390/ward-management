@@ -4,9 +4,17 @@ const Print = (() => {
   const nl = (s) => esc(s).replace(/\n/g, '<br>');
   const up = (s) => String(s ?? '').toUpperCase();
 
-  function go(html, { title, page, margin = '12mm', fit }) {
+  // noHeader: zero page margins, so the browser has no room to print its date/time and URL
+  // header and footer; the margins are recreated inside the page (repeated on every page).
+  function go(html, { title, page, margin = '12mm', fit, noHeader = false }) {
+    if (noHeader) {
+      html = `<table class="pg-wrap"><thead><tr><td style="height:${margin}"></td></tr></thead>`
+        + `<tbody><tr><td>${html}</td></tr></tbody><tfoot><tr><td style="height:${margin}"></td></tr></tfoot></table>`;
+    }
     $('#print').innerHTML = html;
-    $('#page-style').textContent = `@page { size: ${page}; margin: ${margin}; }`;
+    $('#page-style').textContent = noHeader
+      ? `@page { size: ${page}; margin: 0; } @media print { #print { padding: 0 ${margin}; } }`
+      : `@page { size: ${page}; margin: ${margin}; }`;
     if (fit) fit();
     const old = document.title;
     document.title = title;
@@ -86,7 +94,7 @@ const Print = (() => {
   function otList(cases, draft, twice) {
     const title = `OT LIST ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`;
     if (!twice) {
-      go(otHTML(cases, draft), { title, page: 'letter landscape' });
+      go(otHTML(cases, draft), { title, page: 'letter landscape', noHeader: true });
       return;
     }
     const margin = 8;
@@ -120,7 +128,7 @@ const Print = (() => {
       pr.classList.remove('measuring');
       pr.style.width = '';
     };
-    go(html, { title: title + ' PRINT', page: 'letter landscape', margin: margin + 'mm', fit });
+    go(html, { title: title + ' PRINT', page: 'letter landscape', margin: margin + 'mm', fit, noHeader: true });
   }
 
   // ---------------------------------------------------------------- Ward board

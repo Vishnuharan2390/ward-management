@@ -1200,3 +1200,6 @@ html[data-ui="graphite"] input:focus, html[data-ui="graphite"] select:focus, htm
 input:not([type]), input[type="text"], input[type="search"], textarea { text-transform: uppercase; }
 input[type="email"], input[autocomplete="username"], [data-nocaps] input, [data-nocaps] textarea { text-transform: none; }
 input::placeholder, textarea::placeholder { text-transform: none; }
+/* page wrapper for prints without browser header/footer */
+.pg-wrap { width: 100%; border-collapse: collapse; }
+.pg-wrap > thead > tr > td, .pg-wrap > tfoot > tr > td, .pg-wrap > tbody > tr > td { padding: 0; border: 0; }
