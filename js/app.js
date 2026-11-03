@@ -206,6 +206,14 @@ const App = (() => {
     return out;
   }
   const inOrder = (list) => { const ids = new Set(list.map((c) => c.id)); return orderedAll().filter((c) => ids.has(c.id)); };
+  // New order for the cases currently shown (e.g. after a drag); hidden/filtered cases keep their places.
+  function setShownOrder(newShown) {
+    const full = orderedAll().map((c) => c.id);
+    const set = new Set(newShown);
+    const slots = full.map((id, i) => (set.has(id) ? i : -1)).filter((i) => i >= 0);
+    slots.forEach((slot, k) => { full[slot] = newShown[k]; });
+    Store.setMeta({ caseOrder: full });
+  }
   // Move a case one place up/down among the cases currently shown.
   function moveCase(id, dir, shown) {
     const j = shown.indexOf(id) + dir;
@@ -524,7 +532,7 @@ const App = (() => {
           <thead><tr><th>S.No</th><th>Name</th><th>Diagnosis</th><th>To do's</th><th>Assessment / Scheme</th></tr></thead>
           <tbody>
             ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
-              <td>${c.status === 'posted' ? '<span class="tag task">BOT</span><br>' : ''}${i + 1}</td>
+              <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span>${c.status === 'posted' ? '<br><span class="tag task">BOT</span>' : ''}</td>
               <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}</td>
               <td class="nb-todo-cell">
@@ -579,6 +587,7 @@ const App = (() => {
           <button class="chip ${Ward.detailed ? '' : 'on'}" data-layout="0">Notebook</button>
           <button class="chip ${Ward.detailed ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
+        ${Ward.detailed ? '' : `<div class="order-bar"><span class="muted small">Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}</span>${Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}</div>`}
         <div class="table-wrap">${Ward.detailed ? detailed : notebook}</div>
         <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
@@ -598,12 +607,50 @@ const App = (() => {
         const tr = e.target.closest('[data-go]');
         if (tr) location.hash = '#/case/' + tr.dataset.go;
       });
+      // Drag to reorder (finger or mouse): hold the ⠿ handle and move the row up or down.
+      el.addEventListener('pointerdown', (e) => {
+        const h = e.target.closest('[data-drag]');
+        if (!h) return;
+        e.preventDefault();
+        const row = h.closest('tr');
+        const tbody = row.parentElement;
+        document.body.classList.add('dragging');
+        row.classList.add('drag-row');
+        const before = $$('tr[data-nbcase]', tbody).filter((r) => !r.hidden).map((r) => r.dataset.nbcase);
+        const move = (ev) => {
+          const y = ev.clientY;
+          const rows = $$('tr[data-nbcase]', tbody).filter((r) => !r.hidden && r !== row);
+          const next = rows.find((r) => { const b = r.getBoundingClientRect(); return y < b.top + b.height / 2; });
+          if (next) { if (row.nextElementSibling !== next) tbody.insertBefore(row, next); } else if (tbody.lastElementChild !== row) tbody.appendChild(row);
+          // keep the page scrolling while dragging near the top/bottom edge
+          if (y < 70) window.scrollBy(0, -12); else if (y > window.innerHeight - 70) window.scrollBy(0, 12);
+        };
+        const end = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', end);
+          window.removeEventListener('pointercancel', end);
+          row.classList.remove('drag-row');
+          document.body.classList.remove('dragging');
+          const after = $$('tr[data-nbcase]', tbody).filter((r) => !r.hidden).map((r) => r.dataset.nbcase);
+          if (after.join() !== before.join()) {
+            setShownOrder(after);
+            toast('Order saved');
+          }
+          render();
+        };
+        // on the window, not the handle: moving the row in the page would drop a pointer capture
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', end);
+        window.addEventListener('pointercancel', end);
+      });
       // Search: hide rows that don't match (no re-render, so typing isn't interrupted).
       const filter = () => {
         const q = String(Ward.q || '').trim().toUpperCase();
         $$('tbody tr[data-q]', el).forEach((tr) => { tr.hidden = !!q && !tr.dataset.q.includes(q); });
       };
       $('#nb-q', el).addEventListener('input', (e) => { Ward.q = e.target.value; filter(); });
+      const nbReset = $('#nb-order-reset', el);
+      if (nbReset) nbReset.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); };
       filter();
       el.addEventListener('change', (e) => {
         const t = e.target;
@@ -2828,6 +2875,7 @@ const App = (() => {
   }
 
   const editing = () => {
+    if (document.body.classList.contains('dragging')) return true;
     const a = document.activeElement;
     return a && App.el?.contains(a) && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.type !== 'checkbox' && a.type !== 'file';
   };

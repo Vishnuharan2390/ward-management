@@ -1259,3 +1259,9 @@ html[data-ui="graphite"] .picker tr.picked:hover { background: #2c2c33; }
 .tasks .task-text:hover { border-color: var(--line); }
 .tasks .task-text:focus { border-color: var(--brand); background: var(--field); }
 .tasks li.done .task-text { text-decoration: line-through; color: var(--muted); }
+/* Ward notebook: drag to reorder */
+.nb-edit .nb-sno { white-space: nowrap; }
+.drag-handle { touch-action: none; cursor: grab; border: 0; background: transparent; color: var(--muted); font-size: 1.25rem; line-height: 1; padding: .15rem .3rem .15rem 0; margin-right: .15rem; vertical-align: -2px; user-select: none; -webkit-user-select: none; }
+.drag-handle:hover { color: var(--ink); }
+body.dragging, body.dragging * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+.nb-edit tr.drag-row { outline: 2px solid var(--primary-bg); outline-offset: -2px; background: color-mix(in srgb, var(--primary-bg) 12%, var(--card)); position: relative; z-index: 2; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
