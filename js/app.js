@@ -352,8 +352,11 @@ const App = (() => {
       const it = Import.items;
       const sexSel = (i, v) => `<select data-i="${i}" data-f="sex">${['', 'M', 'F'].map((x) => `<option${x === v ? ' selected' : ''}>${x}</option>`).join('')}</select>`;
       const kinds = [...ADD_CASE_KINDS.map((k) => [k.k, k.label]), ['skip', 'Don’t add']];
+      const deckMode = Import.back === '#/deck';
+      const others = deckMode && it ? it.filter((c) => c.otherDay).length : 0;
+      const shown = it ? it.filter((c) => !deckMode || !c.otherDay || Import.otherDay) : [];
       const list = it ? `
-        <div class="toolbar"><h2>${it.length} case${it.length === 1 ? '' : 's'} found</h2>
+        <div class="toolbar"><h2>${deckMode ? `${shown.length} case${shown.length === 1 ? '' : 's'} posted on the ${esc(fmtDate(Import.doa))} admission day` : `${it.length} case${it.length === 1 ? '' : 's'} found`}</h2>
           <button class="btn" id="imp-clear">Start over</button></div>
         <div class="card imp-doa">
           <label>Date of admission<input type="date" id="imp-doa" value="${esc(Import.doa)}" ${Import.usePosted ? 'disabled' : ''}></label>
@@ -361,7 +364,8 @@ const App = (() => {
             <button class="link" id="imp-posted">${Import.usePosted ? 'Use the Admission day PPT date' : 'Use the date each case was posted instead'}</button></p>
         </div>
         ${it.length ? '' : '<p class="empty">No case posts found. A post needs a line like “Udayakumar 26/M” and the diagnosis.</p>'}
-        ${it.map((c, i) => `
+        ${others ? `<p class="small"><button class="link" id="imp-others">${Import.otherDay ? 'Hide' : 'Show'} ${others} post${others === 1 ? '' : 's'} from other days</button></p>` : ''}
+        ${it.map((c, i) => (deckMode && c.otherDay && !Import.otherDay ? '' : `
           <div class="card imp-case${c.dup ? ' imp-dup' : ''}">
             <label class="imp-pick"><input type="checkbox" data-i="${i}" data-f="sel" ${c.sel ? 'checked' : ''}>
               <b>${c.caseNo ? `Case ${esc(c.caseNo)} · ` : ''}${esc(c.name)} ${esc(c.age)}/${esc(c.sex)}</b>
@@ -381,7 +385,7 @@ const App = (() => {
             ${c.photos.length ? `<div class="imp-photos">${c.photos.map((ph, j) => `
               <figure><img src="${ph.url}" alt=""><select data-i="${i}" data-p="${j}">${kinds.map(([k, l]) => `<option value="${k}"${k === ph.kind ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></figure>`).join('')}</div>` : ''}
             ${c.missing ? `<p class="muted small">${c.missing} photo(s) in this post weren't in the file — export the chat <b>with media</b> (Attach Media) to bring them in.</p>` : ''}
-          </div>`).join('')}
+          </div>`)).join('')}
         ${it.length ? `<div class="form-actions"><button class="btn primary" id="imp-add">Add ${it.filter((c) => c.sel).length} case(s) to Cases</button></div>` : ''}
         ${datalist('dl-mode', MODES)}` : '';
       return `
@@ -404,8 +408,23 @@ const App = (() => {
           <div class="form-actions"><button class="btn primary" id="imp-read">Read message</button></div>
         </section>`}`;
     },
+    // From the admission day PPT: only the posts of that admission day (8 AM to 10 AM next morning)
+    // are ticked; posts from other days stay hidden unless asked for.
+    markDay() {
+      if (Import.back !== '#/deck') return;
+      const [y, mo, d] = Import.doa.split('-').map(Number);
+      const from = Date.UTC(y, mo - 1, d, 8, 0);
+      const to = from + 26 * 3600e3;
+      for (const c of Import.items || []) {
+        const other = c.t != null && (c.t < from || c.t >= to);
+        if (other !== !!c.otherDay) c.sel = !c.dup && !other;
+        c.otherDay = other;
+      }
+    },
     async load(cases) {
       const have = new Set(caseList().map((c) => WaImport.key(c.name, c.age)));
+      const num = (c) => (c.caseNo ? parseInt(c.caseNo, 10) : 1e9);
+      cases.sort((a, b) => (a.doa || '').localeCompare(b.doa || '') || num(a) - num(b));
       for (const c of cases) {
         c.dup = have.has(WaImport.key(c.name, c.age));
         c.sel = !c.dup;
@@ -418,6 +437,8 @@ const App = (() => {
         }
       }
       Import.items = cases;
+      Import.otherDay = false;
+      Import.markDay();
       Import.applyDoa();
       Import.busy = '';
       render();
@@ -447,9 +468,12 @@ const App = (() => {
       if (doa) doa.onchange = () => {
         Import.doa = doa.value || todayISO();
         Deck.date = Import.doa;
+        Import.markDay();
         Import.applyDoa();
         render();
       };
+      const oth = $('#imp-others', el);
+      if (oth) oth.onclick = () => { Import.otherDay = !Import.otherDay; render(); };
       const posted = $('#imp-posted', el);
       if (posted) posted.onclick = () => {
         Import.usePosted = !Import.usePosted;
@@ -495,6 +519,7 @@ const App = (() => {
             mode: c.mode.trim().toUpperCase(), diagnosis, plan, doa: c.doa || todayISO(),
             implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
             status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'), writtenBy: '',
+            ...(c.caseNo ? { caseNo: String(c.caseNo) } : {}),
           });
           for (const ph of c.photos.filter((x) => x.kind !== 'skip')) {
             toast(`Saving photos… ${++photos}`, 8000);
@@ -506,7 +531,21 @@ const App = (() => {
         (Import.items || []).forEach((c) => c.photos.forEach((ph) => URL.revokeObjectURL(ph.url)));
         Import.items = null;
         toast(`Added ${pick.length} case(s)${photos ? ` with ${photos - bad} photo(s)` : ''}${bad ? ` — ${bad} photo(s) couldn't be opened` : ''}`, 5000);
-        if (Import.back === '#/deck') Deck.date = Import.doa;
+        if (Import.back === '#/deck') {
+          Deck.date = Import.doa;
+          // The PPT follows the case numbers from the group (Case 10 before Case 11), whatever order they were posted in.
+          const cfg = deckCfg(Import.doa);
+          const ids = deckCases(Import.doa, cfg).map((x) => x.id);
+          const no = (id) => { const n = parseInt(Store.cases[id]?.caseNo, 10); return Number.isFinite(n) ? n : null; };
+          const pos = new Map(ids.map((id, k) => [id, k]));
+          const ordered = [...ids].sort((a, b) => {
+            const A = no(a);
+            const B = no(b);
+            if (A != null && B != null) return A - B;
+            return pos.get(a) - pos.get(b);
+          });
+          saveDeckCfg(Import.doa, { ...cfg, order: ordered });
+        }
         location.hash = Import.back;
       };
     },

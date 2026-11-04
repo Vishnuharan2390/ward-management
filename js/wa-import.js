@@ -109,7 +109,7 @@ const WaImport = (() => {
       idx.forEach((k) => used.add(k));
       const extra = idx.flatMap((k) => msgs[k].files);
       if (before.length) files.unshift(...extra); else files.push(...extra);
-      out.push({ ...c, doa: m.date, sender: m.sender, files });
+      out.push({ ...c, doa: m.date, t: m.t, sender: m.sender, files });
     });
     return out;
   }
@@ -125,8 +125,17 @@ const WaImport = (() => {
       g.drawImage(img, 0, 0, 48, 48);
       const d = g.getImageData(0, 0, 48, 48).data;
       let sat = 0;
-      for (let p = 0; p < d.length; p += 4) sat += Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
-      return sat / (d.length / 4) / 255 < 0.07 ? 'xray' : 'wound';
+      let r = 0;
+      let b = 0;
+      for (let p = 0; p < d.length; p += 4) {
+        sat += Math.max(d[p], d[p + 1], d[p + 2]) - Math.min(d[p], d[p + 1], d[p + 2]);
+        r += d[p];
+        b += d[p + 2];
+      }
+      const n = d.length / 4;
+      const s = sat / n / 255;
+      // greyscale film, or a blue-grey film photographed on a light box / phone screen
+      return s < 0.07 || (b / n > r / n + 8 && s < 0.35) ? 'xray' : 'wound';
     } catch { return 'wound'; } finally { URL.revokeObjectURL(url); }
   }
 
