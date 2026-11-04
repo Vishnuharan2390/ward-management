@@ -369,7 +369,7 @@ const App = (() => {
           <div class="card imp-case${c.dup ? ' imp-dup' : ''}">
             <label class="imp-pick"><input type="checkbox" data-i="${i}" data-f="sel" ${c.sel ? 'checked' : ''}>
               <b>${c.caseNo ? `Case ${esc(c.caseNo)} · ` : ''}${esc(c.name)} ${esc(c.age)}/${esc(c.sex)}</b>
-              <span class="muted small">${c.doa ? 'posted ' + esc(fmtDate(c.doa)) : ''}${c.sender ? ' by ' + esc(c.sender) : ''}</span>
+              <span class="muted small">${(c.posted || c.doa) ? 'posted ' + esc(fmtDate(c.posted || c.doa)) : ''}${c.sender ? ' by ' + esc(c.sender) : ''}</span>
               ${c.dup ? '<span class="tag task">Already in Cases</span>' : ''}</label>
             <div class="form imp-grid">
               <label class="span2">Name<input data-i="${i}" data-f="name" value="${esc(c.name)}"></label>
@@ -384,7 +384,7 @@ const App = (() => {
             </div>
             ${c.photos.length ? `<div class="imp-photos">${c.photos.map((ph, j) => `
               <figure><img src="${ph.url}" alt=""><select data-i="${i}" data-p="${j}">${kinds.map(([k, l]) => `<option value="${k}"${k === ph.kind ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></figure>`).join('')}</div>` : ''}
-            ${c.missing ? `<p class="muted small">${c.missing} photo(s) in this post weren't in the file — export the chat <b>with media</b> (Attach Media) to bring them in.</p>` : ''}
+            ${c.skippedPhotos ? `<p class="muted small">${c.skippedPhotos} photo(s) not loaded — this post is from another day.</p>` : c.missing ? `<p class="muted small">${c.missing} photo(s) in this post weren't in the file — export the chat <b>with media</b> (Attach Media) to bring them in.</p>` : ''}
           </div>`)).join('')}
         ${it.length ? `<div class="form-actions"><button class="btn primary" id="imp-add">Add ${it.filter((c) => c.sel).length} case(s) to Cases</button></div>` : ''}
         ${datalist('dl-mode', MODES)}` : '';
@@ -410,11 +410,16 @@ const App = (() => {
     },
     // From the admission day PPT: only the posts of that admission day (8 AM to 10 AM next morning)
     // are ticked; posts from other days stay hidden unless asked for.
-    markDay() {
-      if (Import.back !== '#/deck') return;
+    dayWindow() {
+      if (Import.back !== '#/deck' || !Import.doa) return null;
       const [y, mo, d] = Import.doa.split('-').map(Number);
       const from = Date.UTC(y, mo - 1, d, 8, 0);
-      const to = from + 26 * 3600e3;
+      return [from, from + 26 * 3600e3];
+    },
+    markDay() {
+      const win = Import.dayWindow();
+      if (!win) return;
+      const [from, to] = win;
       for (const c of Import.items || []) {
         const other = c.t != null && (c.t < from || c.t >= to);
         if (other !== !!c.otherDay) c.sel = !c.dup && !other;
@@ -451,7 +456,9 @@ const App = (() => {
         Import.busy = 'Reading the chat…';
         render();
         try {
-          await Import.load(await WaImport.readExport(f));
+          // From the admission day PPT: only that day's photos are unpacked from the export.
+          const win = Import.dayWindow();
+          await Import.load(await WaImport.readExport(f, (c) => !win || c.t == null || (c.t >= win[0] && c.t < win[1])));
         } catch (err) {
           Import.busy = '';
           render();

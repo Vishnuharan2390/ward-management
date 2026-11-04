@@ -140,7 +140,9 @@ const WaImport = (() => {
   }
 
   // Open an export (.zip or .txt) → [{ ...case, photos: [{ name, blob }] }]
-  async function readExport(file) {
+  // wantPhotos(case): unpack this post's photos? (From the admission day PPT only that day's
+  // posts need them — a whole-group export can hold months of photos.)
+  async function readExport(file, wantPhotos = () => true) {
     if (/\.txt$/i.test(file.name) || file.type === 'text/plain') {
       return casesFromChat(parseChat(await file.text())).map((c) => ({ ...c, photos: [], missing: c.files.length }));
     }
@@ -152,6 +154,7 @@ const WaImport = (() => {
     const cases = casesFromChat(parseChat(await chat.async('string')));
     for (const c of cases) {
       c.photos = [];
+      if (!wantPhotos(c)) { c.skippedPhotos = c.files.length; continue; }
       for (const n of c.files) {
         const f = byName.get(n.toLowerCase());
         if (f && /\.(jpe?g|png|webp|gif|heic)$/i.test(n)) c.photos.push({ name: n, blob: await f.async('blob') });
