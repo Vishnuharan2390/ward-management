@@ -653,8 +653,8 @@ const App = (() => {
           <button class="btn" id="print-ward">Print / PDF</button>
         </div>
         <div class="row wa-row">
-          <button class="btn small wa" id="wa-ward">WhatsApp: ward status</button>
-          <button class="btn small wa" id="wa-pending">WhatsApp: pending works</button>
+          <button class="btn small wa" id="wa-ward">WhatsApp: ward status (PDF)</button>
+          <button class="btn small wa" id="wa-pending">WhatsApp: pending works (PDF)</button>
         </div>
         ${post ? incomingHTML() : ''}
         <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(W.q || '')}"></label>
@@ -683,8 +683,9 @@ const App = (() => {
         Store.patch('cases', id, { 'transfer.received': true, 'transfer.receivedBy': Store.who(), 'transfer.receivedAt': Date.now() });
         toast(`${Store.cases[id]?.name || 'Case'} received into the post-op ward`);
       });
-      $('#wa-ward', el).onclick = () => Share.send(Share.wardText(wardCases(W)));
-      $('#wa-pending', el).onclick = () => Share.send(Share.pendingText(wardCases(W)));
+      // Sent as PDF files (share sheet → WhatsApp). Built straight from the tap, as Safari requires.
+      $('#wa-ward', el).onclick = () => SharePdf.ward(wardCases(W), Store.meta, post);
+      $('#wa-pending', el).onclick = () => SharePdf.pending(wardCases(W), Store.meta, post);
       // Rounds: go to the previous / next patient (saving the box being typed in first).
       const goRound = (id) => {
         document.activeElement?.blur?.();
