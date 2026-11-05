@@ -1577,6 +1577,7 @@ const App = (() => {
     d.date ||= todayISO(1);
     d.day ||= dayName(d.date).toUpperCase();
     d.selected ||= [];
+    d.standby ||= [];
     d.unitId ||= m.unitId || 'I';
     d.chief ||= unitOf(d.unitId).chief;
     d.prof ||= m.lastProf || unitOf(d.unitId).aps[0];
@@ -1686,8 +1687,9 @@ const App = (() => {
             ${sel.map((c, i) => `
               <div class="ot-row" data-case="${c.id}">
                 <div class="ot-row-head">
-                  <b>${i + 1}. ${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))} · IP ${esc(c.ipNo)} · DOA ${esc(fmtDate(c.doa))}</span>
+                  <b>${i + 1}. ${esc(c.name)}</b>${d.standby.includes(c.id) ? ' <span class="tag task">(STANDBY)</span>' : ''} <span class="muted">${esc(ageSex(c))} · IP ${esc(c.ipNo)} · DOA ${esc(fmtDate(c.doa))}</span>
                   <span class="right">
+                    <button class="btn small${d.standby.includes(c.id) ? ' primary' : ''}" data-standby title="Print “(STANDBY)” under the name">Standby</button>
                     <button class="icon" data-move="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
                     <button class="icon" data-move="1" ${i < sel.length - 1 ? '' : 'disabled'} title="Move down">↓</button>
                     <button class="icon" data-unpick title="Remove">✕</button>
@@ -1882,6 +1884,8 @@ const App = (() => {
             const j = i + Number(b.dataset.move);
             [x.selected[i], x.selected[j]] = [x.selected[j], x.selected[i]];
           });
+        } else if (b.dataset.standby !== undefined) {
+          upd((x) => { x.standby = x.standby.includes(cid) ? x.standby.filter((i) => i !== cid) : [...x.standby, cid]; });
         } else if (b.dataset.unpick !== undefined) {
           upd((x) => { x.selected = x.selected.filter((i) => i !== cid); });
         } else if (b.dataset.refill !== undefined) {
@@ -1902,7 +1906,7 @@ const App = (() => {
         document.activeElement?.blur(); // flush the field being edited
         const dd = otDraft();
         Store.setMeta({ lastProf: dd.prof });
-        return [dd.selected.map((id) => ({ id, ...Store.cases[id] })), dd];
+        return [dd.selected.map((id) => ({ id, ...Store.cases[id], standby: dd.standby.includes(id) })), dd];
       };
       if (!$('#ot-go', el)) return;
       const generate = (twice) => {

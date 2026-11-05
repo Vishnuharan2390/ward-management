@@ -11,7 +11,7 @@ const Share = (() => {
     const [t1, t2] = Print.otTitle(draft);
     let s = `*${t1}*\n${t2 ? `_${t2}_\n` : ''}\n`;
     cases.forEach((c, i) => {
-      s += `*${i + 1}. ${who(c)}*\n` + line('Dx', U(c.diagnosis)) + line('Plan', U(c.plan)) + line('Level', c.level)
+      s += `*${i + 1}. ${who(c)}*${c.standby ? ' (STANDBY)' : ''}\n` + line('Dx', U(c.diagnosis)) + line('Plan', U(c.plan)) + line('Level', c.level)
         + line('Implants', U(c.implants)) + line('Scheme', U(c.scheme)) + '\n';
     });
     if (draft.prof) s += `_${U(draft.prof)}_`;

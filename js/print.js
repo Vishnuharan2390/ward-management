@@ -48,7 +48,7 @@ const Print = (() => {
   function otCell(col, c, i, draft) {
     switch (col) {
       case 'sno': return i + 1;
-      case 'name': return esc(up(c.name));
+      case 'name': return esc(up(c.name)) + (c.standby ? '<br>(STANDBY)' : '');
       case 'agesex': return esc(up(ageSex(c)));
       case 'ip': return esc(c.ipNo);
       case 'ward': return esc(up(c.ward));
