@@ -1589,7 +1589,9 @@ const App = (() => {
   };
 
   const OT = {
-    live: false,
+    // live: redraw when the shared data changes (order reset / moves / edits on another phone, or the
+    // up-to-date data arriving after the page first drew from the offline copy). Never while typing.
+    live: true,
     showAll: false,
     render() {
       const d = otDraft();
