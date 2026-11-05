@@ -1629,7 +1629,7 @@ const App = (() => {
                   <td><select class="ot-sel" data-f="scheme" aria-label="Scheme status">${schemeOpts(c.scheme)}</select></td>
                   <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
                   <td>${c.otOnly
-                    ? `<span class="ot-only-acts"><button class="btn small" data-ot-keep="${c.id}" title="Also put this case in the e-case sheet and ward">+ e-Case sheet</button><button class="btn small hide-btn" data-ot-del="${c.id}" title="Delete this OT-only case">Delete</button></span>`
+                    ? `<span class="ot-only-acts"><label class="btn small">+ X-ray<input type="file" accept="image/*" multiple data-ot-xray="${c.id}" hidden></label><button class="btn small" data-ot-keep="${c.id}" title="Also put this case in the e-case sheet and ward">+ e-Case sheet</button><button class="btn small hide-btn" data-ot-del="${c.id}" title="Delete this OT-only case">Delete</button></span>`
                     : `<button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button>`}</td>
                 </tr>`;
                 }).join('') || `<tr><td colspan="11" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
@@ -1656,6 +1656,10 @@ const App = (() => {
             <label class="span2">Plan<input name="plan"></label>
             <label>Anaesthesia<select name="anaes"><option value="">—</option>${opts(PAC_OPTIONS, '')}</select></label>
             <label>Scheme<select name="scheme">${schemeOpts('')}</select></label>
+            <div class="span2 img-adders">
+              ${[['xray', 'X-ray'], ['ct', 'CT'], ['mri', 'MRI']].map(([k, l]) => `<label class="btn small">+ ${l}<input type="file" accept="image/*" multiple data-qimg="${k}" hidden></label>`).join('')}
+            </div>
+            <div class="span2 pending-imgs" id="ot-quick-imgs"></div>
             <div class="span2 form-actions"><button class="btn primary">Add to OT list</button></div>
           </form>
         </details>
@@ -1735,6 +1739,20 @@ const App = (() => {
 
       el.addEventListener('change', (e) => {
         const t = e.target;
+        if (t.dataset.otXray) {
+          const cid = t.dataset.otXray;
+          const files = [...t.files];
+          t.value = '';
+          (async () => {
+            let n = 0;
+            for (const file of files) {
+              try { await Store.addImage(cid, 'xray', await compressImage(file), file.name.replace(/\.[^.]+$/, '')); n++; } catch { toast(`"${file.name}" couldn't be opened as an image. Use JPG or PNG.`, 4000); }
+            }
+            if (n) toast(`${n} X-ray(s) added to ${Store.cases[cid]?.name || 'the case'}`);
+            render();
+          })();
+          return;
+        }
         if (t.dataset.pick) {
           upd((x) => {
             x.selected = x.selected.filter((i) => i !== t.dataset.pick);
@@ -1751,10 +1769,28 @@ const App = (() => {
       if (qd) qd.ontoggle = () => { OT.openQuick = qd.open; };
       const qf = $('#ot-quick-form', el);
       if (qf) {
+        const qImgs = [];
+        const drawQ = () => {
+          $('#ot-quick-imgs', el).innerHTML = qImgs.map((q, i) => `<div class="pthumb"><img src="${q.data}" alt=""><span>${esc(imageKind(q.kind).label)}</span><button type="button" class="icon" data-qrm="${i}" title="Remove">✕</button></div>`).join('');
+        };
+        qf.addEventListener('change', async (e) => {
+          const kind = e.target.dataset.qimg;
+          if (!kind) return;
+          const files = [...e.target.files];
+          e.target.value = '';
+          for (const file of files) {
+            try { qImgs.push({ kind, data: await compressImage(file), name: file.name.replace(/\.[^.]+$/, '') }); } catch { toast(`"${file.name}" couldn't be opened as an image. Use JPG or PNG.`, 4000); }
+          }
+          drawQ();
+        });
+        qf.addEventListener('click', (e) => {
+          const r = e.target.closest('[data-qrm]');
+          if (r) { qImgs.splice(+r.dataset.qrm, 1); drawQ(); }
+        });
         let planTouched = false;
         qf.elements.plan.addEventListener('input', () => { planTouched = true; });
         qf.elements.diagnosis.addEventListener('input', () => { if (!planTouched) qf.elements.plan.value = defaultPlanFor(qf.elements.diagnosis.value); });
-        qf.onsubmit = (e) => {
+        qf.onsubmit = async (e) => {
           e.preventDefault();
           const v = (k) => qf.elements[k].value.trim();
           const plan = v('plan').toUpperCase();
@@ -1769,7 +1805,11 @@ const App = (() => {
           dd.selected = [...dd.selected.filter((i) => i !== nid), nid];
           saveDraft(dd);
           OT.openQuick = false;
-          toast(`${v('name').toUpperCase()} added to the OT list`);
+          if (qImgs.length) {
+            toast(`Saving ${qImgs.length} image(s)…`, 8000);
+            for (const q of qImgs) await Store.addImage(nid, q.kind, q.data, q.name);
+          }
+          toast(`${v('name').toUpperCase()} added to the OT list${qImgs.length ? ` with ${qImgs.length} image(s)` : ''}`);
           render();
         };
       }
@@ -1826,7 +1866,7 @@ const App = (() => {
         }
         // Tapping anywhere on a picker row toggles it.
         const pr = e.target.closest('[data-row]');
-        if (pr && !/^(INPUT|SELECT|OPTION)$/.test(e.target.tagName)) {
+        if (pr && !/^(INPUT|SELECT|OPTION|LABEL|BUTTON)$/.test(e.target.tagName) && !e.target.closest('label, button')) {
           const cb = $('[data-pick]', pr);
           cb.checked = !cb.checked;
           cb.dispatchEvent(new Event('change', { bubbles: true }));
