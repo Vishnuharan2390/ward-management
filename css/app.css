@@ -1340,3 +1340,8 @@ html, body { overscroll-behavior-x: none; }
 .inc-row { display: flex; justify-content: space-between; align-items: center; gap: .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
 .inc-row:first-of-type { border-top: 0; }
 .inc-acts { display: flex; gap: .4rem; flex: none; }
+
+/* OT list: OT-only cases */
+.ot-quick summary { cursor: pointer; font-weight: 700; color: var(--brand); }
+.ot-quick[open] summary { margin-bottom: .5rem; }
+.ot-only-acts { display: inline-flex; gap: .3rem; flex-wrap: wrap; }

@@ -8,7 +8,9 @@ const App = (() => {
     return `<option value="${esc(val)}"${val === sel ? ' selected' : ''}>${esc(label)}</option>`;
   }).join('');
   const datalist = (id, list) => `<datalist id="${id}">${list.map((v) => `<option value="${esc(v)}">`).join('')}</datalist>`;
-  const caseList = () => Object.entries(Store.cases).map(([id, c]) => ({ id, ...c }));
+  // OT-only cases (added straight to the OT list) stay out of the e-case sheet, wards and PPTs.
+  const allCases = () => Object.entries(Store.cases).map(([id, c]) => ({ id, ...c }));
+  const caseList = () => allCases().filter((c) => !c.otOnly);
   const statusBadge = (s) => `<span class="badge st-${esc(s || 'preop')}">${esc(CASE_STATUS[s] || 'Pre-op')}</span>`;
   const levelOpts = (sel) => opts([['', '—'], ...LEVELS.map((l) => [l, l])], sel || '');
   const schemeOpts = (sel) => opts([['', '—'], ...SCHEMES.map((s) => [s, s])], sel || '');
@@ -192,7 +194,7 @@ const App = (() => {
   // with the team), with newly added cases slotted in by their DOA.
   const byDoa = (a, b) => (a.doa || '').localeCompare(b.doa || '') || (a.createdAt || 0) - (b.createdAt || 0);
   function orderedAll() {
-    const all = caseList().sort(byDoa);
+    const all = allCases().sort(byDoa);
     const ord = Store.meta.caseOrder;
     if (!ord?.length) return all;
     const pos = new Map(ord.map((id, i) => [id, i]));
@@ -427,7 +429,7 @@ const App = (() => {
       }
     },
     async load(cases) {
-      const have = new Set(caseList().map((c) => WaImport.key(c.name, c.age)));
+      const have = new Set(allCases().map((c) => WaImport.key(c.name, c.age)));
       const num = (c) => (c.caseNo ? parseInt(c.caseNo, 10) : 1e9);
       cases.sort((a, b) => (a.doa || '').localeCompare(b.doa || '') || num(a) - num(b));
       for (const c of cases) {
@@ -1591,8 +1593,8 @@ const App = (() => {
     render() {
       const d = otDraft();
       d.selected = d.selected.filter((id) => Store.cases[id]);
-      const pool = inOrder(caseList().filter((c) => !c.otHidden && (OT.showAll || d.selected.includes(c.id) || isActive(c))));
-      const hidden = caseList().filter((c) => c.otHidden && (OT.showAll || isActive(c))).sort(byWard);
+      const pool = inOrder(allCases().filter((c) => !c.otHidden && (OT.showAll || d.selected.includes(c.id) || isActive(c))));
+      const hidden = allCases().filter((c) => c.otHidden && (OT.showAll || isActive(c))).sort(byWard);
       const sel = d.selected.map((id) => ({ id, ...Store.cases[id] }));
       // Selected unit's staff first, then everyone else.
       const unitFirst = [unitOf(d.unitId), ...allUnits().filter((u) => u.id !== d.unitId)];
@@ -1620,13 +1622,15 @@ const App = (() => {
                   return `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}" data-case="${c.id}">
                   <td class="ot-move"><button class="icon" data-omove="-1" ${pi ? '' : 'disabled'} aria-label="Move up" title="Move up">↑</button><button class="icon" data-omove="1" ${pi < pool.length - 1 ? '' : 'disabled'} aria-label="Move down" title="Move down">↓</button></td>
                   <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
-                  <td><b>${esc(c.name)}</b></td><td class="nowrap">${esc(ageSex(c))}</td>
+                  <td><b>${esc(c.name)}</b>${c.otOnly ? '<br><span class="tag task">OT only</span>' : ''}</td><td class="nowrap">${esc(ageSex(c))}</td>
                   <td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
                   <td class="nowrap">${esc(fmtDate(c.doa))}</td>
                   <td><select class="ot-sel" data-f="work.anaes" aria-label="Anaesthesia assessment"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></td>
                   <td><select class="ot-sel" data-f="scheme" aria-label="Scheme status">${schemeOpts(c.scheme)}</select></td>
                   <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
-                  <td><button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button></td>
+                  <td>${c.otOnly
+                    ? `<span class="ot-only-acts"><button class="btn small" data-ot-keep="${c.id}" title="Also put this case in the e-case sheet and ward">+ e-Case sheet</button><button class="btn small hide-btn" data-ot-del="${c.id}" title="Delete this OT-only case">Delete</button></span>`
+                    : `<button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button>`}</td>
                 </tr>`;
                 }).join('') || `<tr><td colspan="11" class="empty">${hidden.length ? 'All cases are hidden — add them back below.' : 'No pre-op cases.'}</td></tr>`}
               </tbody>
@@ -1639,6 +1643,22 @@ const App = (() => {
               <button class="btn small" data-ot-show="${c.id}">Add back</button></li>`).join('')}</ul>
           </details>` : ''}
         </div>
+        <details class="card ot-quick" id="ot-quick"${OT.openQuick ? ' open' : ''}>
+          <summary>+ Add case to OT list only</summary>
+          <p class="muted small">For a case that isn't in your e-case sheet or ward (e.g. from another unit or an emergency). It goes on the OT list only.</p>
+          <form id="ot-quick-form" class="form imp-grid" autocomplete="off">
+            <label class="span2">Name<input name="name" required></label>
+            <label>Age<input name="age" inputmode="numeric"></label>
+            <label>Sex<select name="sex"><option></option><option>M</option><option>F</option></select></label>
+            <label>IP no.<input name="ipNo"></label>
+            <label>Ward<input name="ward"></label>
+            <label class="span2">Diagnosis<textarea name="diagnosis" rows="2" required></textarea></label>
+            <label class="span2">Plan<input name="plan"></label>
+            <label>Anaesthesia<select name="anaes"><option value="">—</option>${opts(PAC_OPTIONS, '')}</select></label>
+            <label>Scheme<select name="scheme">${schemeOpts('')}</select></label>
+            <div class="span2 form-actions"><button class="btn primary">Add to OT list</button></div>
+          </form>
+        </details>
         <div class="form-actions"><a class="btn primary" href="#/ot/list" ${sel.length ? '' : 'aria-disabled="true"'}>Next (${sel.length} selected) →</a></div>`;
       }
       return `
@@ -1726,6 +1746,33 @@ const App = (() => {
       });
 
       const ores = $('#ot-order-reset', el);
+      // Quick add: an OT-only case, ticked straight onto the list.
+      const qd = $('#ot-quick', el);
+      if (qd) qd.ontoggle = () => { OT.openQuick = qd.open; };
+      const qf = $('#ot-quick-form', el);
+      if (qf) {
+        let planTouched = false;
+        qf.elements.plan.addEventListener('input', () => { planTouched = true; });
+        qf.elements.diagnosis.addEventListener('input', () => { if (!planTouched) qf.elements.plan.value = defaultPlanFor(qf.elements.diagnosis.value); });
+        qf.onsubmit = (e) => {
+          e.preventDefault();
+          const v = (k) => qf.elements[k].value.trim();
+          const plan = v('plan').toUpperCase();
+          const diagnosis = v('diagnosis').toUpperCase();
+          const nid = uid();
+          Store.create('cases', nid, {
+            otOnly: true, name: v('name').toUpperCase(), age: v('age'), sex: qf.elements.sex.value, ipNo: v('ipNo'), ward: v('ward').toUpperCase(),
+            diagnosis, plan, doa: todayISO(), status: 'preop', scheme: qf.elements.scheme.value, work: { anaes: qf.elements.anaes.value },
+            implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
+          });
+          const dd = otDraft();
+          dd.selected = [...dd.selected.filter((i) => i !== nid), nid];
+          saveDraft(dd);
+          OT.openQuick = false;
+          toast(`${v('name').toUpperCase()} added to the OT list`);
+          render();
+        };
+      }
       if (ores) ores.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); render(); };
       el.addEventListener('click', (e) => {
         const om = e.target.closest('[data-omove]');
@@ -1734,6 +1781,21 @@ const App = (() => {
           moveCase(om.closest('[data-row]').dataset.row, +om.dataset.omove, shown);
           render();
           return;
+        }
+        const keepB = e.target.closest('[data-ot-keep]');
+        if (keepB) {
+          Store.patch('cases', keepB.dataset.otKeep, { otOnly: false });
+          toast('Now also in the e-case sheet and ward');
+          return render();
+        }
+        const delB = e.target.closest('[data-ot-del]');
+        if (delB) {
+          const cid = delB.dataset.otDel;
+          if (!confirm(`Delete ${Store.cases[cid]?.name || 'this case'} from the OT list?`)) return;
+          d.selected = d.selected.filter((i) => i !== cid);
+          saveDraft(d);
+          Store.remove('cases', cid);
+          return render();
         }
         const hideB = e.target.closest('[data-ot-hide]');
         if (hideB) {
@@ -2202,7 +2264,7 @@ const App = (() => {
       PostOp.to ||= todayISO();
       PostOp.from ||= todayISO(-14);
       const sel = postopSel().filter((id) => Store.cases[id]);
-      const list = caseList().filter(isOperated)
+      const list = allCases().filter(isOperated)
         .filter((c) => PostOp.all || sel.includes(c.id) || !surgeryDate(c) || (surgeryDate(c) >= PostOp.from && surgeryDate(c) <= PostOp.to))
         .sort((a, b) => surgeryDate(b).localeCompare(surgeryDate(a)) || (a.name || '').localeCompare(b.name || ''));
       const cnt = (c, ...ks) => ks.reduce((n, k) => n + caseImages(c.id, k).length, 0);
