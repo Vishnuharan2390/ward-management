@@ -1315,6 +1315,11 @@ const App = (() => {
               <label>Surgeon<input data-bind="surgeon" list="dl-surgeons" value="${esc(c.surgeon)}"></label>
               <label class="span2">Procedure done<textarea data-bind="procedureDone" rows="2">${esc(c.procedureDone)}</textarea></label>
               <label class="span2">Assistant surgeon(s)<input data-bind="assistants" list="dl-pg" value="${esc(c.assistants)}"></label>
+              <details class="span2 opn-wrap"${c.opBuild ? ' open' : ''}>
+                <summary>Op-note builder — choose from the lists and it writes the operative notes</summary>
+                <div id="opn">${opnHTML(c.opBuild || opnDefaults(c))}</div>
+                <div class="form-actions"><button type="button" class="btn primary" id="opn-gen">Write operative notes</button></div>
+              </details>
               <label class="span2">Operative notes<textarea data-bind="opNotes" rows="6">${esc(c.opNotes)}</textarea></label>
               <label class="span2">Implants used <span class="hint">picked up from the operative notes — edit if needed</span>
                 <textarea data-bind="implantsUsed" rows="2">${esc(c.implantsUsed)}</textarea></label>
@@ -1358,6 +1363,53 @@ const App = (() => {
           }
         });
         $('#add-set', el).onclick = () => openLabModal(id);
+        // Op-note builder: every choice is saved on the case (opBuild) and fills what follows.
+        const opnBox = $('#opn', el);
+        const opnState = () => JSON.parse(JSON.stringify(Store.cases[id].opBuild || opnDefaults({ id, ...Store.cases[id] })));
+        const opnSave = (b) => { opnBox.innerHTML = opnHTML(b); Store.patch('cases', id, { opBuild: b }); };
+        if (opnBox) {
+          opnBox.addEventListener('change', (e) => {
+            const t = e.target;
+            const b = opnState();
+            if (t.dataset.ob) {
+              const k = t.dataset.ob;
+              b[k] = t.value;
+              const resets = { cat: ['region', 'bone', 'site'], region: ['bone', 'site'], bone: ['site'] };
+              (resets[k] || []).forEach((r) => { b[r] = ''; });
+              if (k === 'region' && t.value) { const first = Object.keys(opnBones(t.value))[0]; if (first && Object.keys(opnBones(t.value)).length === 1) b.bone = first; }
+              opnSave(opnFill(b, { [k]: true }));
+            } else if (t.dataset.obs !== undefined) {
+              b.screws[+t.dataset.obs][t.dataset.f] = t.value;
+              opnSave(b);
+            }
+          });
+          opnBox.addEventListener('click', (e) => {
+            const add = e.target.closest('[data-obs-add]');
+            const rm = e.target.closest('[data-obs-rm]');
+            if (!add && !rm) return;
+            const b = opnState();
+            b.screws ||= [];
+            if (add) b.screws.push({ type: '', n: '' });
+            else b.screws.splice(+rm.dataset.obsRm, 1);
+            opnSave(b);
+          });
+          $('#opn-gen', el).onclick = () => {
+            document.activeElement?.blur?.();
+            const b = opnState();
+            const text = opNoteText({ ...b, dx: Store.cases[id].diagnosis });
+            if (!text) return toast('Choose the bone, fracture site, approach and implant first', 4000);
+            const ta = $('[data-bind="opNotes"]', el);
+            if (ta.value.trim() && !confirm('Replace the operative notes already typed with the new notes?')) return;
+            ta.value = text;
+            ta.dispatchEvent(new Event('change', { bubbles: true }));
+            const cur = Store.cases[id];
+            const ch = {};
+            if (!hasText(cur.procedureDone)) ch.procedureDone = opProcedureName(b);
+            if (Object.keys(ch).length) Store.patch('cases', id, ch);
+            ta.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            toast('Operative notes written — read through and edit as needed', 4000);
+          };
+        }
         const tp = $('#to-postop', el);
         if (tp) tp.onclick = () => {
           const cur = Store.cases[id];

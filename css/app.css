@@ -1345,3 +1345,19 @@ html, body { overscroll-behavior-x: none; }
 .ot-quick summary { cursor: pointer; font-weight: 700; color: var(--brand); }
 .ot-quick[open] summary { margin-bottom: .5rem; }
 .ot-only-acts { display: inline-flex; gap: .3rem; flex-wrap: wrap; }
+
+/* Op-note builder */
+.opn-wrap { border: 1px solid var(--line); border-radius: var(--rc, 10px); padding: .6rem .7rem; }
+.opn-wrap summary { cursor: pointer; font-weight: 700; color: var(--brand); }
+.opn-wrap[open] summary { margin-bottom: .6rem; }
+.opn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem .6rem; }
+.opn-grid > label { display: flex; flex-direction: column; font-size: .8rem; min-width: 0; }
+.opn-grid .span2 { grid-column: 1 / -1; }
+.opn-grid select, .opn-grid input { width: 100%; min-width: 0; }
+.opn-lab { font-size: .8rem; margin-bottom: .25rem; }
+.opn-screw { display: flex; gap: .35rem; align-items: flex-end; margin-bottom: .35rem; }
+.opn-screw select { flex: 1; min-width: 0; }
+.opn-screw > input { flex: 1; min-width: 0; }
+.opn-n { display: flex; flex-direction: column; font-size: .7rem; width: 4.2rem; }
+.opn-n input { width: 100%; }
+@media (max-width: 520px) { .opn-grid { grid-template-columns: 1fr; } }
