@@ -16,8 +16,18 @@ ALLOWED_NUMBERS = ""
 GRAPH_VERSION = "v21.0"
 CLAUDE_MODEL = "claude-opus-5-5"
 
+# Case intake → the ward app's Firebase (these identify the project; they are not passwords —
+# the same values are in the app's config.js).
+FIREBASE_PROJECT_ID = "ortho-ward-c2e69"
+FIREBASE_API_KEY = "AIzaSyBI8bub3UpXN-fxBzlbWryzBdZigtt88Us"
+FIREBASE_UNIT_ID = "ortho-unit-1"
+# The bot's own sign-in for the ward app (an email on Settings → Team, verified). Password is a secret.
+BOT_EMAIL = ""
+BOT_NAME = "WHATSAPP BOT"
+
 # Secrets (never put these in this file) — set each with `npx wrangler secret put NAME`:
-#   ANTHROPIC_API_KEY   from console.anthropic.com
+#   BOT_PASSWORD        password of the bot's ward-app account (BOT_EMAIL above)
+#   ANTHROPIC_API_KEY   optional — only for the Claude chat part (console.anthropic.com)
 #   WHATSAPP_TOKEN      permanent access token from Meta (System User token)
 #   WHATSAPP_PHONE_ID   the bot number's "Phone number ID" in Meta's WhatsApp → API Setup
 #   APP_SECRET          Meta app → Settings → Basic → App secret (verifies webhooks are really from Meta)

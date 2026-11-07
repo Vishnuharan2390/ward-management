@@ -1,8 +1,13 @@
-// WhatsApp ⇄ Claude bot for the Ortho Unit I team (Govt. Rajaji Hospital, Madurai).
-// Runs as a Cloudflare Worker: Meta's WhatsApp Cloud API posts each incoming message to
-// /webhook, the Worker asks Claude, and sends the answer back on WhatsApp.
+// WhatsApp bot for the Ortho Unit I team (Govt. Rajaji Hospital, Madurai).
+// Runs as a Cloudflare Worker: Meta's WhatsApp Cloud API posts each incoming message to /webhook.
+//  1. Case intake: forward your "Case 10 / Sivagamy 47/F / NMLC/FALL / diagnosis" posts (with their
+//     photos) and the bot saves them as cases in the ward app's Firebase — they appear in the
+//     Admission day PPT and the pre-op ward. "DOA 2/11" sets the admission day for what follows.
+//  2. Anything else goes to Claude (only if ANTHROPIC_API_KEY is set).
 // Only numbers listed in ALLOWED_NUMBERS get answers; everyone else is ignored.
 import Anthropic from '@anthropic-ai/sdk';
+import { parseCaseText, defaultPlanFor, caseKey, admissionDay, parseDoaCommand, STANDARD_TREATMENT } from './caseparse.js';
+import { createDoc, patchDoc, uid } from './firestore.js';
 
 const HISTORY_TURNS = 20; // messages kept per chat (user + assistant)
 const HISTORY_TTL = 12 * 3600; // forget a chat after 12 h of silence
@@ -62,6 +67,28 @@ export async function handle(m, env) {
     return reply(env, from, 'Fresh start — I have forgotten our earlier chat.');
   }
 
+  // ---- case intake (when the ward app's Firebase is configured) ----
+  if (intakeOn(env)) {
+    if (m.type === 'text' && /^\/?help$/i.test(text)) return reply(env, from, HELP);
+    if (m.type === 'text' && /^doa\s*[:\-]?\s*(auto|today)$/i.test(text)) {
+      await env.HISTORY.delete(`doa:${from}`);
+      return reply(env, from, 'OK — admission day is worked out from the time you forward (before 10 AM counts as the previous day).');
+    }
+    const doaCmd = m.type === 'text' && parseDoaCommand(text, new Date().getUTCFullYear());
+    if (doaCmd) {
+      await env.HISTORY.put(`doa:${from}`, doaCmd, { expirationTtl: 14 * 3600 });
+      return reply(env, from, `✓ Cases you forward now go to the *${dmy(doaCmd)}* admission day (for the next 14 hours). Send *DOA AUTO* to go back to automatic.`);
+    }
+    const caption = (m.image?.caption || '').trim();
+    const post = m.type === 'text' ? parseCaseText(text) : m.type === 'image' ? parseCaseText(caption) : null;
+    if (post) return intake(env, m, from, post, m.type === 'image' ? m.image : null);
+    if (m.type === 'image') {
+      const last = await recentCase(env, from);
+      if (last) return addPhoto(env, from, last, m.image, kindFromCaption(caption));
+    }
+    if (!env.ANTHROPIC_API_KEY) return reply(env, from, HELP);
+  }
+
   // Build this turn's content: what Claude sees now, and the lighter copy we keep in history.
   let content;
   let saved;
@@ -90,6 +117,87 @@ export async function handle(m, env) {
   // Keep only text in history (photos are summarised as a note) so later turns stay cheap.
   history.push({ role: 'user', content: saved }, { role: 'assistant', content: answer });
   await env.HISTORY.put(histKey, JSON.stringify(history.slice(-HISTORY_TURNS)), { expirationTtl: HISTORY_TTL });
+}
+
+// ---------------------------------------------------------------- case intake
+const intakeOn = (env) => !!(env.FIREBASE_PROJECT_ID && env.FIREBASE_API_KEY && env.FIREBASE_UNIT_ID && env.BOT_EMAIL && env.BOT_PASSWORD);
+const dmy = (iso) => iso.split('-').reverse().join('/');
+const MAX_IMAGE = 950000; // a Firestore document holds 1 MB; the app keeps images under that too
+
+const HELP = `*Ortho Unit I — case bot*
+Forward your case posts here (photos too):
+_Case 10_
+_Sivagamy 47/F_
+_NMLC/ACCIDENTAL FALL_
+_CLOSED FRACTURE BOTH BONE FOREARM LEFT_
+Each post is saved as a case — it appears in the *Admission day PPT* and the *pre-op ward*.
+
+• A photo sent with the post goes on its X-ray slide. Photos sent just after a post join that case (caption *wound* / *CT* / *MRI* to file them there; otherwise X-ray).
+• Admission day: posts forwarded before 10 AM count for the previous day. To choose it yourself send e.g. *DOA 2/11* (lasts 14 h; *DOA AUTO* to undo).
+• Forwarding the same patient twice won't make a duplicate.`;
+
+const kindFromCaption = (c) => (/\bwound|clinical|pic(ture)?\b/i.test(c) ? 'wound' : /\bct\b/i.test(c) ? 'ct' : /\bmri\b/i.test(c) ? 'mri' : /post[\s-]?op/i.test(c) ? 'poxray' : /post[\s-]?reduction/i.test(c) ? 'prxray' : 'xray');
+const KIND_LABEL = { xray: 'X-ray', wound: 'wound pic', ct: 'CT', mri: 'MRI', poxray: 'post-op X-ray', prxray: 'post-reduction X-ray' };
+
+async function recentCase(env, from) {
+  try { return JSON.parse((await env.HISTORY.get(`last:${from}`)) || 'null'); } catch { return null; }
+}
+
+async function intake(env, m, from, p, image) {
+  const doa = (await env.HISTORY.get(`doa:${from}`)) || admissionDay(m.timestamp || Date.now() / 1000);
+  const who = env.BOT_NAME || 'WhatsApp bot';
+  const dupKey = `ck:${env.FIREBASE_UNIT_ID}:${caseKey(p.name, p.age)}:${doa}`;
+  let id = await env.HISTORY.get(dupKey);
+  const label = `${p.caseNo ? `Case ${p.caseNo} ` : ''}*${p.name}* ${[p.age, p.sex].filter(Boolean).join('/')}`;
+  const last = { id: null, label };
+  try {
+    if (id) {
+      last.id = id;
+      await env.HISTORY.put(`last:${from}`, JSON.stringify(last), { expirationTtl: 20 * 60 });
+      if (image) return addPhoto(env, from, last, image, 'xray');
+      return reply(env, from, `${label} is already in the ${dmy(doa)} admission day — not added again.`);
+    }
+    id = uid();
+    const now = Date.now();
+    const diagnosis = p.diagnosis.toUpperCase();
+    await createDoc(env, 'cases', id, {
+      name: p.name, age: p.age, sex: p.sex, ipNo: p.ipNo, ward: p.ward, mode: p.mode, diagnosis,
+      plan: defaultPlanFor(diagnosis), doa, status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'), writtenBy: '',
+      ...(p.caseNo ? { caseNo: String(p.caseNo) } : {}), source: 'whatsapp-bot',
+      createdAt: now, createdBy: who, updatedAt: now, updatedBy: who,
+    });
+    await env.HISTORY.put(dupKey, id, { expirationTtl: 7 * 86400 });
+    last.id = id;
+    await env.HISTORY.put(`last:${from}`, JSON.stringify(last), { expirationTtl: 20 * 60 });
+    let photo = '';
+    if (image) {
+      const ok = await savePhoto(env, id, image, 'xray', p.caseNo ? `WhatsApp case ${p.caseNo}` : 'WhatsApp').catch((e) => e);
+      photo = ok === true ? ' (1 X-ray)' : ` — photo not saved: ${ok.message}`;
+    }
+    return reply(env, from, `✓ ${label} added to the *${dmy(doa)}* admission day${photo}.`);
+  } catch (err) {
+    console.error('intake failed', err);
+    return reply(env, from, `✗ Couldn't save ${label}: ${err.message}. Add it in the app, or try again in a minute.`);
+  }
+}
+
+async function savePhoto(env, caseId, image, kind, caption) {
+  const { data, mime } = await downloadMedia(env, image.id);
+  const dataUrl = `data:${imageMime(mime)};base64,${data}`;
+  if (dataUrl.length > MAX_IMAGE) throw new Error('too large — add it from the app');
+  const imgId = uid();
+  const now = Date.now();
+  const by = env.BOT_NAME || 'WhatsApp bot';
+  await createDoc(env, 'images', imgId, { id: imgId, caseId, kind, data: dataUrl, caption, at: now, by });
+  await patchDoc(env, 'cases', caseId, { [`images.${imgId}`]: { kind, caption, at: now, by }, updatedAt: now, updatedBy: by });
+  return true;
+}
+
+async function addPhoto(env, from, last, image, kind) {
+  const ok = await savePhoto(env, last.id, image, kind, 'WhatsApp').catch((e) => e);
+  if (ok !== true) return reply(env, from, `✗ Photo for ${last.label} not saved: ${ok.message}`);
+  await env.HISTORY.put(`last:${from}`, JSON.stringify(last), { expirationTtl: 20 * 60 });
+  return reply(env, from, `✓ ${KIND_LABEL[kind] || kind} added to ${last.label}.`);
 }
 
 async function askClaude(env, messages) {

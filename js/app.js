@@ -1961,8 +1961,10 @@ const App = (() => {
     const ids = new Set([...all.filter((c) => c.doa === date).map((c) => c.id), ...cfg.extra.filter((id) => Store.cases[id])]);
     cfg.skip.forEach((id) => ids.delete(id));
     const rank = (id) => { const i = cfg.order.indexOf(id); return i < 0 ? 1e9 : i; };
+    // Cases not placed by hand follow their group case number (Case 10 before 11), then time added.
+    const no = (c) => { const n = parseInt(c.caseNo, 10); return Number.isFinite(n) ? n : 1e9; };
     return [...ids].map((id) => ({ id, ...Store.cases[id] }))
-      .sort((a, b) => rank(a.id) - rank(b.id) || (a.createdAt || 0) - (b.createdAt || 0));
+      .sort((a, b) => rank(a.id) - rank(b.id) || no(a) - no(b) || (a.createdAt || 0) - (b.createdAt || 0));
   }
 
   // Image slides for a case: one slide per image type with the pictures side
