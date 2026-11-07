@@ -70,7 +70,7 @@ const OPN_APPROACHES = {
     'Incision made along the subcutaneous border of the ulna centred over the fracture.',
     'Interval between extensor carpi ulnaris and flexor carpi ulnaris developed.',
     'Periosteum elevated minimally; dorsal branch of the ulnar nerve protected distally.'] },
-  forearmBoth: { label: 'Volar (Henry) approach to radius + subcutaneous approach to ulna', pos: 'SUPINE WITH ARM ON HAND TABLE', tq: true, both: 'one on the volar surface of the radius and one on the subcutaneous border of the ulna', steps: [
+  forearmBoth: { label: 'Volar (Henry) approach to radius + subcutaneous approach to ulna', pos: 'SUPINE WITH ARM ON HAND TABLE', tq: true, both: 'one on the volar surface of the radius and one on the subcutaneous border of the ulna', bothSurfaces: ['volar surface of the radius', 'subcutaneous border of the ulna'], targets: ['Radius', 'Ulna'], steps: [
     'Ulna exposed first through a subcutaneous incision along its border, in the interval between extensor carpi ulnaris and flexor carpi ulnaris, with minimal periosteal stripping.',
     'Radius exposed through a separate volar (Henry) incision from the biceps tendon towards the radial styloid, in the interval between brachioradialis and flexor carpi radialis.',
     'Superficial radial nerve protected under the brachioradialis and the radial artery retracted; supinator detached in supination to protect the posterior interosseous nerve; pronator teres elevated as required.'] },
@@ -169,7 +169,7 @@ const OPN_APPROACHES = {
     'Curvilinear incision made centred over the medial malleolus.',
     'Long saphenous vein and saphenous nerve identified and protected.',
     'Interposed periosteum removed from the fracture site and the joint inspected.'] },
-  ankleBoth: { label: 'Lateral approach to fibula + medial approach to medial malleolus', pos: 'SUPINE', tq: true, steps: [
+  ankleBoth: { label: 'Lateral approach to fibula + medial approach to medial malleolus', pos: 'SUPINE', tq: true, surface: 'lateral surface of the fibula', targets: ['Lateral malleolus', 'Medial malleolus'], steps: [
     'Fibula exposed first through a longitudinal incision along its posterior border, protecting the superficial peroneal nerve anteriorly and the peroneal tendons posteriorly.',
     'Medial malleolus exposed through a curvilinear incision, protecting the long saphenous vein and saphenous nerve; interposed periosteum removed from the fracture site.'] },
   calcSinusTarsi: { label: 'Sinus tarsi approach', pos: 'LATERAL', tq: true, steps: [
@@ -343,8 +343,8 @@ const OPN_TRAUMA = {
     ankle: { label: 'Ankle', sites: {
       lat: S('Lateral malleolus', ['ankleLateral'], ['oneThird', 'fibLcp', 'screwsOnly'], ['3.5MM CORTICAL SCREWS', '4MM CANCELLOUS SCREWS']),
       med: S('Medial malleolus', ['ankleMedial'], ['ccScrews', 'tbw'], ['4MM CANNULATED CANCELLOUS SCREWS']),
-      bimal: S('Bimalleolar', ['ankleBoth'], ['oneThird', 'fibLcp'], ['3.5MM CORTICAL SCREWS', '4MM CANNULATED CANCELLOUS SCREWS']),
-      trimal: S('Trimalleolar', ['ankleBoth'], ['oneThird', 'fibLcp'], ['3.5MM CORTICAL SCREWS', '4MM CANNULATED CANCELLOUS SCREWS']),
+      bimal: S('Bimalleolar', ['ankleBoth'], ['oneThird', 'fibLcp', 'ccScrews', 'tbw'], ['3.5MM CORTICAL SCREWS', '4MM CANNULATED CANCELLOUS SCREWS']),
+      trimal: S('Trimalleolar', ['ankleBoth'], ['oneThird', 'fibLcp', 'ccScrews', 'tbw'], ['3.5MM CORTICAL SCREWS', '4MM CANNULATED CANCELLOUS SCREWS']),
     } },
     calcaneum: { label: 'Calcaneum', sites: {
       jd: S('Joint depression', ['calcSinusTarsi', 'calcExtensile'], ['calcPlate', 'ccScrews'], ['3.5MM LOCKING SCREWS']),
@@ -360,121 +360,183 @@ const opnBones = (region) => OPN_TRAUMA[region]?.bones || {};
 const opnSite = (b) => OPN_TRAUMA[b.region]?.bones[b.bone]?.sites[b.site];
 const opnBoneLabel = (b) => OPN_TRAUMA[b.region]?.bones[b.bone]?.label || '';
 
-// ---- The note
-function opNoteText(b) {
-  const U = (s) => String(s || '').toUpperCase();
-  const side = U(b.side);
-  const site = opnSite(b);
-  const ap = OPN_APPROACHES[b.approach];
-  const imp = b.implant === 'custom' ? { label: b.implantCustom || 'IMPLANT', k: b.customKind || 'plate' } : OPN_IMPLANTS[b.implant];
-  if (!site || !ap || !imp) return '';
-  const boneLabel = opnBoneLabel(b);
-  const boneName = boneLabel.replace(/ & /g, ' AND ').replace(/\s*shaft$/i, '').replace(/^Shaft of /i, '');
-  const fx = String(b.dx || '').trim() || `FRACTURE ${site.label} ${boneLabel} ${side}`;
-  const size = String(b.size || '').trim();
-  const impName = [size, imp.label].filter(Boolean).join(' ');
-  const screws = (b.screws || []).filter((s) => s.type && s.type !== '').map((s) => `${s.n ? s.n + ' X ' : ''}${s.type === 'custom' ? s.custom : s.type}`.trim()).filter(Boolean);
-  const screwText = screws.length ? screws.join(', ') : '';
-  const closed = !!ap.closed;
+// ---- The note (one sitting: shared anaesthesia, one or more procedures, each with one or more implants)
+// Model: { v: 2, cat, anaes, procs: [ { region, bone, site, side, position, tourniquet, approach, drain, slab,
+//          implants: [ { implant, implantCustom, size, screws: [ { type, n, custom } ] } ] } ] }
 
-  // procedure name
-  let procedure;
-  if (imp.k === 'hemi') procedure = `${imp.label.replace(/\s*(hemiarthroplasty\s*)?prosthesis$/i, '')} HEMIARTHROPLASTY ${side} HIP${size ? ` (${size})` : ''}`;
-  else if (imp.k === 'exfix') procedure = `${impName} APPLICATION ${side} ${boneName}`;
-  else if (imp.k === 'excision') procedure = `RADIAL HEAD EXCISION ${side}`;
-  else if (imp.k === 'patellectomy') procedure = `PARTIAL PATELLECTOMY WITH TENDON REPAIR ${side}`;
-  else procedure = `${closed ? 'CLOSED' : 'OPEN'} REDUCTION AND INTERNAL FIXATION WITH ${impName} ${side} ${boneName}`;
+// Older saves were one flat procedure.
+function opnNormalize(b) {
+  if (!b) return null;
+  if (b.procs) return b;
+  return {
+    v: 2, cat: b.cat || 'trauma', anaes: b.anaes || '',
+    procs: [{
+      region: b.region || '', bone: b.bone || '', site: b.site || '', side: b.side || '', position: b.position || '', tourniquet: b.tourniquet || 'no',
+      approach: b.approach || '', drain: b.drain || 'no', slab: b.slab || 'NONE',
+      implants: [{ implant: b.implant || '', implantCustom: b.implantCustom || '', size: b.size || '', screws: b.screws || [] }],
+    }],
+  };
+}
+
+const opnImp = (i) => (i.implant === 'custom' ? { label: i.implantCustom || 'IMPLANT', k: 'plate' } : OPN_IMPLANTS[i.implant]);
+const opnScrewList = (i) => (i.screws || []).filter((s) => s.type).map((s) => `${s.n ? s.n + ' X ' : ''}${s.type === 'custom' ? (s.custom || '') : s.type}`.trim()).filter(Boolean);
+const opnImpName = (i) => [String(i.size || '').trim(), opnImp(i)?.label].filter(Boolean).join(' ');
+
+// One procedure → its name, implant list and the body lines.
+function opnProc(p) {
+  const U = (s) => String(s || '').toUpperCase();
+  const site = opnSite(p);
+  const ap = OPN_APPROACHES[p.approach];
+  const imps = (p.implants || []).filter((i) => opnImp(i));
+  if (!site || !ap || !imps.length) return null;
+  const side = U(p.side);
+  const boneName = opnBoneLabel(p).replace(/ & /g, ' AND ').replace(/\s*shaft$/i, '').replace(/^Shaft of /i, '');
+  const kinds = imps.map((i) => opnImp(i).k);
+  const names = imps.map(opnImpName);
+
+  let name;
+  const first = imps[0];
+  if (kinds[0] === 'hemi') name = `${opnImp(first).label.replace(/\s*(hemiarthroplasty\s*)?prosthesis$/i, '')} HEMIARTHROPLASTY ${side} HIP${first.size ? ` (${String(first.size).trim()})` : ''}`;
+  else if (kinds.every((k) => k === 'exfix')) name = `${names.join(' AND ')} APPLICATION ${side} ${boneName}`;
+  else if (kinds[0] === 'excision') name = `RADIAL HEAD EXCISION ${side}`;
+  else if (kinds[0] === 'patellectomy') name = `PARTIAL PATELLECTOMY WITH TENDON REPAIR ${side}`;
+  else name = `${ap.closed ? 'CLOSED' : 'OPEN'} REDUCTION AND INTERNAL FIXATION WITH ${names.join(' AND ')} ${side} ${boneName}`;
 
   const L = [];
-  L.push(`DIAGNOSIS: ${U(fx)}`.replace(/\s+/g, ' '));
-  L.push(`PROCEDURE: ${U(procedure)}`.replace(/\s+/g, ' '));
-  L.push(`ANAESTHESIA: ${U(b.anaes)}`);
-  L.push(`POSITION: ${U(b.position)}`);
-  L.push(`IMPLANTS: ${[impName, ...screws].join('; ')}`);
-  L.push('');
-  const pre = [`Under ${U(b.anaes).toLowerCase()}, patient positioned ${U(b.position).toLowerCase()}${/TABLE|BOLSTER/.test(U(b.position)) ? '' : ' on a radiolucent table'}.`,
-    'Parts painted with povidone iodine and draped under strict aseptic precautions.',
-    b.tourniquet === 'yes' ? 'Tourniquet applied and inflated after exsanguination.' : ''].filter(Boolean).join(' ');
-  L.push(pre);
   if (!ap.closed) L.push(`${ap.label}:`);
   ap.steps.forEach((s) => L.push(s));
-
-  // reduction + fixation
-  const scr = screwText ? ` and fixed with ${screwText}` : '';
   const openReduce = 'Fracture haematoma evacuated and the fracture ends cleaned of interposed soft tissue and freshened. Fracture reduced anatomically under direct vision and held temporarily with reduction clamps / K-wires.';
-  switch (imp.k) {
-    case 'plate':
-      L.push(openReduce);
-      if (ap.both) L.push(`Two ${impName}s were contoured as required and applied, ${ap.both}${scr}.`);
-      else L.push(`A ${impName} was contoured as required and applied on the ${ap.surface || imp.surface || 'appropriate'} surface${scr}.`);
-      break;
-    case 'mipo':
-      L.push(`A ${impName} was slid through the submuscular tunnel along the ${imp.surface || ''} surface, position checked under C-arm${scr}, using stab incisions for the screws.`);
-      break;
-    case 'nail': {
-      const bone = imp.bone || 'bone';
-      L.push(`Guide wire passed across the fracture site into the distal fragment after closed reduction and confirmed under C-arm. Sequential reaming done.`);
-      L.push(`${impName} inserted over the guide wire and the fracture reduction maintained. Proximal locking done using the jig and distal locking done by free-hand technique under C-arm${screwText ? `, using ${screwText}` : ''}.`);
-      L.push(`Nail position and ${bone} length / rotation checked.`);
-      break;
+  let reduced = false;
+  const reduce = (txt = openReduce) => { if (!reduced) { L.push(txt); reduced = true; } };
+  const plates = imps.filter((i) => ['plate'].includes(opnImp(i).k));
+  let plateNo = 0;
+
+  imps.forEach((i) => {
+    const imp = opnImp(i);
+    const impName = opnImpName(i);
+    const size = String(i.size || '').trim();
+    const sl = opnScrewList(i);
+    const screwText = sl.join(', ');
+    const scr = screwText ? ` and fixed with ${screwText}` : '';
+    switch (imp.k) {
+      case 'plate': {
+        reduce();
+        if (ap.both && plates.length === 1) L.push(`Two ${impName}s were contoured as required and applied, ${ap.both}${scr}.`);
+        else {
+          const surface = (ap.bothSurfaces && ap.bothSurfaces[plateNo]) || ap.surface || imp.surface || 'appropriate';
+          L.push(`A ${impName} was contoured as required and applied on the ${surface}${/surface|border/.test(surface) ? '' : ' surface'}${scr}.`);
+        }
+        plateNo++;
+        break;
+      }
+      case 'mipo':
+        L.push(`A ${impName} was slid through the submuscular tunnel along the ${imp.surface || ''} surface, position checked under C-arm${scr}, using stab incisions for the screws.`);
+        break;
+      case 'nail':
+        L.push('Guide wire passed across the fracture site into the distal fragment after closed reduction and confirmed under C-arm. Sequential reaming done.');
+        L.push(`${impName} inserted over the guide wire and the fracture reduction maintained. Proximal locking done using the jig and distal locking done by free-hand technique under C-arm${screwText ? `, using ${screwText}` : ''}.`);
+        L.push(`Nail position and ${imp.bone || 'bone'} length / rotation checked.`);
+        break;
+      case 'tens':
+        L.push(`Entry points made with an awl through small incisions and ${impName} pre-bent and passed across the fracture site under C-arm guidance; ends cut and bent outside the bone.`);
+        break;
+      case 'pfn':
+        L.push('Entry made at the tip of the greater trochanter with an awl under C-arm; guide wire passed into the femoral canal across the fracture.');
+        L.push(`Proximal femur opened with the entry reamer and the ${impName} inserted with the jig. Guide wires for the neck screws placed centre-inferior on AP and central on lateral view; lag screw and anti-rotation screw inserted after measurement.`);
+        L.push(`Distal locking done${screwText ? ` with ${screwText}` : ''} through the jig.`);
+        break;
+      case 'dhs':
+        L.push('Guide wire inserted at 135 degrees from the lateral cortex into the femoral head, centre-centre on AP and lateral views with tip-apex distance less than 25mm; length measured.');
+        L.push(`Triple reaming done and the lag screw inserted; ${impName} applied and fixed to the femoral shaft${screwText ? ` with ${screwText}` : ''}. Compression screw applied.`);
+        break;
+      case 'ccNeck':
+        L.push(`Three guide wires passed parallel in an inverted triangle configuration along the calcar and posterior cortex under C-arm; ${screwText || '6.5MM CANNULATED CANCELLOUS SCREWS'} inserted after measurement with threads crossing the fracture.`);
+        break;
+      case 'screws':
+        if (!ap.closed) reduce();
+        L.push(`${(ap.targets && ap.targets[imps.indexOf(i)]) || 'Fracture'} fixed with ${screwText || impName} with compression across the fracture site.`);
+        break;
+      case 'tbw':
+        reduce(openReduce.replace('reduction clamps / K-wires', 'a reduction clamp'));
+        L.push(`${imp.label === 'Cannulated screws + tension band' ? 'Two cannulated screws inserted across the fracture and an 18G SS wire passed through them' : 'Two parallel K-wires passed across the fracture and an 18G SS wire passed deep to the K-wires'} in a figure-of-eight fashion and tightened, converting tensile into compressive forces. K-wire ends bent and buried.`);
+        break;
+      case 'kwire':
+        L.push(`Fixed with ${screwText || 'K-wires'}; wires bent and cut outside the skin / buried as appropriate.`);
+        break;
+      case 'exfix':
+        L.push(`Two pins inserted in each main fragment and the ${impName} assembled with clamps and rods after achieving reduction${screwText ? ` (${screwText})` : ''}.`);
+        break;
+      case 'hemi':
+        L.push('Femoral head removed with a corkscrew and its size measured. Neck osteotomy done 1-1.5cm above the lesser trochanter.');
+        L.push(`Femoral canal prepared with box chisel and rasps, and ${impName}${size ? '' : ' of appropriate size'} inserted with appropriate anteversion; hip reduced and found stable through range of motion.`);
+        L.push('Capsule and short external rotators repaired.');
+        break;
+      case 'excision':
+        L.push('Fragments of the radial head removed and the neck smoothened at the level of the annular ligament; elbow and forearm rotation checked for stability.');
+        break;
+      case 'patellectomy':
+        L.push('Comminuted pole fragments excised; patellar tendon reattached to the remaining patella through drill holes with non-absorbable sutures.');
+        break;
+      default:
+        reduce();
+        L.push(`Fixed with ${impName}${scr}.`);
     }
-    case 'tens':
-      L.push(`Entry points made with an awl through small incisions and ${impName} pre-bent and passed across the fracture site under C-arm guidance; ends cut and bent outside the bone.`);
-      break;
-    case 'pfn':
-      L.push('Entry made at the tip of the greater trochanter with an awl under C-arm; guide wire passed into the femoral canal across the fracture.');
-      L.push(`Proximal femur opened with the entry reamer and the ${impName} inserted with the jig. Guide wires for the neck screws placed centre-inferior on AP and central on lateral view; lag screw and anti-rotation screw inserted after measurement.`);
-      L.push(`Distal locking done${screwText ? ` with ${screwText}` : ''} through the jig.`);
-      break;
-    case 'dhs':
-      L.push('Guide wire inserted at 135 degrees from the lateral cortex into the femoral head, centre-centre on AP and lateral views with tip-apex distance less than 25mm; length measured.');
-      L.push(`Triple reaming done and the lag screw inserted; ${impName} applied and fixed to the femoral shaft${screwText ? ` with ${screwText}` : ''}. Compression screw applied.`);
-      break;
-    case 'ccNeck':
-      L.push(`Three guide wires passed parallel in an inverted triangle configuration along the calcar and posterior cortex under C-arm; ${screwText || '6.5MM CANNULATED CANCELLOUS SCREWS'} inserted after measurement with threads crossing the fracture.`);
-      break;
-    case 'screws':
-      if (!ap.closed) L.push(openReduce);
-      L.push(`Fracture fixed with ${screwText || impName} with compression across the fracture site.`);
-      break;
-    case 'tbw':
-      L.push(openReduce.replace('reduction clamps / K-wires', 'a reduction clamp'));
-      L.push(`${imp.label === 'Cannulated screws + tension band' ? 'Two cannulated screws inserted across the fracture and an 18G SS wire passed through them' : 'Two parallel K-wires passed across the fracture and an 18G SS wire passed deep to the K-wires'} in a figure-of-eight fashion and tightened, converting tensile into compressive forces. K-wire ends bent and buried.`);
-      break;
-    case 'kwire':
-      L.push(`Fracture fixed with ${screwText || 'K-wires'}; wires bent and cut outside the skin / buried as appropriate.`);
-      break;
-    case 'exfix':
-      L.push(`Two pins inserted in each main fragment and the ${impName} assembled with clamps and rods after achieving reduction${screwText ? ` (${screwText})` : ''}.`);
-      break;
-    case 'hemi':
-      L.push('Femoral head removed with a corkscrew and its size measured. Neck osteotomy done 1-1.5cm above the lesser trochanter.');
-      L.push(`Femoral canal prepared with box chisel and rasps, and ${impName}${size ? '' : ' of appropriate size'} inserted with appropriate anteversion; hip reduced and found stable through range of motion.`);
-      L.push('Capsule and short external rotators repaired.');
-      break;
-    case 'excision':
-      L.push('Fragments of the radial head removed and the neck smoothened at the level of the annular ligament; elbow and forearm rotation checked for stability.');
-      break;
-    case 'patellectomy':
-      L.push('Comminuted pole fragments excised; patellar tendon reattached to the remaining patella through drill holes with non-absorbable sutures.');
-      break;
-    default:
-      L.push(openReduce);
-      L.push(`Fixed with ${impName}${scr}.`);
-  }
-  if (b.approach === 'humDistPost') L.push('Olecranon osteotomy reduced and fixed with tension band wiring.');
+  });
+  if (p.approach === 'humDistPost') L.push('Olecranon osteotomy reduced and fixed with tension band wiring.');
   L.push('Reduction and implant position confirmed under C-arm in AP and lateral views.');
-  if (b.tourniquet === 'yes') L.push('Tourniquet released and haemostasis achieved.');
+  if (p.tourniquet === 'yes') L.push('Tourniquet released and haemostasis achieved.');
   L.push('Thorough wound wash given with normal saline. Haemostasis achieved.');
-  if (b.drain === 'yes') L.push('Drain placed.');
-  L.push(imp.k === 'exfix' || ap.closed ? 'Incisions closed and sterile dressing applied.' : 'Wound closed in layers with absorbable sutures and skin closed with ethilon / staples. Sterile dressing applied.');
-  if (b.slab && b.slab !== 'NONE') L.push(`${U(b.slab).toLowerCase()} applied.`);
+  if (p.drain === 'yes') L.push('Drain placed.');
+  L.push(kinds.every((k) => k === 'exfix') || ap.closed ? 'Incisions closed and sterile dressing applied.' : 'Wound closed in layers with absorbable sutures and skin closed with ethilon / staples. Sterile dressing applied.');
+  if (p.slab && p.slab !== 'NONE') L.push(`${U(p.slab).toLowerCase()} applied.`);
+  const implantsAll = imps.flatMap((i) => (opnImp(i).k === 'screws' && opnScrewList(i).length ? opnScrewList(i) : [opnImpName(i), ...opnScrewList(i)]));
+  return { name, lines: L, implants: implantsAll };
+}
+
+function opNoteText(raw) {
+  const b = opnNormalize(raw);
+  if (!b) return '';
+  const U = (s) => String(s || '').toUpperCase();
+  const parts = b.procs.map((p) => ({ p, r: opnProc(p) })).filter((x) => x.r);
+  if (!parts.length) return '';
+  const fx = String(raw.dx || '').trim() || parts.map(({ p }) => `FRACTURE ${opnSite(p).label} ${opnBoneLabel(p)} ${U(p.side)}`).join(' + ');
+  const multi = parts.length > 1;
+  const positions = [...new Set(parts.map(({ p }) => U(p.position)).filter(Boolean))];
+  const L = [];
+  L.push(`DIAGNOSIS: ${U(fx)}`.replace(/\s+/g, ' '));
+  if (multi) { L.push('PROCEDURE:'); parts.forEach(({ r }, i) => L.push(`${i + 1}. ${U(r.name)}`.replace(/\s+/g, ' '))); } else L.push(`PROCEDURE: ${U(parts[0].r.name)}`.replace(/\s+/g, ' '));
+  L.push(`ANAESTHESIA: ${U(b.anaes)}`);
+  L.push(`POSITION: ${positions.join(' / ')}`);
+  L.push(`IMPLANTS: ${parts.flatMap(({ r }) => r.implants).join('; ')}`);
+  L.push('');
+  parts.forEach(({ p, r }, i) => {
+    const pos = U(p.position);
+    if (i === 0) {
+      L.push([`Under ${U(b.anaes).toLowerCase()}, patient positioned ${pos.toLowerCase()}${/TABLE|BOLSTER/.test(pos) ? '' : ' on a radiolucent table'}.`,
+        'Parts painted with povidone iodine and draped under strict aseptic precautions.',
+        p.tourniquet === 'yes' ? 'Tourniquet applied and inflated after exsanguination.' : ''].filter(Boolean).join(' '));
+    }
+    if (multi) {
+      L.push('');
+      L.push(`PROCEDURE ${i + 1}: ${U(r.name)}`);
+      if (i > 0) {
+        const prev = U(parts[i - 1].p.position);
+        L.push([pos !== prev ? `Patient repositioned ${pos.toLowerCase()}; parts painted and draped again.` : 'Parts painted and draped for the next procedure.',
+          p.tourniquet === 'yes' ? 'Tourniquet applied and inflated after exsanguination.' : ''].filter(Boolean).join(' '));
+      }
+    }
+    r.lines.forEach((l) => L.push(l));
+  });
+  if (multi) L.push('');
   L.push('Distal neurovascular status checked and found intact.');
   L.push('Patient shifted to the post-operative ward in stable condition.');
   return L.join('\n').toUpperCase();
 }
 
-const opProcedureName = (b) => (opNoteText(b).split('\n').find((l) => l.startsWith('PROCEDURE:')) || '').replace('PROCEDURE: ', '');
+const opProcedureName = (raw) => {
+  const b = opnNormalize(raw);
+  return (b?.procs || []).map(opnProc).filter(Boolean).map((r) => r.name.toUpperCase()).join(' + ');
+};
 
 
 // ---- Builder state and HTML (case page → Operative details)
@@ -513,63 +575,158 @@ const OPN_GUESS = [
   [/CALCANE/, 'lower', 'calcaneum', () => 'jd'],
 ];
 
+// A new procedure: the next fracture named in the diagnosis that no procedure covers yet, with the
+// side written next to it ("…FEMUR RIGHT WITH … ANKLE LEFT").
+function opnNewProc(c, prev, used = []) {
+  const d = String(c?.diagnosis || '').toUpperCase();
+  const sideIn = (t) => (/\b(LEFT|LT)\b/.test(t) ? 'LEFT' : /\b(RIGHT|RT)\b/.test(t) ? 'RIGHT' : '');
+  const p = { side: '', tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [] };
+  const hits = OPN_GUESS.map(([re, region, bone, siteOf]) => { const m = re.exec(d); return m && { at: m.index, region, bone, site: siteOf(d) }; })
+    .filter(Boolean).sort((a, b) => a.at - b.at);
+  const g = hits.find((h) => !used.includes(h.bone));
+  if (g) {
+    Object.assign(p, { region: g.region, bone: g.bone, site: g.site });
+    const seg = d.slice(g.at).split(/\bWITH\b|\+|,|;|\bAND\b/)[0];
+    p.side = sideIn(seg) || sideIn(d);
+  } else {
+    p.region = prev?.region || '';
+    p.side = prev?.side || sideIn(d);
+  }
+  return opnFill(p, {});
+}
+
 function opnDefaults(c) {
-  const d = String(c.diagnosis || '').toUpperCase();
-  const b = { cat: 'trauma', side: /\b(LEFT|LT)\b/.test(d) ? 'LEFT' : /\b(RIGHT|RT)\b/.test(d) ? 'RIGHT' : '', tourniquet: 'no', drain: 'no', slab: 'NONE', screws: [] };
-  const g = OPN_GUESS.find(([re]) => re.test(d));
-  if (g) { b.region = g[1]; b.bone = g[2]; b.site = g[3](d); }
-  return opnFill(b, {});
+  const p = opnNewProc(c);
+  return { v: 2, cat: 'trauma', anaes: p.region ? OPN_TRAUMA[p.region].anaes : '', procs: [p] };
 }
 
-// Fill whatever follows from what was just chosen (only where it isn't set yet).
-function opnFill(b, changed) {
-  const site = opnSite(b);
-  if (b.region && (changed.region || !b.anaes)) b.anaes = OPN_TRAUMA[b.region].anaes;
+const opnNewImp = (site, k) => ({ implant: k || '', implantCustom: '', size: '', screws: (site?.sc || []).map((t) => ({ type: t, n: '' })) });
+
+// Fill whatever follows from what was just chosen in a procedure.
+function opnFill(p, changed) {
+  const site = opnSite(p);
+  const big = changed.site || changed.bone || changed.region;
   if (site) {
-    if (changed.site || changed.bone || changed.region || !site.ap.includes(b.approach)) b.approach = site.ap[0];
-    if (changed.site || changed.bone || changed.region || !(site.im.includes(b.implant) || b.implant === 'custom')) b.implant = site.im[0];
-    if (changed.site || changed.bone || changed.region || !b.screws?.length) b.screws = site.sc.map((t) => ({ type: t, n: '' }));
+    if (big || !site.ap.includes(p.approach)) p.approach = site.ap[0];
+    if (big || !p.implants?.length) p.implants = [opnNewImp(site, site.im[0])];
+  } else if (big) {
+    p.approach = '';
+    p.implants = [];
   }
-  const ap = OPN_APPROACHES[b.approach];
-  if (ap && (changed.approach || changed.site || changed.bone || changed.region || !b.position)) {
-    b.position = ap.pos;
-    b.tourniquet = ap.tq ? 'yes' : 'no';
+  const ap = OPN_APPROACHES[p.approach];
+  if (ap && (changed.approach || big || !p.position)) {
+    p.position = ap.pos;
+    p.tourniquet = ap.tq ? 'yes' : 'no';
   }
-  return b;
+  return p;
 }
 
-function opnHTML(b) {
-  const o = (list, sel, blank = true) => (blank ? '<option value="">—</option>' : '') + list.map(([v, l]) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(l)}</option>`).join('');
-  const pairs = (arr) => arr.map((x) => [x, x]);
-  const sel = (key, label, list, cls = '') => `<label class="${cls}">${label}<select data-ob="${key}">${o(list, b[key] || '')}</select></label>`;
-  if (b.cat && !OPN_READY.includes(b.cat)) {
-    return `<div class="opn-grid">${sel('cat', 'Category', OPN_CATEGORIES)}<p class="muted small span2">Only trauma is ready for now — the others are coming.</p></div>`;
+// A change in the builder → the model. Returns true when something changed.
+function opnApplyChange(B, t) {
+  const d = t.dataset;
+  if (d.ob) {
+    B[d.ob] = t.value;
+    return true;
   }
-  const site = opnSite(b);
-  const bones = Object.entries(opnBones(b.region)).map(([k, v]) => [k, v.label]);
-  const sites = b.bone ? Object.entries(OPN_TRAUMA[b.region].bones[b.bone].sites).map(([k, v]) => [k, v.label]) : [];
-  const aps = site ? site.ap.map((k) => [k, OPN_APPROACHES[k].label]) : [];
-  const ims = site ? [...site.im.map((k) => [k, OPN_IMPLANTS[k].label]), ['custom', 'Custom…']] : [];
-  const screwRows = (b.screws || []).map((s, i) => `<div class="opn-screw">
-      <select data-obs="${i}" data-f="type" aria-label="Screw type">${o([...pairs(OPN_SCREWS), ['custom', 'Custom…']], s.type || '')}</select>
-      ${s.type === 'custom' ? `<input data-obs="${i}" data-f="custom" value="${esc(s.custom || '')}" aria-label="Custom screw / wire">` : ''}
-      <label class="opn-n">No.<input data-obs="${i}" data-f="n" inputmode="numeric" value="${esc(s.n || '')}"></label>
-      <button type="button" class="icon" data-obs-rm="${i}" title="Remove">✕</button></div>`).join('');
-  return `<div class="opn-grid">
-      ${sel('cat', 'Category', OPN_CATEGORIES)}
-      ${sel('region', 'Region', Object.entries(OPN_TRAUMA).map(([k, v]) => [k, v.label]))}
-      ${sel('bone', 'Bone', bones)}
-      ${sel('site', 'Fracture site', sites)}
-      ${sel('side', 'Side', pairs(['LEFT', 'RIGHT']))}
-      ${sel('anaes', 'Anaesthesia', pairs(OPN_ANAES))}
-      ${sel('position', 'Position', pairs(OPN_POSITIONS))}
-      ${sel('tourniquet', 'Tourniquet', [['yes', 'Used'], ['no', 'Not used']])}
-      ${sel('approach', 'Approach', aps, 'span2')}
-      ${sel('implant', 'Implant', ims, 'span2')}
-      ${b.implant === 'custom' ? `<label class="span2">Custom implant<input data-ob="implantCustom" value="${esc(b.implantCustom || '')}"></label>` : ''}
-      <label class="span2">Implant size / details (e.g. 8 HOLED, 9 X 250MM)<input data-ob="size" value="${esc(b.size || '')}"></label>
-      <div class="span2"><div class="opn-lab">Screws / wires</div>${screwRows}<button type="button" class="btn small" data-obs-add>+ Add screw / wire</button></div>
-      ${sel('drain', 'Drain', [['yes', 'Placed'], ['no', 'No drain']])}
-      ${sel('slab', 'Slab / splint', pairs(OPN_SLABS))}
+  const p = B.procs[+d.p];
+  if (!p) return false;
+  if (d.pf) {
+    const k = d.pf;
+    p[k] = t.value;
+    ({ region: ['bone', 'site'], bone: ['site'] }[k] || []).forEach((r) => { p[r] = ''; });
+    if (k === 'region' && t.value && !B.anaes) B.anaes = OPN_TRAUMA[t.value].anaes;
+    opnFill(p, { [k]: true });
+    return true;
+  }
+  const imp = p.implants[+d.i];
+  if (!imp) return false;
+  if (d.if) {
+    imp[d.if] = t.value;
+    if (d.if === 'implant' && t.value && t.value !== 'custom' && !imp.screws.some((s) => s.n)) imp.screws = (opnSite(p)?.sc || []).map((x) => ({ type: x, n: '' }));
+    return true;
+  }
+  if (d.sf) {
+    imp.screws[+d.s][d.sf] = t.value;
+    return true;
+  }
+  return false;
+}
+
+// A button in the builder → the model.
+function opnApplyClick(B, el, c) {
+  const d = el.dataset;
+  if (d.addProc !== undefined) { B.procs.push(opnNewProc(c, B.procs.at(-1), B.procs.map((x) => x.bone))); return true; }
+  if (d.rmProc !== undefined) { B.procs.splice(+d.rmProc, 1); if (!B.procs.length) B.procs.push(opnNewProc(c)); return true; }
+  const p = B.procs[+d.p];
+  if (!p) return false;
+  if (d.addImp !== undefined) { const site = opnSite(p); p.implants.push(opnNewImp(site, '')); return true; }
+  if (d.rmImp !== undefined) { p.implants.splice(+d.i, 1); return true; }
+  const imp = p.implants[+d.i];
+  if (!imp) return false;
+  if (d.addScr !== undefined) { imp.screws.push({ type: '', n: '' }); return true; }
+  if (d.rmScr !== undefined) { imp.screws.splice(+d.s, 1); return true; }
+  return false;
+}
+
+function opnHTML(raw) {
+  const B = opnNormalize(raw);
+  const o = (list, sel) => '<option value="">—</option>' + list.map(([v, l]) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(l)}</option>`).join('');
+  const pairs = (arr) => arr.map((x) => [x, x]);
+  const top = `<div class="opn-grid">
+      <label>Category<select data-ob="cat">${o(OPN_CATEGORIES, B.cat || '')}</select></label>
+      <label>Anaesthesia<select data-ob="anaes">${o(pairs(OPN_ANAES), B.anaes || '')}</select></label></div>`;
+  if (B.cat && !OPN_READY.includes(B.cat)) return top + '<p class="muted small">Only trauma is ready for now — the others are coming.</p>';
+  const procHTML = (p, pi) => {
+    const site = opnSite(p);
+    const at = `data-p="${pi}"`;
+    const sel = (k, label, list, cls = '') => `<label class="${cls}">${label}<select ${at} data-pf="${k}">${o(list, p[k] || '')}</select></label>`;
+    const bones = Object.entries(opnBones(p.region)).map(([k, v]) => [k, v.label]);
+    const sites = p.bone ? Object.entries(OPN_TRAUMA[p.region].bones[p.bone].sites).map(([k, v]) => [k, v.label]) : [];
+    const aps = site ? site.ap.map((k) => [k, OPN_APPROACHES[k].label]) : [];
+    // usual implants for this fracture first, then every other implant, then custom
+    const impOptions = (cur) => {
+      const opt = (k, l) => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(l)}</option>`;
+      const usual = site ? site.im : [];
+      const rest = Object.keys(OPN_IMPLANTS).filter((k) => !usual.includes(k));
+      return '<option value="">—</option>'
+        + (usual.length ? `<optgroup label="Usual for this fracture">${usual.map((k) => opt(k, OPN_IMPLANTS[k].label)).join('')}</optgroup>` : '')
+        + `<optgroup label="Other implants">${rest.map((k) => opt(k, OPN_IMPLANTS[k].label)).join('')}</optgroup>`
+        + `<optgroup label="Other">${opt('custom', 'Custom…')}</optgroup>`;
+    };
+    const impHTML = (imp, ii) => {
+      const ia = `${at} data-i="${ii}"`;
+      const screws = (imp.screws || []).map((s, si) => `<div class="opn-screw">
+          <select ${ia} data-s="${si}" data-sf="type" aria-label="Screw / wire">${o([...pairs(OPN_SCREWS), ['custom', 'Custom…']], s.type || '')}</select>
+          ${s.type === 'custom' ? `<input ${ia} data-s="${si}" data-sf="custom" value="${esc(s.custom || '')}" aria-label="Custom screw / wire">` : ''}
+          <label class="opn-n">No.<input ${ia} data-s="${si}" data-sf="n" inputmode="numeric" value="${esc(s.n || '')}"></label>
+          <button type="button" class="icon" ${ia} data-s="${si}" data-rm-scr title="Remove">✕</button></div>`).join('');
+      return `<div class="opn-imp">
+          <div class="opn-imp-head"><b>Implant ${ii + 1}</b>${p.implants.length > 1 ? `<button type="button" class="link small" ${ia} data-rm-imp>Remove implant</button>` : ''}</div>
+          <div class="opn-grid">
+            <label class="span2">Implant<select ${ia} data-if="implant">${impOptions(imp.implant || '')}</select></label>
+            ${imp.implant === 'custom' ? `<label class="span2">Custom implant<input ${ia} data-if="implantCustom" value="${esc(imp.implantCustom || '')}"></label>` : ''}
+            <label class="span2">Size / details (e.g. 8 HOLED, 9 X 250MM)<input ${ia} data-if="size" value="${esc(imp.size || '')}"></label>
+            <div class="span2"><div class="opn-lab">Screws / wires for this implant</div>${screws}<button type="button" class="btn small" ${ia} data-add-scr>+ Add screw / wire</button></div>
+          </div></div>`;
+    };
+    return `<div class="opn-proc">
+      <div class="opn-proc-head"><b>Procedure ${pi + 1}</b>${B.procs.length > 1 ? `<button type="button" class="link small" data-rm-proc="${pi}">Remove procedure</button>` : ''}</div>
+      <div class="opn-grid">
+        ${sel('region', 'Region', Object.entries(OPN_TRAUMA).map(([k, v]) => [k, v.label]))}
+        ${sel('bone', 'Bone', bones)}
+        ${sel('site', 'Fracture site', sites)}
+        ${sel('side', 'Side', pairs(['LEFT', 'RIGHT']))}
+        ${sel('position', 'Position', pairs(OPN_POSITIONS))}
+        ${sel('tourniquet', 'Tourniquet', [['yes', 'Used'], ['no', 'Not used']])}
+        ${sel('approach', 'Approach', aps, 'span2')}
+      </div>
+      ${(p.implants || []).map(impHTML).join('')}
+      <button type="button" class="btn small" ${at} data-add-imp>+ Add implant</button>
+      <div class="opn-grid opn-end">
+        ${sel('drain', 'Drain', [['yes', 'Placed'], ['no', 'No drain']])}
+        ${sel('slab', 'Slab / splint', pairs(OPN_SLABS))}
+      </div>
     </div>`;
+  };
+  return top + B.procs.map(procHTML).join('') + '<button type="button" class="btn small primary opn-add-proc" data-add-proc>+ Add procedure</button>';
 }

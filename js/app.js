@@ -1365,33 +1365,18 @@ const App = (() => {
         $('#add-set', el).onclick = () => openLabModal(id);
         // Op-note builder: every choice is saved on the case (opBuild) and fills what follows.
         const opnBox = $('#opn', el);
-        const opnState = () => JSON.parse(JSON.stringify(Store.cases[id].opBuild || opnDefaults({ id, ...Store.cases[id] })));
+        const opnState = () => JSON.parse(JSON.stringify(opnNormalize(Store.cases[id].opBuild) || opnDefaults({ id, ...Store.cases[id] })));
         const opnSave = (b) => { opnBox.innerHTML = opnHTML(b); Store.patch('cases', id, { opBuild: b }); };
         if (opnBox) {
           opnBox.addEventListener('change', (e) => {
-            const t = e.target;
             const b = opnState();
-            if (t.dataset.ob) {
-              const k = t.dataset.ob;
-              b[k] = t.value;
-              const resets = { cat: ['region', 'bone', 'site'], region: ['bone', 'site'], bone: ['site'] };
-              (resets[k] || []).forEach((r) => { b[r] = ''; });
-              if (k === 'region' && t.value) { const first = Object.keys(opnBones(t.value))[0]; if (first && Object.keys(opnBones(t.value)).length === 1) b.bone = first; }
-              opnSave(opnFill(b, { [k]: true }));
-            } else if (t.dataset.obs !== undefined) {
-              b.screws[+t.dataset.obs][t.dataset.f] = t.value;
-              opnSave(b);
-            }
+            if (opnApplyChange(b, e.target)) opnSave(b);
           });
           opnBox.addEventListener('click', (e) => {
-            const add = e.target.closest('[data-obs-add]');
-            const rm = e.target.closest('[data-obs-rm]');
-            if (!add && !rm) return;
+            const btn = e.target.closest('[data-add-proc],[data-rm-proc],[data-add-imp],[data-rm-imp],[data-add-scr],[data-rm-scr]');
+            if (!btn) return;
             const b = opnState();
-            b.screws ||= [];
-            if (add) b.screws.push({ type: '', n: '' });
-            else b.screws.splice(+rm.dataset.obsRm, 1);
-            opnSave(b);
+            if (opnApplyClick(b, btn, Store.cases[id])) opnSave(b);
           });
           $('#opn-gen', el).onclick = () => {
             document.activeElement?.blur?.();

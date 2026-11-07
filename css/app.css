@@ -1361,3 +1361,10 @@ html, body { overscroll-behavior-x: none; }
 .opn-n { display: flex; flex-direction: column; font-size: .7rem; width: 4.2rem; }
 .opn-n input { width: 100%; }
 @media (max-width: 520px) { .opn-grid { grid-template-columns: 1fr; } }
+/* Op-note builder: procedures and implants */
+.opn-proc { border: 1px solid var(--line); border-radius: var(--rc, 10px); padding: .6rem; margin: .6rem 0; }
+.opn-proc-head, .opn-imp-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: .45rem; }
+.opn-proc-head b { font-size: .95rem; }
+.opn-imp { border-left: 3px solid var(--primary-bg, var(--brand)); padding: .35rem 0 .35rem .6rem; margin: .6rem 0; }
+.opn-end { margin-top: .6rem; }
+.opn-add-proc { margin-top: .2rem; }
