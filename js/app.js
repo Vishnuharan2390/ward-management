@@ -592,6 +592,38 @@ const App = (() => {
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
 
+  // ---- Comorbidities
+  const comorbOn = (c) => COMORBIDITIES.filter(([k]) => c.comorb?.[k]?.on).map(([k]) => k);
+  // "Other" box: what was typed there, or (older cases) the free-text comorbidities line.
+  const comorbOtherOf = (c) => (c.comorbOther !== undefined ? c.comorbOther : (c.comorb ? '' : (c.comorbid || '')));
+  function comorbCardHTML(c) {
+    const cm = c.comorb || {};
+    const rows = COMORBIDITIES.filter(([k]) => cm[k]?.on).map(([k, label]) => `<div class="cm-row">
+        <b title="${esc(label)}">${esc(k)}</b>
+        <label class="cm-y">Years<input data-cmk="${esc(k)}" data-cmf="years" inputmode="decimal" autocomplete="off" value="${esc(cm[k].years || '')}"></label>
+        <label class="cm-rx">Current treatment<input data-cmk="${esc(k)}" data-cmf="rx" autocomplete="off" value="${esc(cm[k].rx || '')}"></label>
+      </div>`).join('');
+    return `<h3>Comorbidities</h3>
+      <div class="cm-chips">${COMORBIDITIES.map(([k, label]) => `<button type="button" class="chip cm-chip${cm[k]?.on ? ' on' : ''}" data-cm="${esc(k)}" title="${esc(label)}" aria-pressed="${cm[k]?.on ? 'true' : 'false'}">${cm[k]?.on ? '✓ ' : ''}${esc(k)}</button>`).join('')}</div>
+      ${rows}
+      <label class="cm-other">Other<input data-cmo autocomplete="off" value="${esc(comorbOtherOf(c))}"></label>`;
+  }
+
+  // ---- Rounds suggestion pop-up: shown once per patient per session for each new suggestion.
+  const sugSeen = new Map(); // case id -> Set of suggestion lines already shown
+  function suggestHTML(c) {
+    const seen = sugSeen.get(c.id) || new Set();
+    const sug = roundSuggestions(c);
+    if (!sug.length || sug.every((x) => seen.has(x.line))) return '';
+    return `<div class="sug-back" data-sug-case="${c.id}">
+      <div class="sug-box card" role="dialog" aria-label="Suggestions">
+        <h3>Suggested for ${esc(c.name)}</h3>
+        ${sug.map((x) => `<label class="sug-row"><input type="checkbox" data-sug="${esc(x.line)}" checked>
+          <span><b>${esc(x.line)}</b><span class="muted small">${esc(x.why)}</span></span></label>`).join('')}
+        <div class="form-actions"><button type="button" class="btn primary" data-sug-add>Add selected</button><button type="button" class="btn" data-sug-skip>Not now</button></div>
+      </div></div>`;
+  }
+
   // Rounds view: one patient per screen.
   function roundsHTML(W, list) {
     const post = W.kind === 'post';
@@ -617,7 +649,7 @@ const App = (() => {
             <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
           <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
         </div>
-        <div class="rd-dx">${esc(c.diagnosis)}</div>${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : (c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : '')}
+        <div class="rd-dx">${esc(c.diagnosis)}</div>${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : (c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : '')}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
           <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
           <div class="rd-chips">${chips('inv', post ? POST_INV_CHIPS : ROUND_INV_CHIPS)}</div></div>
@@ -628,6 +660,7 @@ const App = (() => {
         <div class="rd-sec"><div class="rd-lab">Scheme</div><div class="rd-seg">${seg('scheme', c.scheme || '', SCHEMES)}</div></div>
       </div>
       ${nav('bottom')}
+      ${suggestHTML(c)}
     </div>`;
   }
 
@@ -779,6 +812,25 @@ const App = (() => {
         }
         const rd = e.target.closest('[data-rd]');
         if (rd) return step(+rd.dataset.rd);
+        const sb = e.target.closest('[data-sug-add],[data-sug-skip]');
+        if (sb) {
+          const back = sb.closest('[data-sug-case]');
+          const cid = back.dataset.sugCase;
+          const all = $$('[data-sug]', back);
+          sugSeen.set(cid, new Set([...(sugSeen.get(cid) || []), ...all.map((x) => x.dataset.sug)]));
+          const pick = sb.dataset.sugAdd !== undefined ? all.filter((x) => x.checked).map((x) => x.dataset.sug) : [];
+          back.remove();
+          if (pick.length) {
+            const box = $('.rounds textarea[data-nb="op"]', el);
+            const have = box.value.split('\n').map((x) => x.trim().toUpperCase());
+            const add2 = pick.filter((x) => !have.includes(x));
+            if (add2.length) box.value = [box.value.trim(), ...add2].filter(Boolean).join('\n');
+            box.dispatchEvent(new Event('input', { bubbles: true }));
+            box.dispatchEvent(new Event('change', { bubbles: true }));
+            toast(`Added ${pick.length} to Opinion / To-do`);
+          }
+          return;
+        }
         // Quick-tap chip: add the line to the box and save it.
         const add = e.target.closest('[data-add]');
         if (add) {
@@ -920,7 +972,9 @@ const App = (() => {
               <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2">${esc(c.plan)}</textarea></label>
               <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
               <label>Scheme status<select name="scheme">${schemeOpts(c.scheme)}</select></label>
-              <label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>
+              ${id && comorbOn(c).length
+                ? `<label class="span2">Comorbidities <span class="hint">edit them on the Comorbidities card of the e-case sheet</span><input name="comorbid" value="${esc(c.comorbid)}" readonly></label>`
+                : `<label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>`}
               <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}"></label>
               <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(c.writtenBy || '')}"></label>
               <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3">${esc(id ? c.treatment : (c.treatment ?? STANDARD_TREATMENT.join('\n')))}</textarea></label>
@@ -1248,6 +1302,8 @@ const App = (() => {
             </div>
           </div>
 
+          <section class="card cm-card" id="cm-card">${comorbCardHTML(c)}</section>
+
           <section class="card">
             <div class="row-between"><h3>Investigations <span class="pill ${r.ready ? 'ok' : ''}">${r.done}/${r.total}</span></h3>
               <button class="btn small primary" id="add-set">+ ${labSets(c).length ? 'Repeat investigations' : 'Enter investigations'}</button></div>
@@ -1363,6 +1419,28 @@ const App = (() => {
           }
         });
         $('#add-set', el).onclick = () => openLabModal(id);
+        // Comorbidities card: buttons switch each one on/off; years + current treatment per one.
+        const cmBox = $('#cm-card', el);
+        const cmSave = (cm, other) => Store.patch('cases', id, { comorb: cm, comorbOther: other, comorbid: comorbText(cm, other) });
+        const cmNow = () => { const cur = Store.cases[id]; return [JSON.parse(JSON.stringify(cur.comorb || {})), comorbOtherOf(cur)]; };
+        cmBox.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-cm]');
+          if (!b) return;
+          const [cm, other] = cmNow();
+          const k = b.dataset.cm;
+          cm[k] = { years: '', rx: '', ...cm[k], on: !cm[k]?.on };
+          cmBox.innerHTML = comorbCardHTML({ ...Store.cases[id], comorb: cm, comorbOther: other });
+          cmSave(cm, other);
+          if (cm[k].on) $(`[data-cmk="${k}"][data-cmf="years"]`, cmBox)?.focus();
+        });
+        cmBox.addEventListener('change', (e) => {
+          const t = e.target;
+          const [cm, other] = cmNow();
+          if (t.dataset.cmk) {
+            cm[t.dataset.cmk] = { ...cm[t.dataset.cmk], [t.dataset.cmf]: t.value.trim().toUpperCase() };
+            cmSave(cm, other);
+          } else if (t.dataset.cmo !== undefined) cmSave(cm, t.value.trim().toUpperCase());
+        });
         // Op-note builder: every choice is saved on the case (opBuild) and fills what follows.
         const opnBox = $('#opn', el);
         const opnState = () => JSON.parse(JSON.stringify(opnNormalize(Store.cases[id].opBuild) || opnDefaults({ id, ...Store.cases[id] })));
@@ -1754,6 +1832,7 @@ const App = (() => {
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
             <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>Share OT list on WhatsApp</button>
             <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op imaging PDF (X-ray, CT, MRI)</button>
+            <button class="btn" id="ot-consent" ${sel.length ? '' : 'disabled'}>Consent forms (Tamil)</button>
           </div>
           <p class="muted small">The print PDF puts the same list twice on one landscape sheet — top and bottom — to print and cut.</p>
         </div>`;
@@ -1958,6 +2037,7 @@ const App = (() => {
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
       $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); Share.send(Share.otText(cases, dd)); };
+      $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); Print.consents(cases, dd, Store.meta); };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
         toast('Collecting X-rays, CT and MRI…', 8000);

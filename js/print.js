@@ -268,7 +268,66 @@ const Print = (() => {
     go(`<div class="pr ip">${pages.join('')}</div>`, { title: `PREOP IMAGING ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'A4 portrait', margin: '10mm' });
   }
 
-  return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, OT_COLUMNS, otTitle };
+  // ---------------------------------------------------------------- Consent forms (Tamil)
+  // One A4 page per OT list case: letterhead, the case details filled in, the consent typed in Tamil,
+  // and signature lines for the patient / relative, witness and doctor.
+  const CONSENT_RISKS = [
+    'அதிக இரத்தப்போக்கு மற்றும் இரத்தம் ஏற்ற வேண்டிய தேவை',
+    'காயத்தில் கிருமித் தொற்று (சீழ் பிடித்தல்)',
+    'நரம்பு மற்றும் இரத்தக் குழாய்களில் பாதிப்பு',
+    'எலும்பு கூடாமை, தாமதமாகக் கூடுதல் அல்லது தவறான நிலையில் கூடுதல்',
+    'பொருத்தப்படும் உலோகக் கருவிகள் (பிளேட், ஸ்க்ரூ, ராடு, கம்பி) உடைதல், தளர்தல் அல்லது தொற்று',
+    'மூட்டு இறுக்கம், தொடர்ந்த வலி, கை / கால் நீளத்தில் வேறுபாடு',
+    'கால் நரம்புகளில் இரத்தம் உறைதல் (DVT), நுரையீரல் இரத்தக் கட்டி அடைப்பு (PE), கொழுப்புத் துகள் அடைப்பு (FAT EMBOLISM)',
+    'மீண்டும் அறுவை சிகிச்சை செய்ய வேண்டிய நிலை',
+    'மயக்க மருந்தினால் ஏற்படக்கூடிய ஒவ்வாமை, இதயம் மற்றும் சுவாசம் சார்ந்த சிக்கல்கள்',
+    'மிக அரிதாக உயிருக்கு ஆபத்து',
+  ];
+  function consents(cases, draft, meta = {}) {
+    const letterhead = meta.letterhead || 'assets/letterhead.jpg';
+    const blank = '<span class="cf-blank"></span>';
+    const val = (v) => (String(v || '').trim() ? esc(up(v)) : blank);
+    const page = (c) => {
+      const anaes = c.opBuild?.anaes || '';
+      const rows = [
+        ['நோயாளியின் பெயர்', 'NAME', c.name],
+        ['வயது / பாலினம்', 'AGE / SEX', ageSex(c)],
+        ['உள்நோயாளி எண்', 'IP NO', c.ipNo],
+        ['வார்டு', 'WARD', c.ward],
+        ['நோயறிதல்', 'DIAGNOSIS', c.diagnosis],
+        ['செய்யப்பட உள்ள அறுவை சிகிச்சை', 'PROPOSED SURGERY', c.plan],
+        ['மயக்க மருந்து முறை', 'ANAESTHESIA', anaes],
+        ['அறுவை சிகிச்சை தேதி', 'DATE OF SURGERY', fmtDate(draft.date)],
+      ];
+      return `
+      <section class="cf-page">
+        <div class="cf-lh"><img src="${esc(letterhead)}" alt=""></div>
+        <h1 class="cf-title">அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்<small>INFORMED CONSENT FOR SURGERY${c.standby ? ' (STANDBY)' : ''}</small></h1>
+        <table class="cf-box">${rows.map(([ta, en, v]) => `<tr><th>${ta} <span>/ ${en}</span></th><td>${val(v)}</td></tr>`).join('')}</table>
+        <ol class="cf-text">
+          <li>மேற்கண்ட நோயாளிக்கு உள்ள நோய் பற்றியும், அதற்கு மேற்கண்ட அறுவை சிகிச்சை தேவை என்பது பற்றியும் மருத்துவர்கள் எனக்குப் புரியும் மொழியில் (தமிழில்) விளக்கினார்கள்.</li>
+          <li>அறுவை சிகிச்சையின் நோக்கம், அதனால் கிடைக்கும் நன்மைகள், மாற்று சிகிச்சை முறைகள், அறுவை சிகிச்சை செய்யாவிட்டால் ஏற்படக்கூடிய விளைவுகள் ஆகியவை எனக்கு விளக்கப்பட்டன.</li>
+          <li>அறுவை சிகிச்சையின் போதும் அதற்குப் பின்பும் கீழ்க்கண்ட சிக்கல்கள் ஏற்படலாம் என்று எனக்குத் தெரிவிக்கப்பட்டது:
+            <ul>${CONSENT_RISKS.map((r) => `<li>${r}</li>`).join('')}</ul></li>
+          <li>அறுவை சிகிச்சையின் போது தேவைப்பட்டால், நோயாளியின் நலன் கருதி சிகிச்சை முறையை மாற்றவும், கூடுதல் சிகிச்சை செய்யவும், இரத்தம் மற்றும் இரத்தக் கூறுகளை ஏற்றவும் மருத்துவர்களுக்கு ஒப்புதல் அளிக்கிறேன்.</li>
+          <li>தேவையான மயக்க மருந்து (முதுகுத் தண்டு மயக்கம் / நரம்புத் தடுப்பு / முழு மயக்கம்) கொடுக்க ஒப்புதல் அளிக்கிறேன். அதன் அபாயங்கள் எனக்கு விளக்கப்பட்டன.</li>
+          <li>அறுவை சிகிச்சையின் முடிவு குறித்து எந்த உத்தரவாதமும் அளிக்கப்படவில்லை என்பதை நான் புரிந்துகொண்டேன்.</li>
+          <li>என் சந்தேகங்கள் அனைத்துக்கும் பதில் அளிக்கப்பட்டது. நான் சுயநினைவுடனும், யாருடைய வற்புறுத்தலும் இன்றியும், முழு மனதுடன் இந்த அறுவை சிகிச்சைக்கு ஒப்புதல் அளிக்கிறேன்.</li>
+        </ol>
+        <div class="cf-sign">
+          <div><span class="cf-line"></span>நோயாளியின் கையொப்பம் / இடது கை பெருவிரல் ரேகை</div>
+          <div><span class="cf-line"></span>உறவினர் / பாதுகாவலர் கையொப்பம்</div>
+          <div><span class="cf-line"></span>உறவினர் பெயர் &amp; உறவுமுறை</div>
+          <div><span class="cf-line"></span>சாட்சி பெயர் &amp; கையொப்பம்</div>
+          <div><span class="cf-line"></span>மருத்துவர் பெயர் &amp; கையொப்பம்</div>
+          <div><span class="cf-line"></span>தேதி &amp; நேரம்</div>
+        </div>
+      </section>`;
+    };
+    go(`<div class="pr cf">${cases.map(page).join('')}</div>`, { title: `CONSENT ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`.replace(/\s+/g, ' '), page: 'A4 portrait', margin: '10mm', noHeader: true });
+  }
+
+  return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, consents, OT_COLUMNS, otTitle };
 })();
 
 // Shared with the on-screen ward view.

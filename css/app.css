@@ -1368,3 +1368,38 @@ html, body { overscroll-behavior-x: none; }
 .opn-imp { border-left: 3px solid var(--primary-bg, var(--brand)); padding: .35rem 0 .35rem .6rem; margin: .6rem 0; }
 .opn-end { margin-top: .6rem; }
 .opn-add-proc { margin-top: .2rem; }
+
+/* ---- Comorbidities card */
+.cm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.cm-row { display: grid; grid-template-columns: 74px 90px 1fr; gap: 8px; align-items: end; padding: 6px 0; border-top: 1px dashed var(--line, #ccc); }
+.cm-row b { align-self: center; }
+.cm-row label { margin: 0; }
+.cm-other { display: block; margin-top: 8px; }
+@media (max-width: 520px) { .cm-row { grid-template-columns: 1fr 1fr; } .cm-row b { grid-column: 1 / -1; } }
+.rd-cm { font-size: .9em; margin-top: 4px; opacity: .85; }
+
+/* ---- Rounds suggestion pop-up */
+.sug-back { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.sug-box { width: 100%; max-width: 440px; max-height: 85vh; overflow: auto; margin: 0; }
+.sug-box h3 { margin-top: 0; }
+.sug-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line, #ddd); cursor: pointer; }
+.sug-row input { width: 20px; height: 20px; margin-top: 2px; flex: none; }
+.sug-row span { display: flex; flex-direction: column; gap: 2px; }
+
+/* ---- Tamil consent forms (print) */
+.pr.cf { font-family: 'Noto Sans Tamil', 'Latha', sans-serif; color: #000; }
+.cf-page { page-break-after: always; break-after: page; font-size: 10pt; line-height: 1.35; }
+.cf-page:last-child { page-break-after: auto; break-after: auto; }
+.cf-lh img { width: 100%; max-height: 26mm; object-fit: contain; display: block; }
+.cf-title { text-align: center; font-size: 14pt; margin: 2mm 0; }
+.cf-title small { display: block; font-size: 9pt; font-weight: 600; letter-spacing: .05em; }
+.cf-box { width: 100%; border-collapse: collapse; margin-bottom: 3mm; }
+.cf-box th, .cf-box td { border: 1px solid #000; padding: .8mm 2mm; text-align: left; vertical-align: top; }
+.cf-box th { width: 36%; font-weight: 600; }
+.cf-box th span { font-weight: 400; font-size: 8.5pt; }
+.cf-blank { display: inline-block; min-width: 50mm; }
+.cf-text { margin: 0 0 2mm; padding-left: 6mm; }
+.cf-text > li { margin-bottom: .8mm; }
+.cf-text ul { margin: 1mm 0; padding-left: 6mm; columns: 2; column-gap: 6mm; font-size: 9pt; }
+.cf-sign { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4mm 8mm; margin-top: 4mm; font-size: 8.5pt; break-inside: avoid; }
+.cf-line { display: block; border-bottom: 1px solid #000; height: 10mm; margin-bottom: 1mm; }

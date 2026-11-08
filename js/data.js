@@ -127,6 +127,7 @@ const OPINION_DEPTS = [
   'General Medicine', 'Cardiology', 'Pulmonology', 'Nephrology', 'Neurology',
   'Endocrinology', 'Diabetology', 'ENT', 'Dental', 'Psychiatry',
   'Plastic Surgery', 'Vascular Surgery', 'Neurosurgery', 'CTVS', 'General Surgery', 'Urology', 'Obstetrics & Gynaecology',
+  'Medical Gastroenterology',
 ];
 
 function parseNum(v, p = {}) {
@@ -228,8 +229,60 @@ function pendingList(c) {
 
 // Ward notebook "To do's", two editable boxes shared with the e-case sheet.
 // Rounds view quick-tap chips (each adds one line to the box).
-const ROUND_INV_CHIPS = ['CBC', 'RFT', 'LFT', 'SERUM ELECTROLYTES', 'RBS', 'COAGULATION PROFILE', 'ECG', 'ECHO', 'CXR', 'X-RAY', 'CT', 'MRI'];
-const ROUND_OP_CHIPS = ['CARDIOLOGY OPINION', 'GENERAL MEDICINE OPINION', 'PULMONOLOGY OPINION', 'NEPHROLOGY OPINION', 'DIABETOLOGY OPINION', 'NEUROSURGERY OPINION', 'PAC', 'CROSS MATCH', 'DRESSING', 'WOUND WASH'];
+const ROUND_INV_CHIPS = ['CBC', 'RFT', 'LFT', 'SERUM ELECTROLYTES', 'RBS', 'VCTC', 'VM', 'ECG', 'ECHO', 'COAGULATION PROFILE', 'CXR', 'X-RAY', 'CT', 'MRI'];
+const ROUND_OP_CHIPS = ['CARDIOLOGY OPINION', 'GENERAL MEDICINE OPINION', 'PULMONOLOGY OPINION', 'NEPHROLOGY OPINION', 'DIABETOLOGY OPINION', 'NEUROSURGERY OPINION', 'PAC', 'CROSS MATCH', 'BLOOD TRANSFUSION', 'DRESSING', 'WOUND WASH'];
+
+// ---- Comorbidities (e-case sheet card): each one ticked carries years + current treatment.
+const COMORBIDITIES = [
+  ['T2DM', 'Type 2 diabetes'], ['S.HTN', 'Systemic hypertension'], ['TB', 'Tuberculosis'], ['ASTHMA', 'Bronchial asthma'],
+  ['EPILEPSY', 'Epilepsy'], ['THYROID', 'Thyroid disorder'], ['CAD', 'Coronary artery disease'], ['CKD', 'Chronic kidney disease'],
+];
+const COMORB_OPINION = { 'T2DM': 'DIABETOLOGY', 'S.HTN': 'GENERAL MEDICINE', TB: 'PULMONOLOGY', ASTHMA: 'PULMONOLOGY', EPILEPSY: 'NEUROLOGY', THYROID: 'ENDOCRINOLOGY', CAD: 'CARDIOLOGY', CKD: 'NEPHROLOGY' };
+// "T2DM X 5 YRS ON TAB METFORMIN 500MG BD, S.HTN X 2 YRS" (+ anything typed under Other)
+function comorbText(cm = {}, other = '') {
+  const parts = COMORBIDITIES.filter(([k]) => cm[k]?.on).map(([k]) => {
+    const y = String(cm[k].years || '').trim();
+    const rx = String(cm[k].rx || '').trim();
+    return [k, y && `X ${y} ${/^\d+(\.\d+)?$/.test(y) ? (y === '1' ? 'YR' : 'YRS') : ''}`.trim(), rx && `ON ${rx}`].filter(Boolean).join(' ');
+  });
+  if (String(other || '').trim()) parts.push(String(other).trim());
+  return parts.join(', ').toUpperCase();
+}
+
+// ---- Rounds: suggestions when a patient comes up (latest labs + comorbidities).
+// Each: { line, why } where line is what goes into the Opinion / To-do box. Lines already there are left out.
+function roundSuggestions(c) {
+  const P = (k) => ALL_PARAMS.find((x) => x.k === k);
+  const val = (k) => { const l = latest(c, k); return l ? { n: parseNum(l.value, P(k)), raw: l.value, f: flagOf(l.value, P(k)) } : null; };
+  const show = (k) => { const v = val(k); return v ? `${P(k).label} ${fmtVal(v.raw, P(k))}${FLAG_MARK[v.f] || ''}` : ''; };
+  const out = new Map();
+  const add = (line, why) => { const cur = out.get(line); out.set(line, cur ? `${cur}; ${why}` : why); };
+  const hb = val('hb');
+  if (hb && hb.n < 9) add('BLOOD TRANSFUSION', `${show('hb')} (below 9)`);
+  const plt = val('plt');
+  if (plt && plt.f === 'low') add('PLATELET TRANSFUSION', show('plt'));
+  const urea = val('urea');
+  const creat = val('creat');
+  if (urea?.f === 'high' || creat?.f === 'high') add('NEPHROLOGY OPINION', [urea?.f === 'high' && show('urea'), creat?.f === 'high' && show('creat')].filter(Boolean).join(', '));
+  const bili = ['tbili', 'dbili', 'ibili'].map(val).some((v) => v?.f === 'high');
+  const enz = ['sgot', 'sgpt'].map(val).some((v) => v?.f === 'high');
+  const biliWhy = ['tbili', 'dbili', 'ibili', 'sgot', 'sgpt'].filter((k) => val(k)?.f === 'high').map(show).join(', ');
+  if (bili && enz) add('MEDICAL GASTROENTEROLOGY OPINION', biliWhy);
+  else if (bili) add('GENERAL MEDICINE OPINION', biliWhy);
+  const na = val('na');
+  const k = val('k');
+  if (na && na.n < 120) add('GENERAL MEDICINE OPINION', `${show('na')} (below 120)`);
+  if (k && k.n < 3) add('GENERAL MEDICINE OPINION', `${show('k')} (below 3)`);
+  const rbs = val('rbs');
+  if (rbs && rbs.n > 140) add('DIABETOLOGY OPINION', `${show('rbs')} (above 140)`);
+  for (const [key] of COMORBIDITIES) if (c.comorb?.[key]?.on) add(`${COMORB_OPINION[key]} OPINION`, `known ${key}`);
+  // leave out what is already asked for / already done
+  const have = new Set([
+    ...listOf(c.opinions).map((o) => `${String(o.dept || '').toUpperCase()} OPINION`),
+    ...listOf(c.tasks).map((t) => String(t.text || '').toUpperCase()),
+  ]);
+  return [...out].filter(([line]) => !have.has(line)).map(([line, why]) => ({ line, why }));
+}
 
 const POST_INV_CHIPS = ['CBC', 'RFT', 'ESR', 'CRP', 'SERUM ELECTROLYTES', 'RBS', 'CHECK X-RAY', 'WOUND C/S'];
 const POST_OP_CHIPS = ['DRESSING', 'SUTURE REMOVAL', 'DRAIN REMOVAL', 'PHYSIOTHERAPY', 'IV ANTIBIOTICS', 'BLOOD TRANSFUSION', 'DISCHARGE PLAN', 'GENERAL MEDICINE OPINION', 'PLASTIC SURGERY OPINION'];
