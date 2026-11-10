@@ -310,7 +310,7 @@ const Print = (() => {
     go(`<div class="pr cf">${cases.map(page).join('')}</div>`, { title: `CONSENT ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`.replace(/\s+/g, ' '), page: 'A4 portrait', margin: '12mm', noHeader: true });
   }
 
-  return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, consents, OT_COLUMNS, otTitle };
+  return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, consents, OT_COLUMNS, otTitle, CONSENT_PARAS, CONSENT_RISK_PARAS };
 })();
 
 // Shared with the on-screen ward view.

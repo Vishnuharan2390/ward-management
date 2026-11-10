@@ -2037,7 +2037,8 @@ const App = (() => {
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
       $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); Share.send(Share.otText(cases, dd)); };
-      $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); Print.consents(cases, dd, Store.meta); };
+      // Phones get a real PDF file (window.print is unreliable there); computers keep the print dialog.
+      $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); if (PhonePdf.isPhone()) PhonePdf.consents(cases, dd); else Print.consents(cases, dd, Store.meta); };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
         toast('Collecting X-rays, CT and MRI…', 8000);
@@ -2055,7 +2056,7 @@ const App = (() => {
         }
         if (!items.length) return toast('None of these cases has a pre-op X-ray, CT or MRI uploaded yet.', 4000);
         toast(none.length ? `No pre-op imaging for: ${none.join(', ')} — left out.` : 'Ready', none.length ? 6000 : 1500);
-        Print.otXrays(items, dd);
+        if (PhonePdf.isPhone()) PhonePdf.otXrays(items, dd); else Print.otXrays(items, dd);
       };
     },
   };
