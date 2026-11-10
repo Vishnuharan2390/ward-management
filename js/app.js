@@ -1830,7 +1830,8 @@ const App = (() => {
           <div class="form-actions">
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
-            <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>Share OT list on WhatsApp</button>
+            <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>WhatsApp OT list PDF</button>
+            <button class="btn" id="ot-mail" ${sel.length ? '' : 'disabled'} title="${esc(Store.meta.otEmail ? 'To ' + Store.meta.otEmail : 'Set the address in Settings')}">Email OT list PDF</button>
             <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op imaging PDF (X-ray, CT, MRI)</button>
             <button class="btn" id="ot-consent" ${sel.length ? '' : 'disabled'}>Consent forms (Tamil)</button>
           </div>
@@ -2036,7 +2037,13 @@ const App = (() => {
       };
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
-      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); Share.send(Share.otText(cases, dd)); };
+      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); SharePdf.ot(cases, dd); };
+      $('#ot-mail', el).onclick = () => {
+        const to = String(Store.meta.otEmail || '').trim();
+        if (!to) return toast('Add the OT list email address in Settings first', 4000);
+        const [cases, dd] = build();
+        SharePdf.otEmail(cases, dd, to);
+      };
       // Phones get a real PDF file (window.print is unreliable there); computers keep the print dialog.
       $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); if (PhonePdf.isPhone()) PhonePdf.consents(cases, dd); else Print.consents(cases, dd, Store.meta); };
       $('#ot-xr', el).onclick = async () => {
@@ -2999,6 +3006,7 @@ const App = (() => {
           <fieldset><legend>Unit & letterhead (shared)</legend>
             <label>Unit<select name="unitId">${opts(UNITS.map((u) => [u.id, 'UNIT ' + u.id]), m.unitId)}</select></label>
             <label>Ortho OPD no.<input name="opd" value="${esc(m.opd)}"></label>
+            <label class="span2" data-nocaps>Email the OT list to<input type="email" name="otEmail" value="${esc(m.otEmail)}" placeholder="name@example.com" autocomplete="off"></label>
             <div class="span2 muted small">Chief: ${esc(unitOf(m.unitId).chief)} · Asst. Profs: ${esc(unitOf(m.unitId).aps.join(', '))}</div>
             <label class="span2">Institution<input name="institution" value="${esc(m.institution)}"></label>
             <label class="span2">Department<input name="department" value="${esc(m.department)}"></label>

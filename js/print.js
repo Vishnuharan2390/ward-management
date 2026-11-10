@@ -92,7 +92,7 @@ const Print = (() => {
 
   // `twice`: two copies on one sheet, top and bottom, each shrunk to fit its half.
   function otList(cases, draft, twice) {
-    const title = `OT LIST ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`;
+    const title = otFileName(draft); // the browser's "Save as PDF" uses this as the file name
     if (!twice) {
       go(otHTML(cases, draft), { title, page: 'letter landscape', noHeader: true });
       return;

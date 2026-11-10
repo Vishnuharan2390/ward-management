@@ -74,6 +74,78 @@ const SharePdf = (() => {
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_PENDING_WORKS_${stamp()}.pdf`, { type: 'application/pdf' });
   }
 
+  // OT list as a PDF file: same page as the printed one (US Letter landscape, the unit's 11 columns,
+  // title on top, Assistant Professor bottom-right). Named "OT LIST UNIT I 11-11-2026.pdf".
+  function otPdf(cases, draft) {
+    const { jsPDF } = window.jspdf;
+    const d = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+    const W = d.internal.pageSize.getWidth();
+    const H = d.internal.pageSize.getHeight();
+    const M = 12;
+    const cols = Object.keys(Print.OT_COLUMNS);
+    const total = cols.reduce((a, k) => a + Print.OT_COLUMNS[k][1], 0);
+    const cell = (k, c, i) => {
+      switch (k) {
+        case 'sno': return String(i + 1);
+        case 'name': return U(c.name) + (c.standby ? '\n(STANDBY)' : '');
+        case 'agesex': return U(ageSex(c));
+        case 'ip': return clean(c.ipNo);
+        case 'ward': return U(c.ward);
+        case 'diagnosis': return U(c.diagnosis);
+        case 'procedure': return U(c.plan);
+        case 'level': return clean(c.level);
+        case 'anaes': return ANAES;
+        case 'implants': return U(c.implants);
+        case 'scheme': return U(c.scheme);
+        default: return '';
+      }
+    };
+    d.setFont('helvetica', 'bold');
+    d.setFontSize(14);
+    const title = Print.otTitle(draft).filter(Boolean).map(clean);
+    title.forEach((t, i) => d.text(t, W / 2, M + 5 + i * 6.5, { align: 'center' }));
+    d.autoTable({
+      startY: M + 5 + title.length * 6.5 + 2,
+      head: [cols.map((k) => Print.OT_COLUMNS[k][0])],
+      body: cases.map((c, i) => cols.map((k) => cell(k, c, i))),
+      theme: 'grid',
+      margin: { top: M, left: M, right: M, bottom: M },
+      styles: { font: 'times', fontStyle: 'bold', fontSize: 8, cellPadding: 1, valign: 'top', textColor: 0, lineColor: 0, lineWidth: 0.25, overflow: 'linebreak', minCellHeight: 13.4 },
+      headStyles: { fillColor: false, minCellHeight: 0 },
+      columnStyles: Object.fromEntries(cols.map((k, i) => [i, { cellWidth: ((W - 2 * M) * Print.OT_COLUMNS[k][1]) / total }])),
+      rowPageBreak: 'avoid',
+    });
+    let y = d.lastAutoTable.finalY + 12;
+    if (y > H - M) { d.addPage(); y = M + 5; }
+    d.setFont('times', 'bold');
+    d.setFontSize(8);
+    d.text(U(draft.prof), W - M - 14, y, { align: 'right' });
+    return new File([d.output('blob')], otFileName(draft) + '.pdf', { type: 'application/pdf' });
+  }
+
+  // Email the OT list to the unit's address (Settings). A web page can't send mail by itself,
+  // so: phone - share sheet with the PDF (pick Gmail / Mail), address copied to paste into "To";
+  // computer - the PDF is downloaded and the mail app opens addressed, to attach it.
+  function email(file, to, draft) {
+    const subject = file.name.replace(/\.pdf$/, '');
+    const body = `${Print.otTitle(draft).filter(Boolean).join('\n')}\n\nOT list attached.`;
+    let ok = false;
+    try { ok = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch { ok = false; }
+    if (ok && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      navigator.clipboard?.writeText(to).catch(() => {});
+      toast(`Pick Gmail / Mail — ${to} is copied, paste it into "To"`, 7000);
+      navigator.share({ files: [file], title: subject, text: body }).catch((e) => { if (e.name !== 'AbortError') mailto(); });
+      return;
+    }
+    mailto();
+    function mailto() {
+      download(file, `Saved ${file.name} — attach it to the email`);
+      const a = document.createElement('a');
+      a.href = `mailto:${encodeURIComponent(to).replace(/%40/g, '@')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      a.click();
+    }
+  }
+
   // Phone: share sheet (pick WhatsApp). Computer / browsers without file sharing: download it.
   function send(file) {
     let ok = false;
@@ -84,7 +156,7 @@ const SharePdf = (() => {
     }
     download(file);
   }
-  function download(file) {
+  function download(file, msg) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(file);
     a.download = file.name;
@@ -92,12 +164,14 @@ const SharePdf = (() => {
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    toast(`Saved ${file.name} — attach it in WhatsApp`, 4000);
+    toast(msg || `Saved ${file.name} — attach it in WhatsApp`, 4000);
   }
 
   return {
     ward: (cases, meta, post) => send(wardPdf(cases, meta, post)),
     pending: (cases, meta, post) => send(pendingPdf(cases, meta, post)),
-    wardPdf, pendingPdf,
+    ot: (cases, draft) => send(otPdf(cases, draft)),
+    otEmail: (cases, draft, to) => email(otPdf(cases, draft), to, draft),
+    wardPdf, pendingPdf, otPdf,
   };
 })();
