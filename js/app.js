@@ -270,6 +270,7 @@ const App = (() => {
           <label class="search-lab">Search<input type="search" id="q" aria-label="Search name, IP, ward, diagnosis" value="${esc(dashQuery)}"></label>
           <a class="btn primary" href="#/new">+ New case</a>
           <a class="btn wa" href="#/import">From WhatsApp</a>
+          <a class="btn" href="#/import">From PowerPoint</a>
         </div>
         <div class="chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
         <div class="order-bar">
@@ -353,7 +354,8 @@ const App = (() => {
     render() {
       const it = Import.items;
       const sexSel = (i, v) => `<select data-i="${i}" data-f="sex">${['', 'M', 'F'].map((x) => `<option${x === v ? ' selected' : ''}>${x}</option>`).join('')}</select>`;
-      const kinds = [...ADD_CASE_KINDS.map((k) => [k.k, k.label]), ['skip', 'Don’t add']];
+      const kinds = [...IMAGE_KINDS.map((k) => [k.k, k.label]), ['skip', 'Don’t add']];
+      const ppt = Import.source === 'ppt';
       const deckMode = Import.back === '#/deck';
       const others = deckMode && it ? it.filter((c) => c.otherDay).length : 0;
       const shown = it ? it.filter((c) => !deckMode || !c.otherDay || Import.otherDay) : [];
@@ -362,16 +364,17 @@ const App = (() => {
           <button class="btn" id="imp-clear">Start over</button></div>
         <div class="card imp-doa">
           <label>Date of admission<input type="date" id="imp-doa" value="${esc(Import.doa)}" ${Import.usePosted ? 'disabled' : ''}></label>
-          <p class="small muted">${Import.usePosted ? 'Each case gets the date it was posted in the group.' : 'Taken from the Admission day PPT date. Changing it here changes the PPT date too.'}
-            <button class="link" id="imp-posted">${Import.usePosted ? 'Use the Admission day PPT date' : 'Use the date each case was posted instead'}</button></p>
+          ${ppt ? `<p class="small muted">${Import.pptDate ? 'Taken from the date on the PowerPoint’s first slide.' : 'No date found on the PowerPoint’s first slide — check it.'}</p>` : `<p class="small muted">${Import.usePosted ? 'Each case gets the date it was posted in the group.' : 'Taken from the Admission day PPT date. Changing it here changes the PPT date too.'}
+            <button class="link" id="imp-posted">${Import.usePosted ? 'Use the Admission day PPT date' : 'Use the date each case was posted instead'}</button></p>`}
         </div>
-        ${it.length ? '' : '<p class="empty">No case posts found. A post needs a line like “Udayakumar 26/M” and the diagnosis.</p>'}
+        ${it.length ? '' : ppt ? '<p class="empty">No cases found in that PowerPoint. A case slide needs a NAME row (or a “Raja 26/M” line) and the diagnosis.</p>' : '<p class="empty">No case posts found. A post needs a line like “Udayakumar 26/M” and the diagnosis.</p>'}
+        ${ppt && Import.pptSkipped ? `<p class="muted small">${Import.pptSkipped} picture(s) are in a format a browser can’t open (EMF/TIFF) and were left out.</p>` : ''}
         ${others ? `<p class="small"><button class="link" id="imp-others">${Import.otherDay ? 'Hide' : 'Show'} ${others} post${others === 1 ? '' : 's'} from other days</button></p>` : ''}
         ${it.map((c, i) => (deckMode && c.otherDay && !Import.otherDay ? '' : `
           <div class="card imp-case${c.dup ? ' imp-dup' : ''}">
             <label class="imp-pick"><input type="checkbox" data-i="${i}" data-f="sel" ${c.sel ? 'checked' : ''}>
               <b>${c.caseNo ? `Case ${esc(c.caseNo)} · ` : ''}${esc(c.name)} ${esc(c.age)}/${esc(c.sex)}</b>
-              <span class="muted small">${(c.posted || c.doa) ? 'posted ' + esc(fmtDate(c.posted || c.doa)) : ''}${c.sender ? ' by ' + esc(c.sender) : ''}</span>
+              <span class="muted small">${ppt ? `${c.deckStatus ? esc(c.deckStatus) + ' · ' : ''}${c.photos.length} picture(s)` : `${(c.posted || c.doa) ? 'posted ' + esc(fmtDate(c.posted || c.doa)) : ''}${c.sender ? ' by ' + esc(c.sender) : ''}`}</span>
               ${c.dup ? '<span class="tag task">Already in Cases</span>' : ''}</label>
             <div class="form imp-grid">
               <label class="span2">Name<input data-i="${i}" data-f="name" value="${esc(c.name)}"></label>
@@ -383,6 +386,9 @@ const App = (() => {
               <label>DOA<input type="date" data-i="${i}" data-f="doa" value="${esc(c.doa)}"></label>
               <label class="span2">Diagnosis<textarea data-i="${i}" data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
               <label class="span2">Plan<input data-i="${i}" data-f="plan" value="${esc(c.plan)}"></label>
+              ${c.phone != null || c.address != null ? `<label>Phone<input data-i="${i}" data-f="phone" inputmode="tel" value="${esc(c.phone || '')}"></label>
+              <label>Address<input data-i="${i}" data-f="address" value="${esc(c.address || '')}"></label>` : ''}
+              ${c.treatment != null ? `<label class="span2">Treatment<textarea data-i="${i}" data-f="treatment" rows="2">${esc(c.treatment)}</textarea></label>` : ''}
             </div>
             ${c.photos.length ? `<div class="imp-photos">${c.photos.map((ph, j) => `
               <figure><img src="${ph.url}" alt=""><select data-i="${i}" data-p="${j}">${kinds.map(([k, l]) => `<option value="${k}"${k === ph.kind ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></figure>`).join('')}</div>` : ''}
@@ -391,11 +397,17 @@ const App = (() => {
         ${it.length ? `<div class="form-actions"><button class="btn primary" id="imp-add">Add ${it.filter((c) => c.sel).length} case(s) to Cases</button></div>` : ''}
         ${datalist('dl-mode', MODES)}` : '';
       return `
-        <h2>Import from WhatsApp</h2>
+        <h2>${it ? (ppt ? 'Import from PowerPoint' : 'Import from WhatsApp') : 'Import cases'}</h2>
         ${Import.busy ? `<p class="notice">${esc(Import.busy)}</p>` : ''}
         ${it ? list : `
         <section class="card">
-          <h3>Whole group (with photos)</h3>
+          <h3>Admission day PowerPoint (.pptx)</h3>
+          <p class="small muted">The deck you made separately: each “CASE n” slide (name, age/sex, IP no., mode, diagnosis…) becomes a case,
+            and the picture slides after it (X-RAY, CT, MRI, WOUND PIC…) become its images. You check everything before it's added.</p>
+          <label class="btn primary">Open PowerPoint (.pptx)<input type="file" id="imp-ppt" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden></label>
+        </section>
+        <section class="card">
+          <h3>WhatsApp: whole group (with photos)</h3>
           <ol class="small imp-steps">
             <li>Open the group in WhatsApp → tap the group name at the top.</li>
             <li>Scroll down → <b>Export chat</b> → <b>Attach Media</b> → <b>Save to Files</b> (Android: ⋮ → More → Export chat → Include media).</li>
@@ -440,7 +452,7 @@ const App = (() => {
         c.photos = c.photos || [];
         for (const ph of c.photos) {
           ph.url = URL.createObjectURL(ph.blob);
-          ph.kind = await WaImport.guessKind(ph.blob);
+          ph.kind = ph.kind || await WaImport.guessKind(ph.blob); // a PowerPoint slide title already says X-ray / CT / wound
         }
       }
       Import.items = cases;
@@ -451,6 +463,27 @@ const App = (() => {
       render();
     },
     mount(el) {
+      const pptIn = $('#imp-ppt', el);
+      if (pptIn) pptIn.onchange = async () => {
+        const f = pptIn.files[0];
+        if (!f) return;
+        Import.busy = 'Reading the PowerPoint…';
+        render();
+        try {
+          const { date, cases, skipped } = await PptImport.read(f);
+          Import.source = 'ppt';
+          Import.pptDate = date;
+          Import.pptSkipped = skipped;
+          Import.usePosted = false;
+          if (date) Import.doa = date;
+          if (date && Import.back === '#/deck') Deck.date = date;
+          await Import.load(cases.map((c) => ({ ...c, doa: c.doa || Import.doa })));
+        } catch (err) {
+          Import.busy = '';
+          render();
+          toast(`Couldn't read that file: ${err.message}`, 7000);
+        }
+      };
       const file = $('#imp-file', el);
       if (file) file.onchange = async () => {
         const f = file.files[0];
@@ -460,6 +493,7 @@ const App = (() => {
         try {
           // From the admission day PPT: only that day's photos are unpacked from the export.
           const win = Import.dayWindow();
+          Import.source = 'wa';
           await Import.load(await WaImport.readExport(f, (c) => !win || c.t == null || (c.t >= win[0] && c.t < win[1])));
         } catch (err) {
           Import.busy = '';
@@ -471,6 +505,7 @@ const App = (() => {
       if (read) read.onclick = () => {
         const c = WaImport.parseCaseText($('#imp-text', el).value);
         if (!c) return toast('Couldn’t find a “Name 26/M” line and a diagnosis in that message', 5000);
+        Import.source = 'wa';
         Import.load([{ ...c, doa: todayISO(), photos: [] }]);
       };
       const doa = $('#imp-doa', el);
@@ -527,13 +562,17 @@ const App = (() => {
             name: c.name.trim().toUpperCase(), age: String(c.age).trim(), sex: c.sex, ipNo: (c.ipNo || '').trim(), ward: (c.ward || '').trim().toUpperCase(),
             mode: c.mode.trim().toUpperCase(), diagnosis, plan, doa: c.doa || todayISO(),
             implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
-            status: 'preop', work: {}, treatment: STANDARD_TREATMENT.join('\n'), writtenBy: '',
+            status: 'preop', work: {}, treatment: String(c.treatment || '').trim() || STANDARD_TREATMENT.join('\n'), writtenBy: (c.writtenBy || '').trim().toUpperCase(),
             ...(c.caseNo ? { caseNo: String(c.caseNo) } : {}),
+            ...(c.phone ? { phone: String(c.phone).trim() } : {}),
+            ...(c.address ? { address: String(c.address).trim().toUpperCase() } : {}),
+            ...(c.deckStatus ? { deckStatus: c.deckStatus } : {}),
           });
           for (const ph of c.photos.filter((x) => x.kind !== 'skip')) {
             toast(`Saving photos… ${++photos}`, 8000);
             try {
-              await Store.addImage(nid, ph.kind, await compressImage(ph.blob), c.caseNo ? `WhatsApp case ${c.caseNo}` : 'WhatsApp');
+              const src = Import.source === 'ppt' ? 'PowerPoint' : 'WhatsApp';
+              await Store.addImage(nid, ph.kind, await compressImage(ph.blob), c.caseNo ? `${src} case ${c.caseNo}` : src);
             } catch { bad++; }
           }
         }
@@ -2226,6 +2265,7 @@ const App = (() => {
           <div class="deck-add-row">
             <button class="btn primary" id="deck-new">+ Add case ${st.cases.length + 1}</button>
             <a class="btn wa" href="#/import/deck/${esc(date)}">From WhatsApp</a>
+            <a class="btn" href="#/import/deck/${esc(date)}">From PowerPoint</a>
             ${others.length ? `<select id="deck-add" aria-label="Add an existing case"><option value="">or add an existing case…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select>` : ''}
           </div>
           ${cfg.skip.length ? `<p class="small"><button class="link" id="deck-unskip">Bring back ${cfg.skip.length} left-out case(s)</button></p>` : ''}
