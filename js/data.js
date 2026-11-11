@@ -5,6 +5,7 @@ const CASE_STATUS = {
   preop: 'Pre-op',
   posted: 'Posted',
   postop: 'Post-op',
+  plastic: 'Plastic T/O',
   discharged: 'Discharged',
 };
 

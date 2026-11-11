@@ -121,6 +121,7 @@ label > input, label > select, label > textarea { margin-top: .2rem; color: var(
 .st-posted { background: var(--blue-bg); color: var(--brand); }
 .st-postop { background: var(--ok-bg); color: var(--ok); }
 .st-discharged { background: var(--line); color: var(--muted); }
+.st-plastic { background: #fdecef; color: #a3264a; }
 
 .pill { font-size: .75rem; font-weight: 600; padding: .1rem .5rem; border-radius: 99px; background: var(--warn-bg); color: var(--warn); }
 .pill.ok { background: var(--ok-bg); color: var(--ok); }
@@ -1428,3 +1429,12 @@ html, body { overscroll-behavior-x: none; }
 .flow thead th.d { padding: .3rem .25rem; }
 .flow td.v { min-width: 0; padding-right: .9rem; }
 @media (max-width: 640px) { .flow .flow-date { font-size: .72rem; width: 6.2rem; } .flow td.pn { white-space: normal; min-width: 6.5rem; } }
+
+/* Plastic transfer outs */
+.pl-row { display: flex; gap: .75rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.pl-main { flex: 1; min-width: 14rem; }
+.pl-acts { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
+.pl-back-h { margin-top: 1.2rem; }
+.pl-done { padding: .35rem 0; border-bottom: 1px solid var(--line); }
+.pl-done:last-child { border-bottom: 0; }
+.st-plastic { color: #a3264a; }
