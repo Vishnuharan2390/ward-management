@@ -1172,27 +1172,41 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------- Case detail
+  // Every value is typed straight into the table: change a box and it saves when you
+  // leave it (empty = no value). Abnormal values go red with ↑ / ↓ as you type.
+  function flowCell(p, v) {
+    const f = flagOf(v, p);
+    const shown = p.scale && hasText(v) ? fmtVal(v, { ...p, unit: '' }) : '';
+    return `data-mark="${esc(FLAG_MARK[f].trim())}" class="v${f ? ' flag' : ''}"`
+      // the full count under shorthand (PLT 2.4 → 2,40,000), not when it would only add commas
+      + ` title="${esc(hasText(v) ? fmtVal(v, p) : '')}" data-fv="${esc(shown.replace(/,/g, '') !== String(v ?? '').trim().replace(/,/g, '') ? shown : '')}"`;
+  }
   function flowsheetHTML(c) {
     const sets = labSets(c);
-    if (!sets.length) return '<div class="muted">No investigations entered yet.</div>';
+    if (!sets.length) return '<div class="muted">No investigations entered yet. Tap <b>+ Column</b> to type them into the table, or use the button above.</div>';
     const row = (p, optional) => {
       const missing = !optional && !latest(c, p.k);
-      return `<tr class="${missing ? 'missing' : ''}">
+      return `<tr class="${missing ? 'missing' : ''}" data-row="${p.k}">
         <td class="pn">${esc(p.label)}${missing ? ' <span class="tag inv">pending</span>' : ''}<span class="rng">${esc(p.range)}${p.unit ? ' ' + esc(p.unit) : ''}</span></td>
         ${sets.map((s) => {
-          const v = s.v?.[p.k];
-          const f = flagOf(v, p);
-          return `<td class="v${f ? ' flag' : ''}">${hasText(v) ? esc(fmtVal(v, p)) + FLAG_MARK[f] : ''}</td>`;
+          const v = s.v?.[p.k] ?? '';
+          const aria = `${p.label} ${fmtDate(s.date)}`;
+          const field = p.options
+            ? `<select class="flow-in" data-lab="${s.id}" data-lk="${p.k}" aria-label="${esc(aria)}"><option value=""></option>${opts(hasText(v) && !p.options.includes(v) ? [...p.options, v] : p.options, v)}</select>`
+            : `<input class="flow-in" data-lab="${s.id}" data-lk="${p.k}" value="${esc(v)}" inputmode="decimal" autocomplete="off" data-nocaps aria-label="${esc(aria)}">`;
+          return `<td ${flowCell(p, v)}>${field}</td>`;
         }).join('')}
       </tr>`;
     };
-    const cols = sets.length + 1;
+    const cols = sets.length + 2;
     const customs = customParams(c);
     return `
       <div class="table-wrap">
         <table class="flow">
-          <thead><tr><th>Investigation <span class="rng">normal range</span></th>${sets.map((s) => `<th class="d">${esc(fmtDate(s.date)) || '—'}
-            <span class="set-acts"><button class="icon" data-edit-set="${s.id}" title="Edit">✎</button><button class="icon" data-del-set="${s.id}" title="Delete">✕</button></span></th>`).join('')}</tr></thead>
+          <thead><tr><th>Investigation <span class="rng">normal range</span></th>${sets.map((s) => `<th class="d">
+            <input type="date" class="flow-date" data-lab-date="${s.id}" value="${esc(s.date || '')}" aria-label="Date of these investigations">
+            <span class="set-acts"><button class="icon" data-edit-set="${s.id}" title="Edit in the form (photo of report, other investigations)">✎</button><button class="icon" data-del-set="${s.id}" title="Delete this column">✕</button></span></th>`).join('')}
+            <th class="d add-col"><button class="icon" data-add-col title="Add a column for today">+ Column</button></th></tr></thead>
           <tbody>
             ${LAB_GROUPS.map((g) => `<tr class="grp"><th colspan="${cols}">${esc(g.long || g.label)}${g.optional ? ' <span class="muted">(if needed)</span>' : ''}</th></tr>${g.params.map((p) => row(p, g.optional)).join('')}`).join('')}
             ${customs.length ? `<tr class="grp"><th colspan="${cols}">Other</th></tr>${customs.map((p) => row(p)).join('')}` : ''}
@@ -1345,7 +1359,8 @@ const App = (() => {
 
           <section class="card">
             <div class="row-between"><h3>Investigations <span class="pill ${r.ready ? 'ok' : ''}">${r.done}/${r.total}</span></h3>
-              <button class="btn small primary" id="add-set">+ ${labSets(c).length ? 'Repeat investigations' : 'Enter investigations'}</button></div>
+              <span class="row-acts">${labSets(c).length ? '' : '<button class="btn small" data-add-col>+ Column</button>'}<button class="btn small primary" id="add-set">+ ${labSets(c).length ? 'Repeat investigations' : 'Enter investigations'}</button></span></div>
+            ${labSets(c).length ? '<p class="muted small flow-hint">Tap any box to type or correct a value — it saves when you move on.</p>' : ''}
             ${flowsheetHTML(c)}
             <div class="pus">
               <label>Pus C/S — organism<input class="italic" data-bind="pus.organism" value="${esc(c.pus?.organism)}"></label>
@@ -1538,8 +1553,34 @@ const App = (() => {
           toast(hide ? 'Hidden from the OT list builder' : 'Back in the OT list builder');
         };
 
+        // Investigations table: live red flag while typing.
+        el.addEventListener('input', (e) => {
+          const t = e.target;
+          if (!t.dataset?.lab) return;
+          const c = Store.cases[id];
+          const p = [...ALL_PARAMS, ...customParams(c)].find((x) => x.k === t.dataset.lk);
+          const td = t.closest('td');
+          if (!p || !td) return;
+          const f = flagOf(t.value, p);
+          td.classList.toggle('flag', !!f);
+          td.dataset.mark = FLAG_MARK[f].trim();
+          td.dataset.fv = '';
+        });
+
         el.addEventListener('change', async (e) => {
           const t = e.target;
+          if (t.dataset.lab) {
+            const base = `labs.${t.dataset.lab}`;
+            const cur = Store.cases[id].labs?.[t.dataset.lab]?.v?.[t.dataset.lk] ?? '';
+            const val = t.value.trim();
+            if (val === String(cur).trim()) return;
+            Store.patch('cases', id, { [`${base}.v.${t.dataset.lk}`]: val || DELETE, [`${base}.by`]: Store.who() });
+            return;
+          }
+          if (t.dataset.labDate) {
+            Store.patch('cases', id, { [`labs.${t.dataset.labDate}.date`]: t.value });
+            return;
+          }
           if (t.dataset.check) {
             Store.patch('cases', id, { [t.dataset.check]: t.checked ? 'Taken' : '' });
           } else if (t.dataset.bind === 'opNotes') {
@@ -1578,6 +1619,12 @@ const App = (() => {
             Store.patch('cases', id, { ['opinions.' + b.dataset.delOp]: DELETE });
           } else if (b.dataset.delTask) {
             if (confirm('Delete this task?')) Store.patch('cases', id, { ['tasks.' + b.dataset.delTask]: DELETE });
+          } else if (b.dataset.addCol !== undefined) {
+            // A new empty column dated today, then straight into its first box.
+            const sid = uid();
+            Store.patch('cases', id, { ['labs.' + sid]: { date: todayISO(), at: Date.now(), by: Store.who(), v: {} } });
+            render();
+            setTimeout(() => $(`[data-lab="${sid}"]`)?.focus(), 0);
           } else if (b.dataset.editSet) {
             openLabModal(id, b.dataset.editSet);
           } else if (b.dataset.delSet) {

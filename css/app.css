@@ -1409,3 +1409,22 @@ html, body { overscroll-behavior-x: none; }
 #update-bar span { flex: 1; min-width: 0; }
 #update-bar .btn { white-space: nowrap; }
 @media print { .reload-btn, #update-bar { display: none !important; } }
+
+/* Investigations table: values typed straight into the cells */
+.flow td.v { padding: .15rem .25rem; position: relative; }
+.flow .flow-in { width: 4.6rem; min-width: 0; box-sizing: border-box; padding: .25rem .3rem; text-align: center; font: inherit; font-variant-numeric: tabular-nums; border: 1px solid transparent; border-radius: 6px; background: transparent; color: inherit; }
+.flow select.flow-in { width: 6.2rem; text-align-last: center; }
+.flow .flow-in:hover { border-color: var(--line); }
+.flow .flow-in:focus { border-color: var(--brand); background: var(--field, #fff); outline: none; }
+.flow td.v.flag .flow-in { color: var(--red); font-weight: 700; }
+.flow td.v[data-mark]:not([data-mark=""])::after { content: attr(data-mark); color: var(--red); font-weight: 700; position: absolute; right: .1rem; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.flow td.v[data-fv]:not([data-fv=""])::before { content: attr(data-fv); position: absolute; left: 0; right: 0; bottom: 0; font-size: .62rem; color: var(--muted); text-align: center; pointer-events: none; }
+.flow .flow-date { font: inherit; font-size: .8rem; background: transparent; color: inherit; border: 1px solid transparent; border-radius: 6px; padding: .1rem .2rem; width: 6.9rem; max-width: 6.9rem; }
+.flow .flow-date:focus { border-color: currentColor; outline: none; }
+.flow th.add-col .icon { color: inherit; font-size: .8rem; white-space: nowrap; }
+.flow-hint { margin: .2rem 0 .4rem; }
+.row-acts { display: inline-flex; gap: .4rem; flex-wrap: wrap; }
+@media print { .flow .flow-in, .flow .flow-date { border: 0; } .flow th.add-col, .flow .set-acts { display: none; } }
+.flow thead th.d { padding: .3rem .25rem; }
+.flow td.v { min-width: 0; padding-right: .9rem; }
+@media (max-width: 640px) { .flow .flow-date { font-size: .72rem; width: 6.2rem; } .flow td.pn { white-space: normal; min-width: 6.5rem; } }
