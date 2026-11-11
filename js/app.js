@@ -233,29 +233,39 @@ const App = (() => {
     Store.patch('cases', id, { status: 'postop', transfer: { by: Store.who(), at: Date.now(), received: false } });
   }
 
-  // Plastic surgery: transfer out from the pre-op or post-op ward (the case leaves both wards and
-  // the OT list and waits under "Plastic transfer outs"); transferred back in, it joins the pre-op ward.
-  // Each stay is kept on the case (plasticLog).
+  // Transfer outs (Plastic surgery, Neurosurgery): from the pre-op or post-op ward the case leaves both
+  // wards and the OT list and waits under that department's tab; transferred back in, it joins the
+  // pre-op ward. The open stay is c[dept], each finished stay is kept in c[dept + 'Log'].
   const wardOf = (c) => (c.status === 'postop' ? 'Post-op ward' : 'Pre-op ward');
-  function transferToPlastic(id) {
+  const canTransferOut = (c) => isActive(c) || c.status === 'postop';
+  function transferOut(id, dept) {
     const c = Store.cases[id];
-    Store.patch('cases', id, { status: 'plastic', plastic: { out: todayISO(), at: Date.now(), by: Store.who(), from: c.status === 'postop' ? 'postop' : 'preop' } });
+    const ch = { status: dept, [dept]: { out: todayISO(), at: Date.now(), by: Store.who(), from: c.status === 'postop' ? 'postop' : c[c.status]?.from || 'preop' } };
+    // Straight from one department to another: close the first stay.
+    if (TRANSFER_DEPTS[c.status] && c.status !== dept) Object.assign(ch, closeStay(c, c.status, dept));
+    Store.patch('cases', id, ch);
   }
-  function backFromPlastic(id) {
-    const p = Store.cases[id].plastic || {};
-    Store.patch('cases', id, { status: 'preop', plastic: DELETE, ['plasticLog.' + uid()]: { ...p, in: todayISO(), inAt: Date.now(), inBy: Store.who() } });
-  }
-  function askPlasticOut(id) {
+  // `to`: where the case went when the stay ended — 'preop' (transferred back in) or another department.
+  const closeStay = (c, dept, to = 'preop') => ({ [dept]: DELETE, [`${dept}Log.${uid()}`]: { ...(c[dept] || {}), in: todayISO(), inAt: Date.now(), inBy: Store.who(), to } });
+  function backIn(id) {
     const c = Store.cases[id];
-    if (!confirm(`Transfer ${c.name || 'this case'} out to Plastic surgery?\n\nIt leaves the ${wardOf(c).toLowerCase()} and the OT list, and waits under "Plastic transfer outs" until it is transferred back in.`)) return false;
-    transferToPlastic(id);
-    toast(`${c.name || 'Case'} transferred out to Plastic`);
+    Store.patch('cases', id, { status: 'preop', ...closeStay(c, c.status) });
+  }
+  function askOut(id, dept) {
+    const c = Store.cases[id];
+    const D = TRANSFER_DEPTS[dept];
+    const here = TRANSFER_DEPTS[c.status] ? `${TRANSFER_DEPTS[c.status].short} list` : `${wardOf(c).toLowerCase()} and the OT list`;
+    if (!confirm(`Transfer ${c.name || 'this case'} out to ${D.long}?\n\nIt leaves the ${here}, and waits under "${D.tab}" until it is transferred back in.`)) return false;
+    transferOut(id, dept);
+    toast(`${c.name || 'Case'} transferred out to ${D.short}`);
     return true;
   }
-  function askPlasticBack(id) {
+  function askBack(id) {
     const c = Store.cases[id];
-    if (!confirm(`Transfer ${c.name || 'this case'} back in from Plastic?\n\nIt goes into the pre-op ward.`)) return false;
-    backFromPlastic(id);
+    const D = TRANSFER_DEPTS[c.status];
+    if (!D) return false;
+    if (!confirm(`Transfer ${c.name || 'this case'} back in from ${D.short}?\n\nIt goes into the pre-op ward.`)) return false;
+    backIn(id);
     toast(`${c.name || 'Case'} is back in the pre-op ward`);
     return true;
   }
@@ -277,7 +287,7 @@ const App = (() => {
       const all = caseList();
       const cnt = (s) => all.filter((c) => (c.status || 'preop') === s).length;
       const ready = all.filter((c) => (c.status || 'preop') === 'preop' && readiness(c).ready).length;
-      const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ['plastic', 'Plastic T/O'], ['discharged', 'Discharged'], ['all', 'All']];
+      const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ...Object.entries(TRANSFER_DEPTS).map(([k, D]) => [k, D.status]), ['discharged', 'Discharged'], ['all', 'All']];
       const u = unitOf(Store.meta.unitId);
       return `
         <div class="hosp">
@@ -1004,43 +1014,47 @@ const App = (() => {
     </div>`;
   }
 
-  // ---------------------------------------------------------------- Plastic transfer outs
-  const Plastic = {
-    live: true,
-    render() {
-      const out = caseList().filter((c) => c.status === 'plastic').sort((a, b) => (a.plastic?.at || 0) - (b.plastic?.at || 0));
-      // Came back in the last 14 days (now in the pre-op ward).
-      const back = caseList().flatMap((c) => listOf(c.plasticLog).filter((l) => l.in && daysSince(l.in) <= 14).map((l) => ({ c, l })))
-        .sort((a, b) => (b.l.inAt || 0) - (a.l.inAt || 0));
-      const row = (c) => {
-        const p = c.plastic || {};
-        const d = p.out ? daysSince(p.out) : null;
-        return `<div class="card pl-row">
-          <div class="pl-main">
-            <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}${c.bed ? ' · Bed ' + esc(c.bed) : ''}</span></div>
-            <div class="small">${esc(c.diagnosis) || '—'}</div>
-            ${c.procedureDone ? `<div class="small muted">Done: ${esc(c.procedureDone)}</div>` : ''}
-            <div class="muted small">From the ${esc(p.from === 'postop' ? 'post-op' : 'pre-op')} ward · out ${esc(fmtDate(p.out))}${d != null ? ` · <b>day ${d}</b>` : ''}${p.by ? ' · by ' + esc(p.by) : ''}</div>
-          </div>
-          <span class="pl-acts"><a class="btn small" href="#/case/${c.id}">e-Case sheet</a><button class="btn small primary" data-pl-back="${c.id}">Transfer back in</button></span>
-        </div>`;
-      };
-      return `
-        <div class="toolbar"><h2>Plastic transfer outs <span class="pill">${out.length}</span></h2></div>
-        <p class="muted small">Cases transferred out to Plastic surgery from the pre-op or post-op ward. <b>Transfer back in</b> puts the case in the pre-op ward.
-          To transfer a case out, open its e-case sheet and tap <b>Transfer out to Plastic</b>.</p>
-        ${out.map(row).join('') || '<div class="empty">No cases with Plastic right now.</div>'}
-        ${back.length ? `<h3 class="pl-back-h">Back in the pre-op ward (last 14 days)</h3>
-          <div class="card">${back.map(({ c, l }) => `<div class="pl-done"><a href="#/case/${c.id}"><b>${esc(c.name)}</b></a> <span class="muted small">${esc(ageSex(c))}</span>
-            <div class="muted small">Out ${esc(fmtDate(l.out))} → back ${esc(fmtDate(l.in))} (${Math.max(0, daysSince(l.out) - daysSince(l.in))} day(s) with Plastic)</div></div>`).join('')}</div>` : ''}`;
-    },
-    mount(el) {
-      el.addEventListener('click', (e) => {
-        const b = e.target.closest('[data-pl-back]');
-        if (b) askPlasticBack(b.dataset.plBack);
-      });
-    },
-  };
+  // ---------------------------------------------------------------- Transfer-out tabs (Plastic, Neurosurgery)
+  function TransferTab(dept) {
+    const D = TRANSFER_DEPTS[dept];
+    return {
+      live: true,
+      render() {
+        const out = caseList().filter((c) => c.status === dept).sort((a, b) => (a[dept]?.at || 0) - (b[dept]?.at || 0));
+        // Came back in the last 14 days (now in the pre-op ward).
+        const back = caseList().flatMap((c) => listOf(c[dept + 'Log']).filter((l) => l.in && daysSince(l.in) <= 14).map((l) => ({ c, l })))
+          .sort((a, b) => (b.l.inAt || 0) - (a.l.inAt || 0));
+        const row = (c) => {
+          const p = c[dept] || {};
+          const d = p.out ? daysSince(p.out) : null;
+          return `<div class="card pl-row">
+            <div class="pl-main">
+              <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}${c.bed ? ' · Bed ' + esc(c.bed) : ''}</span></div>
+              <div class="small">${esc(c.diagnosis) || '—'}</div>
+              ${c.procedureDone ? `<div class="small muted">Done: ${esc(c.procedureDone)}</div>` : ''}
+              <div class="muted small">From the ${esc(p.from === 'postop' ? 'post-op' : 'pre-op')} ward · out ${esc(fmtDate(p.out))}${d != null ? ` · <b>day ${d}</b>` : ''}${p.by ? ' · by ' + esc(p.by) : ''}</div>
+            </div>
+            <span class="pl-acts"><a class="btn small" href="#/case/${c.id}">e-Case sheet</a><button class="btn small primary" data-back-in="${c.id}">Transfer back in</button></span>
+          </div>`;
+        };
+        return `
+          <div class="toolbar"><h2>${esc(D.tab)} <span class="pill">${out.length}</span></h2></div>
+          <p class="muted small">Cases transferred out to ${esc(D.long)} from the pre-op or post-op ward. <b>Transfer back in</b> puts the case in the pre-op ward.
+            To transfer a case out, open its e-case sheet and tap <b>Transfer out to ${esc(D.short)}</b>.</p>
+          ${out.map(row).join('') || `<div class="empty">No cases with ${esc(D.short)} right now.</div>`}
+          ${back.length ? `<h3 class="pl-back-h">Transferred back (last 14 days)</h3>
+            <div class="card">${back.map(({ c, l }) => `<div class="pl-done"><a href="#/case/${c.id}"><b>${esc(c.name)}</b></a> <span class="muted small">${esc(ageSex(c))}</span>
+              <div class="muted small">Out ${esc(fmtDate(l.out))} → ${TRANSFER_DEPTS[l.to] ? `moved to ${esc(TRANSFER_DEPTS[l.to].short)}` : 'back to the pre-op ward'} ${esc(fmtDate(l.in))} (${Math.max(0, daysSince(l.out) - daysSince(l.in))} day(s) with ${esc(D.short)})</div></div>`).join('')}</div>` : ''}`;
+      },
+      mount(el) {
+        el.addEventListener('click', (e) => {
+          const b = e.target.closest('[data-back-in]');
+          if (b) askBack(b.dataset.backIn);
+        });
+      },
+    };
+  }
+  const TransferTabs = Object.fromEntries(Object.keys(TRANSFER_DEPTS).map((k) => [k, TransferTab(k)]));
 
   // ---------------------------------------------------------------- Case form
   // `deckDate`: opened from the admission day PPT — preset the DOA and go back there after saving.
@@ -1414,9 +1428,9 @@ const App = (() => {
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               ${isActive(c) ? '<button class="btn primary" id="to-postop">Transfer to post-op ward</button>' : ''}
               ${c.status === 'postop' ? `<span class="tag ok">${isIncoming(c) ? 'Sent to post-op ward — waiting to be received' : 'In the post-op ward'}</span>` : ''}
-              ${isActive(c) || c.status === 'postop' ? '<button class="btn" id="to-plastic">Transfer out to Plastic</button>' : ''}
-              ${c.status === 'plastic' ? `<span class="tag task">With Plastic since ${esc(fmtDate(c.plastic?.out))}${c.plastic?.out ? ` (day ${daysSince(c.plastic.out)})` : ''}</span>
-              <button class="btn primary" id="from-plastic">Transfer back in to pre-op ward</button>` : ''}
+              ${canTransferOut(c) ? Object.entries(TRANSFER_DEPTS).map(([k, D]) => `<button class="btn" data-out-to="${k}">Transfer out to ${esc(D.short)}</button>`).join('') : ''}
+              ${TRANSFER_DEPTS[c.status] ? `<span class="tag task">With ${esc(TRANSFER_DEPTS[c.status].short)} since ${esc(fmtDate(c[c.status]?.out))}${c[c.status]?.out ? ` (day ${daysSince(c[c.status].out)})` : ''}</span>
+              <button class="btn primary" id="back-in">Transfer back in to pre-op ward</button>` : ''}
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
               <button class="btn wa" id="wa-case">WhatsApp${caseImages(id).length ? ` + ${caseImages(id).length} photo${caseImages(id).length === 1 ? '' : 's'}` : ''}</button>
               <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
@@ -1529,15 +1543,14 @@ const App = (() => {
         $('#case-status', el).onchange = (e) => {
           const cur = Store.cases[id];
           const to = e.target.value;
-          // Plastic transfers go through the same steps as the buttons, so the stay is recorded.
-          if (to === 'plastic' && cur.status !== 'plastic') { if (!askPlasticOut(id)) e.target.value = cur.status || 'preop'; return; }
-          if (cur.status === 'plastic' && to === 'preop') { if (!askPlasticBack(id)) e.target.value = 'plastic'; return; }
+          // Transfer outs go through the same steps as the buttons, so the stay is recorded.
+          if (TRANSFER_DEPTS[to] && cur.status !== to) { if (!askOut(id, to)) e.target.value = cur.status || 'preop'; return; }
+          if (TRANSFER_DEPTS[cur.status] && to === 'preop') { if (!askBack(id)) e.target.value = cur.status; return; }
           Store.patch('cases', id, { status: to });
         };
-        const tpl = $('#to-plastic', el);
-        if (tpl) tpl.onclick = () => { if (askPlasticOut(id)) location.hash = '#/plastic'; };
-        const fpl = $('#from-plastic', el);
-        if (fpl) fpl.onclick = () => askPlasticBack(id);
+        $$('[data-out-to]', el).forEach((b) => { b.onclick = () => { if (askOut(id, b.dataset.outTo)) location.hash = '#/' + b.dataset.outTo; }; });
+        const bin = $('#back-in', el);
+        if (bin) bin.onclick = () => askBack(id);
         el.addEventListener('input', (e) => {
           const k = e.target.dataset.cin;
           const box = e.target.closest('[data-chart]');
@@ -3476,7 +3489,7 @@ const App = (() => {
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
     [/^#\/postward$/, () => PostWard],
-    [/^#\/plastic$/, () => Plastic],
+    [/^#\/(plastic|neuro)$/, (k) => TransferTabs[k]],
     [/^#\/new$/, () => CaseForm()],
     [/^#\/import$/, () => Import.open()],
     [/^#\/import\/deck\/([\d-]+)$/, (d) => Import.open(d)],
@@ -3501,7 +3514,7 @@ const App = (() => {
   }
 
   function section() {
-    const m = (location.hash || '#/').match(/^#\/(ward|postward|plastic|ot|deck|postop|settings)\b/);
+    const m = (location.hash || '#/').match(/^#\/(ward|postward|plastic|neuro|ot|deck|postop|settings)\b/);
     return m ? '#/' + m[1] : '#/';
   }
 

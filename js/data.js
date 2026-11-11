@@ -6,7 +6,15 @@ const CASE_STATUS = {
   posted: 'Posted',
   postop: 'Post-op',
   plastic: 'Plastic T/O',
+  neuro: 'Neurosurgery T/O',
   discharged: 'Discharged',
+};
+
+// Departments a case can be transferred out to (and back in from, into the pre-op ward).
+// The key is the case status and the tab's address (#/plastic). Add a line here for another one.
+const TRANSFER_DEPTS = {
+  plastic: { short: 'Plastic', long: 'Plastic surgery', tab: 'Plastic transfer outs', status: 'Plastic T/O' },
+  neuro: { short: 'Neurosurgery', long: 'Neurosurgery', tab: 'Neurosurgery transfer outs', status: 'Neurosurgery T/O' },
 };
 
 const ANAES = 'GA/RA';
