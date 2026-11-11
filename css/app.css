@@ -1401,3 +1401,11 @@ html, body { overscroll-behavior-x: none; }
 .cf-end { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6mm; break-inside: avoid; }
 .cf-by { width: 70mm; font-size: 9.5pt; }
 .cf-line { display: block; border-bottom: 1px solid #000; height: 11mm; margin-bottom: 1mm; }
+
+/* Reload button (menu bar) and the "new version" bar */
+.reload-btn { font: inherit; font-size: 12px; padding: .15rem .55rem; margin-left: .5rem; border-radius: 6px; border: 1px solid var(--line, rgba(127,127,127,.4)); background: transparent; color: inherit; cursor: pointer; white-space: nowrap; }
+.reload-btn:active { opacity: .6; }
+#update-bar { position: fixed; left: 50%; bottom: calc(16px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 80; display: flex; gap: .5rem; align-items: center; width: min(460px, calc(100% - 32px)); box-sizing: border-box; padding: .55rem .6rem .55rem .9rem; border-radius: 12px; background: var(--ink); color: var(--bg); box-shadow: 0 8px 28px rgba(0,0,0,.45); font-size: .9rem; }
+#update-bar span { flex: 1; min-width: 0; }
+#update-bar .btn { white-space: nowrap; }
+@media print { .reload-btn, #update-bar { display: none !important; } }
