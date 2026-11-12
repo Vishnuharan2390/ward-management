@@ -150,7 +150,10 @@ const SharePdf = (() => {
       d.setDrawColor(120);
       d.line(4, M + half + gap / 2, W - 4, M + half + gap / 2);
     }
-    return new File([d.output('blob')], otFileName(draft) + (twice ? ' PRINT' : '') + '.pdf', { type: 'application/pdf' });
+    const name = otFileName(draft) + (twice ? ' PRINT' : '');
+    d.setProperties({ title: name }); // the tab / PDF viewer shows this instead of a random id
+    d.setDisplayMode(undefined, undefined, 'UseNone');
+    return new File([d.output('blob')], name + '.pdf', { type: 'application/pdf' });
   }
 
   // Email the OT list to the unit's address (Settings). A web page can't send mail by itself,
@@ -197,8 +200,19 @@ const SharePdf = (() => {
     toast(msg || `Saved ${file.name} — attach it in WhatsApp`, 4000);
   }
 
+  // Computer: open the PDF in a new tab (the browser's PDF viewer prints it as it is — no web-address
+  // strip, which the print dialog adds, above all in Safari). Phone: the share sheet.
+  function open(file) {
+    if (PhonePdf.isPhone()) return send(file);
+    const url = URL.createObjectURL(file);
+    const w = window.open(url, '_blank');
+    if (!w) { URL.revokeObjectURL(url); download(file, `Saved ${file.name}`); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 10 * 60e3);
+  }
+
   return {
     ward: (cases, meta, post) => send(wardPdf(cases, meta, post)),
+    otOpen: (cases, draft, twice = false) => open(otPdf(cases, draft, twice)),
     pending: (cases, meta, post) => send(pendingPdf(cases, meta, post)),
     ot: (cases, draft, twice = false) => send(otPdf(cases, draft, twice)),
     otEmail: (cases, draft, to) => email(otPdf(cases, draft), to, draft),

@@ -2212,10 +2212,10 @@ const App = (() => {
         if ($('#ot-mark', el).checked) {
           cases.filter((c) => c.status !== 'posted').forEach((c) => Store.patch('cases', c.id, { status: 'posted', otDate: dd.date }));
         }
-        // iPhone ignores window.print() (above all in the home-screen app): phones get a real PDF
-        // file in the share sheet (Print / Save to Files / WhatsApp); computers keep the print dialog.
-        if (PhonePdf.isPhone()) SharePdf.ot(cases, dd, twice);
-        else Print.otList(cases, dd, twice);
+        // A real PDF file, not the print dialog: iPhone ignores window.print(), and the print dialog
+        // adds the web-address strip (Safari even with zero margins). Phone: share sheet;
+        // computer: opens in a new tab to print or save.
+        SharePdf.otOpen(cases, dd, twice);
       };
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
