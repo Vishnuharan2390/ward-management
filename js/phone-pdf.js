@@ -79,14 +79,15 @@ const PhonePdf = (() => {
 
   // ---------------------------------------------------------------- Pre-op imaging
   // Same layout as Print.otXrays: patient box, section heading, the images side by side, list line at the foot.
-  async function otXrays(items, draft) {
+  // opt.foot / opt.name: footer line and file name (default: the OT list's).
+  async function otXrays(items, draft, opt = {}) {
     const { jsPDF } = window.jspdf;
     const d = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     const PW = 210;
     const PH = 297;
     const M = 10;
     const CW = PW - 2 * M;
-    const foot = latin(Print.otTitle(draft)[0]);
+    const foot = latin(opt.foot ?? Print.otTitle(draft)[0]);
     let first = true;
     for (const { c, n, sections } of items) {
       for (const { title, images, per = 3 } of sections) {
@@ -106,8 +107,9 @@ const PhonePdf = (() => {
           d.rect(M, M, CW, boxH);
           d.setFontSize(17);
           d.setFont('helvetica', 'normal');
-          d.text(`${n}.`, M + 3, M + 8.5);
-          const nw = d.getTextWidth(`${n}. `);
+          const no = n ? `${n}.` : '';
+          d.text(no, M + 3, M + 8.5);
+          const nw = no ? d.getTextWidth(no + ' ') : 0;
           d.setFont('helvetica', 'bold');
           d.text(latin(`${up(c.name)}   ${up(ageSex(c))}`), M + 3 + nw, M + 8.5, { maxWidth: CW - 6 - nw });
           d.setFontSize(12.5);
@@ -149,8 +151,30 @@ const PhonePdf = (() => {
         }
       }
     }
-    const name = `PREOP_IMAGING_${latin(up(draft.unit || '')).replace(/\s+/g, '_')}_${stamp(draft.date)}`.replace(/_+/g, '_') + '.pdf';
+    const name = opt.name || `PREOP_IMAGING_${latin(up(draft.unit || '')).replace(/\s+/g, '_')}_${stamp(draft.date)}`.replace(/_+/g, '_') + '.pdf';
     return new File([d.output('blob')], name, { type: 'application/pdf' });
+  }
+
+  // ---------------------------------------------------------------- Discharge summary
+  // The same A4 pages the discharge PowerPoint uses (DcPages), one per PDF page.
+  async function discharge(c, dd, meta) {
+    const { jsPDF } = window.jspdf;
+    const pages = await DcPages.render(c, dd, meta);
+    const d = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    pages.forEach((png, i) => {
+      if (i) d.addPage();
+      d.addImage(png, 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+    });
+    return new File([d.output('blob')], `${latin(up(c.name)).replace(/\s+/g, '_') || 'PATIENT'}_DISCHARGE.pdf`, { type: 'application/pdf' });
+  }
+
+  // ---------------------------------------------------------------- Radiographs (discharge page)
+  function radiographs(c, dd, sections, meta) {
+    const who = { ...c, diagnosis: dd.diagnosis || c.diagnosis };
+    const foot = [up(dd.procedure || c.plan), dd.dos ? 'DOS ' + fmtDate(dd.dos) : '', unitName(meta.unitId)].filter(Boolean).join(' - ');
+    return otXrays([{ c: who, n: '', sections: sections.map((x) => ({ ...x, per: 3 })) }], {}, {
+      foot, name: `${latin(up(c.name)).replace(/\s+/g, '_') || 'PATIENT'}_RADIOGRAPHS.pdf`,
+    });
   }
 
   // ---------------------------------------------------------------- Consent forms (Tamil)
@@ -345,5 +369,7 @@ const PhonePdf = (() => {
     isPhone,
     otXrays: (items, draft) => run(() => otXrays(items, draft), 'pre-op imaging'),
     consents: (cases, draft) => run(() => consents(cases, draft), 'consent forms'),
+    discharge: (c, dd, meta) => run(() => discharge(c, dd, meta), 'discharge summary'),
+    radiographs: (c, dd, sections, meta) => run(() => radiographs(c, dd, sections, meta), 'radiographs'),
   };
 })();

@@ -76,12 +76,15 @@ const SharePdf = (() => {
 
   // OT list as a PDF file: same page as the printed one (US Letter landscape, the unit's 11 columns,
   // title on top, Assistant Professor bottom-right). Named "OT LIST UNIT I 11-11-2026.pdf".
-  function otPdf(cases, draft) {
+  // twice: the "print" version — the same list twice on one sheet, top and bottom, each shrunk
+  // until it fits its half, with a dashed cut line between (like Print.otList(…, true)).
+  function otPdf(cases, draft, twice = false) {
     const { jsPDF } = window.jspdf;
-    const d = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
-    const W = d.internal.pageSize.getWidth();
-    const H = d.internal.pageSize.getHeight();
-    const M = 12;
+    const newDoc = () => new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+    const probe = newDoc();
+    const W = probe.internal.pageSize.getWidth();
+    const H = probe.internal.pageSize.getHeight();
+    const M = twice ? 8 : 12;
     const cols = Object.keys(Print.OT_COLUMNS);
     const total = cols.reduce((a, k) => a + Print.OT_COLUMNS[k][1], 0);
     const cell = (k, c, i) => {
@@ -100,27 +103,54 @@ const SharePdf = (() => {
         default: return '';
       }
     };
-    d.setFont('helvetica', 'bold');
-    d.setFontSize(14);
     const title = Print.otTitle(draft).filter(Boolean).map(clean);
-    title.forEach((t, i) => d.text(t, W / 2, M + 5 + i * 6.5, { align: 'center' }));
-    d.autoTable({
-      startY: M + 5 + title.length * 6.5 + 2,
-      head: [cols.map((k) => Print.OT_COLUMNS[k][0])],
-      body: cases.map((c, i) => cols.map((k) => cell(k, c, i))),
-      theme: 'grid',
-      margin: { top: M, left: M, right: M, bottom: M },
-      styles: { font: 'times', fontStyle: 'bold', fontSize: 8, cellPadding: 1, valign: 'top', textColor: 0, lineColor: 0, lineWidth: 0.25, overflow: 'linebreak', minCellHeight: 13.4 },
-      headStyles: { fillColor: false, minCellHeight: 0 },
-      columnStyles: Object.fromEntries(cols.map((k, i) => [i, { cellWidth: ((W - 2 * M) * Print.OT_COLUMNS[k][1]) / total }])),
-      rowPageBreak: 'avoid',
-    });
-    let y = d.lastAutoTable.finalY + 12;
-    if (y > H - M) { d.addPage(); y = M + 5; }
-    d.setFont('times', 'bold');
-    d.setFontSize(8);
-    d.text(U(draft.prof), W - M - 14, y, { align: 'right' });
-    return new File([d.output('blob')], otFileName(draft) + '.pdf', { type: 'application/pdf' });
+    const body = cases.map((c, i) => cols.map((k) => cell(k, c, i)));
+    // One copy of the list from y0 at scale s; returns where it ends (below the signature).
+    const draw = (d, y0, s) => {
+      d.setFont('helvetica', 'bold');
+      d.setFontSize(14 * s);
+      title.forEach((t, i) => d.text(t, W / 2, y0 + 5 * s + i * 6.5 * s, { align: 'center' }));
+      d.autoTable({
+        startY: y0 + 5 * s + title.length * 6.5 * s + 2 * s,
+        head: [cols.map((k) => Print.OT_COLUMNS[k][0])],
+        body,
+        theme: 'grid',
+        margin: { top: M, left: M, right: M, bottom: twice ? 2 : M },
+        styles: { font: 'times', fontStyle: 'bold', fontSize: 8 * s, cellPadding: 1 * s, valign: 'top', textColor: 0, lineColor: 0, lineWidth: 0.25, overflow: 'linebreak', minCellHeight: (twice ? 9 : 13.4) * s },
+        headStyles: { fillColor: false, minCellHeight: 0 },
+        columnStyles: Object.fromEntries(cols.map((k, i) => [i, { cellWidth: ((W - 2 * M) * Print.OT_COLUMNS[k][1]) / total }])),
+        rowPageBreak: 'avoid',
+      });
+      let y = d.lastAutoTable.finalY + 12 * s;
+      if (!twice && y > H - M) { d.addPage(); y = M + 5; }
+      d.setFont('times', 'bold');
+      d.setFontSize(8 * s);
+      d.text(U(draft.prof), W - M - 14 * s, y, { align: 'right' });
+      return y + 2 * s;
+    };
+    let d;
+    if (!twice) {
+      d = newDoc();
+      draw(d, M, 1);
+    } else {
+      const gap = 8;
+      const half = (H - 2 * M - gap) / 2;
+      // Largest scale at which one copy stays on the page and inside its half.
+      let s = 1;
+      for (; s > 0.35; s -= 0.05) {
+        const t = newDoc();
+        const end = draw(t, M, s);
+        if (t.internal.getNumberOfPages() === 1 && end <= M + half) break;
+      }
+      d = newDoc();
+      draw(d, M, s);
+      draw(d, M + half + gap, s);
+      d.setLineDashPattern([2, 2], 0);
+      d.setLineWidth(0.2);
+      d.setDrawColor(120);
+      d.line(4, M + half + gap / 2, W - 4, M + half + gap / 2);
+    }
+    return new File([d.output('blob')], otFileName(draft) + (twice ? ' PRINT' : '') + '.pdf', { type: 'application/pdf' });
   }
 
   // Email the OT list to the unit's address (Settings). A web page can't send mail by itself,
@@ -170,7 +200,7 @@ const SharePdf = (() => {
   return {
     ward: (cases, meta, post) => send(wardPdf(cases, meta, post)),
     pending: (cases, meta, post) => send(pendingPdf(cases, meta, post)),
-    ot: (cases, draft) => send(otPdf(cases, draft)),
+    ot: (cases, draft, twice = false) => send(otPdf(cases, draft, twice)),
     otEmail: (cases, draft, to) => email(otPdf(cases, draft), to, draft),
     wardPdf, pendingPdf, otPdf,
   };

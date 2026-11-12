@@ -831,7 +831,8 @@ const App = (() => {
         <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
-      $('#print-ward', el).onclick = () => Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD');
+      // Phones: the notebook as a PDF file (window.print is unreliable there).
+      $('#print-ward', el).onclick = () => (PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'));
       // Post-op PG receives a case transferred from the pre-op ward.
       el.addEventListener('click', (e) => {
         const r = e.target.closest('[data-receive]');
@@ -2211,7 +2212,10 @@ const App = (() => {
         if ($('#ot-mark', el).checked) {
           cases.filter((c) => c.status !== 'posted').forEach((c) => Store.patch('cases', c.id, { status: 'posted', otDate: dd.date }));
         }
-        Print.otList(cases, dd, twice);
+        // iPhone ignores window.print() (above all in the home-screen app): phones get a real PDF
+        // file in the share sheet (Print / Save to Files / WhatsApp); computers keep the print dialog.
+        if (PhonePdf.isPhone()) SharePdf.ot(cases, dd, twice);
+        else Print.otList(cases, dd, twice);
       };
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
@@ -2964,7 +2968,8 @@ const App = (() => {
             if (st === 'postop' && c().status !== 'postop') transferToPostop(id);
             else if (c().status !== st) Store.patch('cases', id, { status: st });
           }
-          Print.discharge(c(), d, Store.meta);
+          if (PhonePdf.isPhone()) PhonePdf.discharge(c(), d, Store.meta);
+          else Print.discharge(c(), d, Store.meta);
         };
         $('#out-summary', el).onclick = () => f.requestSubmit();
 
@@ -2998,7 +3003,8 @@ const App = (() => {
           if (!sections.length) return toast('No pre-op X-ray, post-op X-ray or post-op wound pic uploaded yet.', 4000);
           const missing = ['PRE-OP X-RAY', 'POST-OP X-RAY', 'POST-OP WOUND PIC'].filter((t) => !sections.some((x) => x.title === t));
           if (missing.length) toast('Not uploaded, left out: ' + missing.join(', '), 4000);
-          Print.imagesPdf(c(), d, sections, Store.meta);
+          if (PhonePdf.isPhone()) PhonePdf.radiographs(c(), d, sections, Store.meta);
+          else Print.imagesPdf(c(), d, sections, Store.meta);
         };
 
         $('#out-ppt', el).onclick = async (e) => {
