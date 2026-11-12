@@ -272,6 +272,7 @@ const App = (() => {
 
   // ---------------------------------------------------------------- Dashboard
   let dashFilter = sessionStorage.getItem('wm.filter') || 'active';
+  if (TRANSFER_DEPTS[dashFilter]) dashFilter = 'active'; // those filter chips became the transfer-out buttons
   let dashQuery = '';
 
   function filteredCases() {
@@ -287,7 +288,7 @@ const App = (() => {
       const all = caseList();
       const cnt = (s) => all.filter((c) => (c.status || 'preop') === s).length;
       const ready = all.filter((c) => (c.status || 'preop') === 'preop' && readiness(c).ready).length;
-      const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ...Object.entries(TRANSFER_DEPTS).map(([k, D]) => [k, D.status]), ['discharged', 'Discharged'], ['all', 'All']];
+      const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ['discharged', 'Discharged'], ['all', 'All']];
       const u = unitOf(Store.meta.unitId);
       return `
         <div class="hosp">
@@ -309,6 +310,7 @@ const App = (() => {
           <a class="btn wa" href="#/import">From WhatsApp</a>
           <a class="btn" href="#/import">From PowerPoint</a>
         </div>
+        <div class="xfer-links">${Object.entries(TRANSFER_DEPTS).map(([k, D]) => `<a class="btn small" href="#/${k}" title="${esc(D.tab)}">${esc(D.btn || D.tab)}${cnt(k) ? ` <span class="pill">${cnt(k)}</span>` : ''}</a>`).join('')}</div>
         <div class="chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
         <div class="order-bar">
           <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order' : 'By date of admission (oldest first)'}</span>
@@ -1039,6 +1041,7 @@ const App = (() => {
           </div>`;
         };
         return `
+          <p class="small"><a href="#/">← e-Case Sheet</a></p>
           <div class="toolbar"><h2>${esc(D.tab)} <span class="pill">${out.length}</span></h2></div>
           <p class="muted small">Cases transferred out to ${esc(D.long)} from the pre-op or post-op ward. <b>Transfer back in</b> puts the case in the pre-op ward.
             To transfer a case out, open its e-case sheet and tap <b>Transfer out to ${esc(D.short)}</b>.</p>
@@ -3520,7 +3523,7 @@ const App = (() => {
   }
 
   function section() {
-    const m = (location.hash || '#/').match(/^#\/(ward|postward|plastic|neuro|ot|deck|postop|settings)\b/);
+    const m = (location.hash || '#/').match(/^#\/(ward|postward|ot|deck|postop|settings)\b/);
     return m ? '#/' + m[1] : '#/';
   }
 
