@@ -5,7 +5,8 @@ const Print = (() => {
   const up = (s) => String(s ?? '').toUpperCase();
 
   // noHeader: zero page margins, so the browser has no room to print its date/time and URL
-  // header and footer; the margins are recreated inside the page (repeated on every page).
+  // header and footer (the web-address strip); the margins are recreated inside the page
+  // (repeated on every page). Every print uses it.
   function go(html, { title, page, margin = '12mm', fit, noHeader = false }) {
     if (noHeader) {
       html = `<table class="pg-wrap"><thead><tr><td style="height:${margin}"></td></tr></thead>`
@@ -151,7 +152,7 @@ const Print = (() => {
           <tbody>${rows}</tbody>
         </table>
       </div>`;
-    go(html, { title: `Ward status ${fmtDate(todayISO()).replace(/\//g, '-')}`, page: 'A4 landscape' });
+    go(html, { title: `Ward status ${fmtDate(todayISO()).replace(/\//g, '-')}`, page: 'A4 landscape', noHeader: true });
   }
 
   // ---------------------------------------------------------------- Discharge
@@ -198,7 +199,7 @@ const Print = (() => {
           ${row(`<div class="dc-end"><div class="dc-doc"><b>DISCHARGING DOCTOR:</b> ${esc(up(d.doctor))}</div><div class="dc-sig">DOCTOR SIGNATURE</div></div>`)}
         </tbody>
       </table>`;
-    go(html, { title: `${up(c.name)}_DISCHARGE`, page: 'A4 portrait' });
+    go(html, { title: `${up(c.name)}_DISCHARGE`, page: 'A4 portrait', noHeader: true });
   }
 
   // ---------------------------------------------------------------- Chart
@@ -223,7 +224,7 @@ const Print = (() => {
           }).join('')}</tr>`).join('')}</tbody>
         </table>
       </div>`;
-    go(html, { title: `${ch.title} ${c.name}`, page: cols.length > 7 ? 'A4 landscape' : 'A4 portrait' });
+    go(html, { title: `${ch.title} ${c.name}`, page: cols.length > 7 ? 'A4 landscape' : 'A4 portrait', noHeader: true });
   }
 
   // ---------------------------------------------------------------- Radiographs PDF
@@ -239,7 +240,7 @@ const Print = (() => {
         <h2 class="ip-title">${esc(sec.title)}</h2>
         <div class="ip-imgs n${Math.min(sec.images.length, 3)}">${sec.images.map((src) => `<img src="${src}" alt="">`).join('')}</div>
       </section>`).join('')}</div>`;
-    go(html, { title: `${up(c.name)}_RADIOGRAPHS`, page: 'A4 portrait', margin: '10mm' });
+    go(html, { title: `${up(c.name)}_RADIOGRAPHS`, page: 'A4 portrait', margin: '10mm', noHeader: true });
   }
 
 
@@ -265,7 +266,7 @@ const Print = (() => {
         }
       });
     });
-    go(`<div class="pr ip">${pages.join('')}</div>`, { title: `PREOP IMAGING ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'A4 portrait', margin: '10mm' });
+    go(`<div class="pr ip">${pages.join('')}</div>`, { title: `PREOP IMAGING ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`, page: 'A4 portrait', margin: '10mm', noHeader: true });
   }
 
   // ---------------------------------------------------------------- Consent forms (Tamil)
