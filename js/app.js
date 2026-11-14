@@ -232,7 +232,8 @@ const App = (() => {
   // Pre-op → post-op handover: the case (with everything in it) leaves the pre-op ward and
   // waits in the post-op ward's Incoming list until the post-op PG taps Receive.
   function transferToPostop(id) {
-    Store.patch('cases', id, { status: 'postop', transfer: { by: Store.who(), at: Date.now(), received: false } });
+    // Straight into the post-op ward (no separate "receive" step).
+    Store.patch('cases', id, { status: 'postop', transfer: { by: Store.who(), at: Date.now(), received: true } });
   }
 
   // Transfer outs (Plastic surgery, Neurosurgery): from the pre-op or post-op ward the case leaves both
@@ -681,8 +682,9 @@ const App = (() => {
 
   // Ward order: by bed number (default — follows the walk round the ward), or the shared list order.
   const bedKey = (c) => String(c.bed || '').trim();
-  // Post-op ward: cases transferred out of the pre-op ward and received there.
-  const isIncoming = (c) => c.status === 'postop' && c.transfer && c.transfer.received === false;
+  // Post-op ward: every post-op case. There is no "incoming / receive" step any more — a transfer
+  // lands in the post-op ward at once, and cases still marked "not received" from before count as in.
+  const isIncoming = () => false;
   const postWardCases = () => inOrder(caseList().filter((c) => c.status === 'postop' && !isIncoming(c)));
   const podOf = (c) => { const d = c.surgeryDate || c.otDate; return d ? daysSince(d) : null; };
   function wardCases(W) {
@@ -857,7 +859,6 @@ const App = (() => {
           <button class="btn small wa" id="wa-ward">WhatsApp: ward status (PDF)</button>
           <button class="btn small wa" id="wa-pending">WhatsApp: pending works (PDF)</button>
         </div>
-        ${post ? incomingHTML() : ''}
         <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(W.q || '')}"></label>
         <div class="chips">
           <button class="chip ${W.layout === '0' ? 'on' : ''}" data-layout="0">Notebook</button>
@@ -899,14 +900,6 @@ const App = (() => {
       const pw = $('#print-ward', el);
       // Phones: the notebook as a PDF file (window.print is unreliable there).
       if (pw) pw.onclick = () => (PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'));
-      // Post-op PG receives a case transferred from the pre-op ward.
-      el.addEventListener('click', (e) => {
-        const r = e.target.closest('[data-receive]');
-        if (!r) return;
-        const id = r.dataset.receive;
-        Store.patch('cases', id, { 'transfer.received': true, 'transfer.receivedBy': Store.who(), 'transfer.receivedAt': Date.now() });
-        toast(`${Store.cases[id]?.name || 'Case'} received into the post-op ward`);
-      });
       // Sent as PDF files (share sheet → WhatsApp). Built straight from the tap, as Safari requires.
       const waW = $('#wa-ward', el);
       if (waW) waW.onclick = () => SharePdf.ward(wardCases(W), Store.meta, post);
@@ -1077,20 +1070,6 @@ const App = (() => {
   const Ward = makeWard('pre');
   const PostWard = makeWard('post');
 
-  // Cases transferred from the pre-op ward, waiting for the post-op PG to receive them.
-  function incomingHTML() {
-    const inc = caseList().filter(isIncoming).sort((a, b) => (a.transfer.at || 0) - (b.transfer.at || 0));
-    if (!inc.length) return '';
-    return `<div class="card incoming">
-      <h3>Incoming from the pre-op ward <span class="pill">${inc.length}</span></h3>
-      ${inc.map((c) => `<div class="inc-row">
-        <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}</span>
-          <div class="small">${esc(c.diagnosis)}${c.procedureDone || c.plan ? ` <span class="muted">✓ ${esc(c.procedureDone || c.plan)}</span>` : ''}</div>
-          <div class="muted small">Sent by ${esc(c.transfer.by || '—')} · ${fmtTime(c.transfer.at)}</div></div>
-        <span class="inc-acts"><a class="btn small" href="#/case/${c.id}">View</a><button class="btn small primary" data-receive="${c.id}">Receive</button></span>
-      </div>`).join('')}
-    </div>`;
-  }
 
   // ---------------------------------------------------------------- Transfer-out tabs (Plastic, Neurosurgery)
   function TransferTab(dept) {
@@ -1507,7 +1486,7 @@ const App = (() => {
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               ${isActive(c) ? '<button class="btn primary" id="to-postop">Transfer to post-op ward</button>' : ''}
-              ${c.status === 'postop' ? `<span class="tag ok">${isIncoming(c) ? 'Sent to post-op ward — waiting to be received' : 'In the post-op ward'}</span>` : ''}
+              ${c.status === 'postop' ? `<span class="tag ok">In the post-op ward</span>` : ''}
               ${canTransferOut(c) ? Object.keys(TRANSFER_DEPTS).map((k) => `<button class="btn" data-out-to="${k}">${esc(deptSay(k).outBtn)}</button>`).join('') : ''}
               ${TRANSFER_DEPTS[c.status] ? `<span class="tag task">${esc(deptSay(c.status).withTag)} ${esc(fmtDate(c[c.status]?.out))}${c[c.status]?.out ? ` (day ${daysSince(c[c.status].out)})` : ''}</span>
               <button class="btn primary" id="back-in">${esc(deptSay(c.status).backBtnLong)}</button>` : ''}
@@ -1703,7 +1682,7 @@ const App = (() => {
         const tp = $('#to-postop', el);
         if (tp) tp.onclick = () => {
           const cur = Store.cases[id];
-          if (!confirm(`Transfer ${cur.name || 'this case'} to the post-op ward?\n\nIt leaves the pre-op e-case sheet, ward and OT list, and waits in the post-op ward for the post-op PG to receive it.`)) return;
+          if (!confirm(`Transfer ${cur.name || 'this case'} to the post-op ward?\n\nIt leaves the pre-op ward and the OT list and goes straight into the post-op ward.`)) return;
           transferToPostop(id);
           toast(`${cur.name || 'Case'} sent to the post-op ward`);
           location.hash = '#/';
