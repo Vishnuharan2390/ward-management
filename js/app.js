@@ -1159,13 +1159,10 @@ const App = (() => {
               <label class="span2">Diagnosis<textarea name="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
               <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2">${esc(c.plan)}</textarea></label>
               <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
-              <label>Scheme status<select name="scheme">${schemeOpts(c.scheme)}</select></label>
               ${id && comorbOn(c).length
                 ? `<label class="span2">Comorbidities <span class="hint">edit them on the Comorbidities card of the e-case sheet</span><input name="comorbid" value="${esc(c.comorbid)}" readonly></label>`
                 : `<label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>`}
               <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}"></label>
-              <label>Case sheet written by<input name="writtenBy" list="dl-pg" value="${esc(c.writtenBy || '')}"></label>
-              <label class="span2">Treatment given <span class="hint">for the admission deck — one item per line</span><textarea name="treatment" rows="3">${esc(id ? c.treatment : (c.treatment ?? STANDARD_TREATMENT.join('\n')))}</textarea></label>
               <label class="span2">Implants
                 <textarea name="implants" rows="2">${esc(c.implants)}</textarea>
                 <span class="hint" id="impl-hint"></span>
@@ -1239,7 +1236,9 @@ const App = (() => {
         $('#impl-fill', el).onclick = () => fill(true);
         hint();
 
-        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'bed', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'scheme', 'comorbid', 'implants', 'mode', 'treatment', 'writtenBy'];
+        // Scheme is set from rounds / the OT list; treatment and written-by aren't asked here (the admission
+        // deck still has them). None of the three is in this form, so saving leaves them as they are.
+        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'bed', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'comorbid', 'implants', 'mode'];
 
         // Images picked before the case exists are held here and saved with it.
         const pending = [];
@@ -1268,16 +1267,9 @@ const App = (() => {
           pending.splice(+b.dataset.unpend, 1);
           drawPending();
         });
-        const rememberPg = (name) => {
-          name = (name || '').trim().toUpperCase();
-          if (!name) return;
-          const pgs = [name, ...(Store.meta.pgs || []).filter((x) => x !== name)].slice(0, 15);
-          Store.setMeta({ pgs, lastPg: name });
-        };
         f.onsubmit = async (e) => {
           e.preventDefault();
           const data = Object.fromEntries(BASIC.map((k) => [k, f.elements[k].value.trim()]));
-          rememberPg(data.writtenBy);
           if (id) {
             const before = Store.cases[id];
             const changed = BASIC.filter((k) => (before[k] || '') !== data[k]);
@@ -1292,7 +1284,7 @@ const App = (() => {
             anaes: f.elements.w_anaes.value,
             anaesPending: f.elements.w_anaes.value && f.elements.w_anaes.value !== 'Assessed' ? f.elements.w_anaesPending.value.trim() : '',
           };
-          const doc = { ...data, status: 'preop', work, pus: { organism: f.elements.pusOrganism.value.trim(), sensitive: f.elements.pusSensitive.value.trim() } };
+          const doc = { ...data, treatment: STANDARD_TREATMENT.join('\n'), status: 'preop', work, pus: { organism: f.elements.pusOrganism.value.trim(), sensitive: f.elements.pusSensitive.value.trim() } };
           for (const [path, val] of Object.entries(readLabForm(f) || {})) setPath(doc, path, val);
           Store.create('cases', nid, doc);
           if (pending.length) {
@@ -1540,7 +1532,6 @@ const App = (() => {
                   <button class="icon" data-del-op="${o.id}" title="Remove">✕</button>
                 </div>`).join('') || '<div class="muted small">No opinions sought.</div>'}
             </div>
-            <div class="op-quick">${QUICK_OPINIONS.map((d) => `<button type="button" class="btn small" data-op-quick="${esc(d)}">+ ${esc(d)}</button>`).join('')}</div>
             <form class="inline-add" id="add-op">
               <label class="mini-lab">Add opinion — department<input name="dept" list="dl-depts" required></label>
               <button class="btn small">Add</button>
@@ -1560,7 +1551,6 @@ const App = (() => {
                   <div class="task-line"><input type="checkbox" data-task="${t.id}" ${t.done ? 'checked' : ''} aria-label="Done">
                     <input class="task-text" data-bind="tasks.${t.id}.text" value="${esc(t.text)}" aria-label="Pending work — tap to edit"></div>
                   ${t.to ? `<span class="tag">${esc(t.to)}</span>` : ''}
-                  <div class="muted small">Added by ${esc(t.by)} · ${fmtTime(t.at)}${t.done ? ` — done by ${esc(t.doneBy)} · ${fmtTime(t.doneAt)}` : ''}</div>
                   <button class="icon" data-del-task="${t.id}" title="Delete">✕</button>
                 </li>`).join('') || '<li class="muted small">Nothing pending. Add works for your HS / co-PGs below.</li>'}
             </ul>
@@ -1838,15 +1828,6 @@ const App = (() => {
           }
         });
 
-        $$('[data-op-quick]', el).forEach((b) => {
-          b.onclick = () => {
-            const dept = b.dataset.opQuick;
-            const open = listOf(Store.cases[id].opinions).some((o) => String(o.dept).toUpperCase() === dept.toUpperCase() && !hasText(o.note));
-            if (open) return toast(`${dept} opinion is already pending`);
-            Store.patch('cases', id, { ['opinions.' + uid()]: { dept, note: '', at: Date.now() } });
-            toast(`${dept} opinion added`);
-          };
-        });
         $('#add-op', el).onsubmit = (e) => {
           e.preventDefault();
           const dept = e.target.elements.dept.value.trim();
