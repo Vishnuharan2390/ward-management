@@ -1595,51 +1595,6 @@ html[data-ui="graphite"] #toast { background: rgba(32,32,35,.92); color: #ededed
   .case-head > .actions > .btn.wa { grid-column: 1 / -1; }
 }
 
-/* ---- "ROUND n" splash (rounds mode entry) ---- */
-.rs { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; overflow: hidden; cursor: pointer;
-  background: radial-gradient(ellipse at center, rgba(20,20,24,.82), rgba(0,0,0,.96) 75%);
-  animation: rs-in .18s ease-out both, rs-out .35s 1.95s ease-in both; -webkit-tap-highlight-color: transparent; }
-@keyframes rs-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes rs-out { to { opacity: 0; visibility: hidden; } }
-/* letterbox bars */
-.rs-bar { position: absolute; left: 0; right: 0; height: 14vh; background: #000; box-shadow: 0 0 0 1px rgba(255,255,255,.06); }
-.rs-top { top: 0; animation: rs-bar-t .3s cubic-bezier(.2,.9,.3,1) both; }
-.rs-bot { bottom: 0; animation: rs-bar-b .3s cubic-bezier(.2,.9,.3,1) both; }
-@keyframes rs-bar-t { from { transform: translateY(-100%); } }
-@keyframes rs-bar-b { from { transform: translateY(100%); } }
-/* speed lines sweeping across */
-.rs-lines { position: absolute; inset: 0; opacity: .5; pointer-events: none;
-  background: repeating-linear-gradient(90deg, transparent 0 46px, rgba(255,255,255,.07) 46px 48px, transparent 48px 140px);
-  animation: rs-sweep 1.2s linear infinite; }
-@keyframes rs-sweep { from { background-position: 0 0; } to { background-position: -280px 0; } }
-/* white impact flash */
-.rs-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; animation: rs-flash .45s .3s ease-out both; }
-@keyframes rs-flash { 0% { opacity: .75; } 100% { opacity: 0; } }
-.rs-stage { position: relative; text-align: center; animation: rs-shake .38s .3s both; }
-@keyframes rs-shake { 0%, 100% { transform: none; } 15% { transform: translate(-9px, 4px) rotate(-.6deg); } 30% { transform: translate(8px, -5px) rotate(.5deg); }
-  45% { transform: translate(-6px, -3px); } 60% { transform: translate(5px, 3px); } 80% { transform: translate(-2px, 1px); } }
-.rs-round { display: flex; align-items: baseline; justify-content: center; gap: .35em; font-family: "Pixelify Sans", "VT323", monospace; font-weight: 700;
-  color: #fff; line-height: .9; letter-spacing: .04em; font-size: clamp(3.4rem, 19vw, 8.5rem);
-  text-shadow: 0 0 0 #000, 3px 3px 0 #000, 6px 6px 0 rgba(255,255,255,.18), 0 0 28px rgba(255,255,255,.35);
-  animation: rs-round-out .3s 1.3s ease-in both; }
-@keyframes rs-round-out { to { transform: scale(1.6); opacity: 0; filter: blur(6px); } }
-.rs-word { display: inline-block; animation: rs-slam .34s .1s cubic-bezier(.2,1.4,.4,1) both; }
-.rs-num { display: inline-block; color: #ffd84a; font-size: 1.15em; animation: rs-slam .34s .48s cubic-bezier(.2,1.6,.4,1) both, rs-glow .9s .8s ease-in-out both;
-  text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(255,216,74,.25), 0 0 34px rgba(255,216,74,.7); }
-@keyframes rs-slam { 0% { transform: scale(3.2) rotate(-6deg); opacity: 0; filter: blur(10px); } 60% { opacity: 1; filter: blur(0); } 100% { transform: none; opacity: 1; } }
-@keyframes rs-glow { 50% { text-shadow: 3px 3px 0 #000, 0 0 54px rgba(255,216,74,1); } }
-.rs-sub { margin-top: .9rem; font-family: "JetBrains Mono", ui-monospace, monospace; font-weight: 500; font-size: clamp(.78rem, 3.4vw, 1.05rem); letter-spacing: .28em;
-  color: #d6d6da; animation: rs-wipe .4s .72s ease-out both, rs-round-out .3s 1.3s ease-in both; }
-@keyframes rs-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-.rs-go { position: absolute; left: 50%; top: 50%; translate: -50% -50%; white-space: nowrap; font-family: "Pixelify Sans", "VT323", monospace; font-weight: 700;
-  font-size: clamp(3rem, 17vw, 7.5rem); color: #fff; letter-spacing: .06em; opacity: 0;
-  text-shadow: 3px 3px 0 #000, 0 0 30px rgba(255,255,255,.55); animation: rs-go .62s 1.42s cubic-bezier(.2,1.5,.4,1) both; }
-@keyframes rs-go { 0% { opacity: 0; transform: scale(.3); } 45% { opacity: 1; transform: scale(1.12); } 70% { transform: scale(1); } 100% { opacity: 1; transform: scale(1.04); } }
-@media (prefers-reduced-motion: reduce) { .rs { display: none; } }
-@media print { .rs { display: none !important; } }
-.rs-top { border-bottom: 2px solid rgba(255,216,74,.55); box-shadow: 0 6px 24px rgba(255,216,74,.12); }
-.rs-bot { border-top: 2px solid rgba(255,216,74,.55); box-shadow: 0 -6px 24px rgba(255,216,74,.12); }
-.rs { background: radial-gradient(ellipse at center, rgba(14,14,17,.93), rgba(0,0,0,.98) 75%); }
 
 /* Pre-op ward: optional "procedure done" */
 .nb-done { margin-top: .3rem; }
