@@ -808,7 +808,9 @@ const App = (() => {
         </table>`;
       // Rounds mode: the whole screen, one patient at a time (app header and ward page hidden).
       if (W.layout === '2') {
-        return `<div class="rm-wrap">
+        const enter = W.entering;
+        W.entering = null;
+        return `<div class="rm-wrap${enter ? ' rm-enter' : ''}"${enter ? ` style="--rx:${enter.x}px;--ry:${enter.y}px"` : ''}>
           <div class="rm-bar"><div class="rm-title"><b>Rounds · ${post ? 'Post-op' : 'Pre-op'} ward</b><div class="muted small">${fmtDate(todayISO())} · ${list.length} patient${list.length === 1 ? '' : 's'}</div></div>
             <button class="btn" data-exit-rounds>✕ Exit rounds</button></div>
           ${roundsHTML(W, list)}
@@ -852,6 +854,9 @@ const App = (() => {
       };
       const xr = $('[data-exit-rounds]', el);
       if (xr) xr.onclick = exitRounds;
+      // The entry animation leaves nothing behind (no clip / transform once it has played).
+      const ent = $('.rm-enter', el);
+      if (ent) setTimeout(() => ent.classList.remove('rm-enter'), 1500);
       // Esc on a computer leaves rounds (not while typing in a box).
       W.offEsc?.();
       W.offEsc = null;
@@ -913,6 +918,8 @@ const App = (() => {
             // Entering rounds: remember the table to come back to, and ask for true full screen
             // (computers / Android; the iPhone home-screen app is full screen already).
             W.prevLayout = W.layout === '2' ? '0' : W.layout;
+            const r = l.getBoundingClientRect();
+            W.entering = { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
             document.documentElement.requestFullscreen?.().catch(() => {});
           }
           W.layout = l.dataset.layout;

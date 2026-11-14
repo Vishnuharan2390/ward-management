@@ -1451,3 +1451,33 @@ body.rounds-mode .rounds { max-width: none; }
 .rm-bar .btn { white-space: nowrap; flex: none; }
 body.rounds-mode .rd-card { min-height: calc(100dvh - 15rem); }
 .op-quick { display: flex; gap: .4rem; flex-wrap: wrap; margin: .5rem 0 .3rem; }
+
+/* Rounds mode entry: the screen opens as a circle from the button that was tapped, then the
+   bar drops in and the patient card rises, its sections settling one after another. */
+.rm-enter { animation: rm-iris .62s cubic-bezier(.22, .9, .25, 1) both; }
+@keyframes rm-iris {
+  from { clip-path: circle(0 at var(--rx, 50%) var(--ry, 0)); }
+  to { clip-path: circle(150vmax at var(--rx, 50%) var(--ry, 0)); }
+}
+.rm-enter .rm-bar { animation: rm-drop .45s .18s cubic-bezier(.2, .9, .3, 1.15) both; }
+@keyframes rm-drop { from { transform: translateY(-110%); opacity: 0; } to { transform: none; opacity: 1; } }
+.rm-enter .rd-nav.rd-top { animation: rm-rise .45s .26s cubic-bezier(.2, .8, .2, 1) both; }
+.rm-enter .rd-card { animation: rm-card .6s .3s cubic-bezier(.16, 1, .3, 1) both; transform-origin: 50% 0; }
+@keyframes rm-card {
+  from { transform: translateY(28px) scale(.94); opacity: 0; filter: blur(6px); }
+  60% { filter: blur(0); }
+  to { transform: none; opacity: 1; filter: none; }
+}
+.rm-enter .rd-card > * { animation: rm-rise .5s cubic-bezier(.2, .8, .2, 1) both; }
+.rm-enter .rd-card > :nth-child(1) { animation-delay: .42s; }
+.rm-enter .rd-card > :nth-child(2) { animation-delay: .48s; }
+.rm-enter .rd-card > :nth-child(3) { animation-delay: .53s; }
+.rm-enter .rd-card > :nth-child(4) { animation-delay: .58s; }
+.rm-enter .rd-card > :nth-child(5) { animation-delay: .63s; }
+.rm-enter .rd-card > :nth-child(6) { animation-delay: .68s; }
+.rm-enter .rd-card > :nth-child(n+7) { animation-delay: .73s; }
+.rm-enter .rd-nav.rd-bottom { animation: rm-rise .45s .78s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes rm-rise { from { transform: translateY(14px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .rm-enter, .rm-enter * { animation: none !important; }
+}
