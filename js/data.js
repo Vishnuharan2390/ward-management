@@ -117,9 +117,19 @@ const ALL_PARAMS = LAB_GROUPS.flatMap((g) => g.params.map((p) => ({ ...p, group:
 const PAC_OPTIONS = ['Assessed', 'Provisionally assessed', 'Not assessed'];
 const WORKUP = [
   { k: 'ecg', label: 'ECG', type: 'check' },
-  { k: 'echo', label: 'ECHO', long: 'ECHO & cardio opinion' },
+  // ECHO is asked for only from 40 years of age; below that it can still be written in if taken.
+  { k: 'echo', label: 'ECHO', long: 'ECHO & cardio opinion', needed: (c) => !(ageYears(c) < 40) },
   { k: 'anaes', label: 'PAC', long: 'Anaesthesia assessment', type: 'pac' },
 ];
+// Age in years from the age box ("35", "35Y", "6 MONTHS", "10 DAYS" → under a year). NaN if blank.
+function ageYears(c) {
+  const t = String(c?.age ?? '').trim().toUpperCase();
+  const n = parseFloat(t);
+  if (isNaN(n)) return NaN;
+  return /MONTH|\bMOS?\b|DAY|WEEK|\bWKS?\b/.test(t) ? 0 : n; // a lone "M" is not months ("45 M" = 45 years)
+}
+// Is this work-up item asked for in this patient? (Blank age: yes.)
+const workNeeded = (c, w) => !w.needed || w.needed(c);
 function workDone(c, w) {
   const v = c.work?.[w.k];
   return w.type === 'pac' ? v === 'Assessed' : hasText(v);
@@ -256,7 +266,7 @@ function pendingList(c) {
   for (const p of customParams(c)) if (!latest(c, p.k)) out.push({ kind: 'inv', text: p.label });
   if (!hasPreopXray(c)) out.push({ kind: 'inv', text: 'X-ray' });
   for (const w of WORKUP) {
-    if (workDone(c, w)) continue;
+    if (workDone(c, w) || !workNeeded(c, w)) continue;
     const p = w.type === 'pac' ? c.work?.anaesPending : '';
     out.push({ kind: 'inv', text: hasText(p) ? `PAC: ${p}` : w.label });
   }
@@ -440,7 +450,7 @@ function readiness(c) {
   const tick = (ok) => { total++; if (ok) done++; };
   for (const g of LAB_GROUPS) if (!g.optional) g.params.forEach((p) => tick(latest(c, p.k)));
   customParams(c).forEach((p) => tick(latest(c, p.k)));
-  WORKUP.forEach((w) => tick(workDone(c, w)));
+  WORKUP.filter((w) => workNeeded(c, w)).forEach((w) => tick(workDone(c, w)));
   tick(hasPreopXray(c));
   listOf(c.opinions).forEach((o) => tick(hasText(o.note)));
   return { done, total, ready: total > 0 && done === total };

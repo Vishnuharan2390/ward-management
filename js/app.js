@@ -175,13 +175,15 @@ const App = (() => {
 
   // ECG tick, ECHO text and PAC status (+ work pending) — on the add-case
   // form (`form` true: named fields) and on the case page (bound fields).
-  function workupHTML(work = {}, form = false) {
+  // c: the case (for age-dependent items — ECHO is optional under 40).
+  function workupHTML(work = {}, form = false, c = null) {
+    const echoOpt = c ? !workNeeded(c, WORKUP.find((w) => w.k === 'echo')) : false;
     const pend = work.anaes && work.anaes !== 'Assessed';
     const attr = (k) => (form ? `name="w_${k}"` : `data-bind="work.${k}"`);
     return `
       <div class="workup">
         <label class="ecg-check"><input type="checkbox" ${form ? 'name="w_ecg"' : 'data-check="work.ecg"'} ${work.ecg ? 'checked' : ''}> ECG</label>
-        <label class="echo-line">ECHO<input ${attr('echo')} value="${esc(work.echo)}"></label>
+        <label class="echo-line">ECHO <span class="hint">${form ? 'not needed under 40 yrs — fill only if taken' : echoOpt ? 'not needed (under 40) — fill only if taken' : ''}</span><input ${attr('echo')} value="${esc(work.echo)}" placeholder="${echoOpt ? 'Optional' : ''}"></label>
         <label>Anaesthesia assessment
           <select ${attr('anaes')} data-pac><option value="">—</option>${opts(PAC_OPTIONS, work.anaes || '')}</select></label>
         <label class="pac-pending"${pend ? '' : ' hidden'}>Work pending to get assessment
@@ -760,7 +762,9 @@ const App = (() => {
     roundId: null,
     render() {
       const list = wardCases(W);
-      const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>` : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
+      const work = (c, w) => (workDone(c, w) ? `<td>${esc(workText(c, w))}</td>`
+        : !workNeeded(c, w) ? '<td class="muted small">Not needed</td>'
+          : `<td class="miss">${esc(workText(c, w) || 'Pending')}</td>`);
       // Notebook: To do's and Assessment / Scheme are edited right here and saved to the case
       // (the e-case sheet and the OT list show the same values).
       const lines = (t) => Math.max(1, String(t || '').split('\n').length);
@@ -1503,7 +1507,7 @@ const App = (() => {
               <label>Pus C/S — organism<input class="italic" data-bind="pus.organism" value="${esc(c.pus?.organism)}"></label>
               <label>Sensitive to<input data-bind="pus.sensitive" value="${esc(c.pus?.sensitive)}"></label>
             </div>
-            ${workupHTML(c.work || {})}
+            ${workupHTML(c.work || {}, false, c)}
           </section>
 
           <section class="card" id="charts">
