@@ -254,17 +254,19 @@ const App = (() => {
   function askOut(id, dept) {
     const c = Store.cases[id];
     const D = TRANSFER_DEPTS[dept];
-    const here = TRANSFER_DEPTS[c.status] ? `${TRANSFER_DEPTS[c.status].short} list` : `${wardOf(c).toLowerCase()} and the OT list`;
-    if (!confirm(`Transfer ${c.name || 'this case'} out to ${D.long}?\n\nIt leaves the ${here}, and waits under "${D.tab}" until it is transferred back in.`)) return false;
+    const T = deptSay(dept);
+    const here = TRANSFER_DEPTS[c.status] ? `${TRANSFER_DEPTS[c.status].tab} list` : `${wardOf(c).toLowerCase()} and the OT list`;
+    if (!confirm(`${T.outQ(c.name || 'this case')}\n\nIt leaves the ${here}, and waits under "${D.tab}" until it goes back to the pre-op ward.`)) return false;
     transferOut(id, dept);
-    toast(`${c.name || 'Case'} transferred out to ${D.short}`);
+    toast(T.outToast(c.name || 'Case'));
     return true;
   }
   function askBack(id) {
     const c = Store.cases[id];
     const D = TRANSFER_DEPTS[c.status];
     if (!D) return false;
-    if (!confirm(`Transfer ${c.name || 'this case'} back in from ${D.short}?\n\nIt goes into the pre-op ward.`)) return false;
+    const T = deptSay(c.status);
+    if (!confirm(`${T.backQ(c.name || 'this case')}\n\nIt goes into the pre-op ward.`)) return false;
     backIn(id);
     toast(`${c.name || 'Case'} is back in the pre-op ward`);
     return true;
@@ -1068,6 +1070,7 @@ const App = (() => {
   // ---------------------------------------------------------------- Transfer-out tabs (Plastic, Neurosurgery)
   function TransferTab(dept) {
     const D = TRANSFER_DEPTS[dept];
+    const T = deptSay(dept);
     return {
       live: true,
       render() {
@@ -1083,20 +1086,20 @@ const App = (() => {
               <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}${c.bed ? ' · Bed ' + esc(c.bed) : ''}</span></div>
               <div class="small">${esc(c.diagnosis) || '—'}</div>
               ${c.procedureDone ? `<div class="small muted">Done: ${esc(c.procedureDone)}</div>` : ''}
-              <div class="muted small">From the ${esc(p.from === 'postop' ? 'post-op' : 'pre-op')} ward · out ${esc(fmtDate(p.out))}${d != null ? ` · <b>day ${d}</b>` : ''}${p.by ? ' · by ' + esc(p.by) : ''}</div>
+              <div class="muted small">From the ${esc(p.from === 'postop' ? 'post-op' : 'pre-op')} ward · ${esc(T.outWord)} ${esc(fmtDate(p.out))}${d != null ? ` · <b>day ${d}</b>` : ''}${p.by ? ' · by ' + esc(p.by) : ''}</div>
             </div>
-            <span class="pl-acts"><a class="btn small" href="#/case/${c.id}">e-Case sheet</a><button class="btn small primary" data-back-in="${c.id}">Transfer back in</button></span>
+            <span class="pl-acts"><a class="btn small" href="#/case/${c.id}">e-Case sheet</a><button class="btn small primary" data-back-in="${c.id}">${esc(T.backBtn)}</button></span>
           </div>`;
         };
         return `
           <p class="small"><a href="#/">← e-Case Sheet</a></p>
           <div class="toolbar"><h2>${esc(D.tab)} <span class="pill">${out.length}</span></h2></div>
-          <p class="muted small">Cases transferred out to ${esc(D.long)} from the pre-op or post-op ward. <b>Transfer back in</b> puts the case in the pre-op ward.
-            To transfer a case out, open its e-case sheet and tap <b>Transfer out to ${esc(D.short)}</b>.</p>
-          ${out.map(row).join('') || `<div class="empty">No cases with ${esc(D.short)} right now.</div>`}
-          ${back.length ? `<h3 class="pl-back-h">Transferred back (last 14 days)</h3>
+          <p class="muted small">${esc(T.intro)} <b>${esc(T.backBtn)}</b> puts the case in the pre-op ward.
+            ${T.howTo}</p>
+          ${out.map(row).join('') || `<div class="empty">${esc(T.empty)}</div>`}
+          ${back.length ? `<h3 class="pl-back-h">${esc(T.backH)}</h3>
             <div class="card">${back.map(({ c, l }) => `<div class="pl-done"><a href="#/case/${c.id}"><b>${esc(c.name)}</b></a> <span class="muted small">${esc(ageSex(c))}</span>
-              <div class="muted small">Out ${esc(fmtDate(l.out))} → ${TRANSFER_DEPTS[l.to] ? `moved to ${esc(TRANSFER_DEPTS[l.to].short)}` : 'back to the pre-op ward'} ${esc(fmtDate(l.in))} (${Math.max(0, daysSince(l.out) - daysSince(l.in))} day(s) with ${esc(D.short)})</div></div>`).join('')}</div>` : ''}`;
+              <div class="muted small">${esc(T.outWord[0].toUpperCase() + T.outWord.slice(1))} ${esc(fmtDate(l.out))} → ${TRANSFER_DEPTS[l.to] ? esc(deptSay(l.to).movedTo) : 'back to the pre-op ward'} ${esc(fmtDate(l.in))} (${Math.max(0, daysSince(l.out) - daysSince(l.in))} day(s) ${esc(T.spent)})</div></div>`).join('')}</div>` : ''}`;
       },
       mount(el) {
         el.addEventListener('click', (e) => {
@@ -1480,9 +1483,9 @@ const App = (() => {
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               ${isActive(c) ? '<button class="btn primary" id="to-postop">Transfer to post-op ward</button>' : ''}
               ${c.status === 'postop' ? `<span class="tag ok">${isIncoming(c) ? 'Sent to post-op ward — waiting to be received' : 'In the post-op ward'}</span>` : ''}
-              ${canTransferOut(c) ? Object.entries(TRANSFER_DEPTS).map(([k, D]) => `<button class="btn" data-out-to="${k}">Transfer out to ${esc(D.short)}</button>`).join('') : ''}
-              ${TRANSFER_DEPTS[c.status] ? `<span class="tag task">With ${esc(TRANSFER_DEPTS[c.status].short)} since ${esc(fmtDate(c[c.status]?.out))}${c[c.status]?.out ? ` (day ${daysSince(c[c.status].out)})` : ''}</span>
-              <button class="btn primary" id="back-in">Transfer back in to pre-op ward</button>` : ''}
+              ${canTransferOut(c) ? Object.keys(TRANSFER_DEPTS).map((k) => `<button class="btn" data-out-to="${k}">${esc(deptSay(k).outBtn)}</button>`).join('') : ''}
+              ${TRANSFER_DEPTS[c.status] ? `<span class="tag task">${esc(deptSay(c.status).withTag)} ${esc(fmtDate(c[c.status]?.out))}${c[c.status]?.out ? ` (day ${daysSince(c[c.status].out)})` : ''}</span>
+              <button class="btn primary" id="back-in">${esc(deptSay(c.status).backBtnLong)}</button>` : ''}
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
               <button class="btn wa" id="wa-case">WhatsApp${caseImages(id).length ? ` + ${caseImages(id).length} photo${caseImages(id).length === 1 ? '' : 's'}` : ''}</button>
               <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
@@ -3556,7 +3559,7 @@ const App = (() => {
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
     [/^#\/postward$/, () => PostWard],
-    [/^#\/(plastic|neuro)$/, (k) => TransferTabs[k]],
+    [new RegExp(`^#\\/(${Object.keys(TRANSFER_DEPTS).join('|')})$`), (k) => TransferTabs[k]], // #/plastic, #/neuro, #/retained
     [/^#\/new$/, () => CaseForm()],
     [/^#\/import$/, () => Import.open()],
     [/^#\/import\/deck\/([\d-]+)$/, (d) => Import.open(d)],

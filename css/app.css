@@ -1482,3 +1482,4 @@ body.rounds-mode .rd-card { min-height: calc(100dvh - 15rem); }
   .rm-enter, .rm-enter * { animation: none !important; }
 }
 .stats .st-inc { font-style: normal; font-weight: 700; color: var(--brand); }
+.st-retained { background: #fff4e0; color: #8a5300; }

@@ -7,6 +7,7 @@ const CASE_STATUS = {
   postop: 'Post-op',
   plastic: 'Plastic T/O',
   neuro: 'Neurosurgery T/O',
+  retained: 'Retained',
   discharged: 'Discharged',
 };
 
@@ -15,7 +16,31 @@ const CASE_STATUS = {
 const TRANSFER_DEPTS = {
   plastic: { short: 'Plastic', long: 'Plastic surgery', tab: 'Plastic transfer outs', status: 'Plastic T/O', btn: 'Plastic T/O' },
   neuro: { short: 'Neurosurgery', long: 'Neurosurgery', tab: 'Neurosurgery transfer outs', status: 'Neurosurgery T/O', btn: 'Neurosurgery T/O' },
+  // Not a department: the case is kept back (out of the wards and the OT list) under "Retained cases".
+  retained: {
+    short: 'Retained', long: 'Retained cases', tab: 'Retained cases', status: 'Retained', btn: 'Retained',
+    say: {
+      outBtn: 'Retain case', outQ: (n) => `Retain ${n}?`, outToast: (n) => `${n} retained`, withTag: 'Retained since',
+      backBtn: 'Back to pre-op ward', backBtnLong: 'Back to pre-op ward', backQ: (n) => `Move ${n} from Retained cases back to the pre-op ward?`,
+      backToast: (n) => `${n} is back in the pre-op ward`, outWord: 'retained', intro: 'Cases retained from the pre-op or post-op ward.',
+      howTo: 'To retain a case, open its e-case sheet and tap <b>Retain case</b>.', empty: 'No retained cases right now.',
+      spent: 'retained', movedTo: 'moved to Retained cases', backH: 'Back in the pre-op ward (last 14 days)',
+    },
+  },
 };
+// Wording for one entry: its own `say`, or the transfer-out wording built from its names.
+function deptSay(k) {
+  const D = TRANSFER_DEPTS[k];
+  return {
+    outBtn: `Transfer out to ${D.short}`, outQ: (n) => `Transfer ${n} out to ${D.long}?`, outToast: (n) => `${n} transferred out to ${D.short}`,
+    withTag: `With ${D.short} since`, backBtn: 'Transfer back in', backBtnLong: 'Transfer back in to pre-op ward',
+    backQ: (n) => `Transfer ${n} back in from ${D.short}?`, backToast: (n) => `${n} is back in the pre-op ward`, outWord: 'out',
+    intro: `Cases transferred out to ${D.long} from the pre-op or post-op ward.`,
+    howTo: `To transfer a case out, open its e-case sheet and tap <b>Transfer out to ${D.short}</b>.`,
+    empty: `No cases with ${D.short} right now.`, spent: `with ${D.short}`, movedTo: `moved to ${D.short}`, backH: 'Transferred back (last 14 days)',
+    ...(D.say || {}),
+  };
+}
 
 const ANAES = 'GA/RA';
 const LEVELS = ['I', 'II', 'III', 'IV'];
