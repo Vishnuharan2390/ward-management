@@ -303,7 +303,6 @@ const App = (() => {
       // Census: counted from the very lists the ward pages show, so the numbers always match them.
       const preWard = activeCases(); // pre-op + posted (BOT) patients — all still in the pre-op ward
       const postWard = postWardCases(); // received into the post-op ward
-      const incoming = caseList().filter(isIncoming).length; // transferred, not yet received
       const ready = preWard.filter((c) => readiness(c).ready).length;
       const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ['discharged', 'Discharged'], ['all', 'All']];
       const u = unitOf(Store.meta.unitId);
@@ -317,7 +316,7 @@ const App = (() => {
         </div>
         <div class="stats">
           ${[['ward', preWard.length, 'Pre-op ward'], ['ready', ready, 'Work-up complete'], ['posted', cnt('posted'), 'Posted (BOT)'],
-    ['postward', postWard.length, `Post-op ward${incoming ? `<br><em class="st-inc">+${incoming} incoming</em>` : ''}`]]
+    ['postward', postWard.length, 'Post-op ward']]
     .map(([k, n, l]) => `<div class="stat-btn${dashFilter === k ? ' on' : ''}" role="button" tabindex="0" data-filter="${k}" data-tile aria-pressed="${dashFilter === k}" title="Show these cases">
             <b>${n}</b><span>${l}</span></div>`).join('')}
         </div>
