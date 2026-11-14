@@ -287,7 +287,11 @@ const App = (() => {
     render() {
       const all = caseList();
       const cnt = (s) => all.filter((c) => (c.status || 'preop') === s).length;
-      const ready = all.filter((c) => (c.status || 'preop') === 'preop' && readiness(c).ready).length;
+      // Census: counted from the very lists the ward pages show, so the numbers always match them.
+      const preWard = activeCases(); // pre-op + posted (BOT) patients — all still in the pre-op ward
+      const postWard = postWardCases(); // received into the post-op ward
+      const incoming = caseList().filter(isIncoming).length; // transferred, not yet received
+      const ready = preWard.filter((c) => readiness(c).ready).length;
       const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ['discharged', 'Discharged'], ['all', 'All']];
       const u = unitOf(Store.meta.unitId);
       return `
@@ -299,10 +303,10 @@ const App = (() => {
           <div class="hosp-l4">ORTHO UNIT ${esc(u.id)} · ${esc(u.chief)}</div>
         </div>
         <div class="stats">
-          <div><b>${cnt('preop')}</b><span>Pre-op</span></div>
+          <div><b>${preWard.length}</b><span>Pre-op ward</span></div>
           <div><b>${ready}</b><span>Work-up complete</span></div>
-          <div><b>${cnt('posted')}</b><span>Posted</span></div>
-          <div><b>${cnt('postop')}</b><span>Post-op</span></div>
+          <div><b>${cnt('posted')}</b><span>Posted (BOT)</span></div>
+          <div><b>${postWard.length}</b><span>Post-op ward${incoming ? `<br><em class="st-inc">+${incoming} incoming</em>` : ''}</span></div>
         </div>
         <div class="toolbar">
           <label class="search-lab">Search<input type="search" id="q" aria-label="Search name, IP, ward, diagnosis" value="${esc(dashQuery)}"></label>
