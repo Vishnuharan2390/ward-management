@@ -758,6 +758,16 @@ const App = (() => {
     document.body.appendChild(el);
   }
 
+  // Pre-op ward: an operated patient can carry "procedure done". Shown only when entered; otherwise
+  // a quiet "+ Procedure done" opens a box to add it. Same field as the e-case sheet's Operative details.
+  function doneHTML(c) {
+    const has = hasText(c.procedureDone);
+    return `<details class="nb-done${has ? ' has' : ''}" data-keep="done-${c.id}">
+      <summary>${has ? `✓ ${esc(c.procedureDone)}` : '+ Procedure done'}</summary>
+      <textarea data-nb="procedureDone" rows="2" placeholder="Procedure done (leave empty if not operated)">${esc(c.procedureDone || '')}</textarea>
+    </details>`;
+  }
+
   // Rounds view: one patient per screen.
   function roundsHTML(W, list) {
     const post = W.kind === 'post';
@@ -783,7 +793,7 @@ const App = (() => {
             <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
           <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
         </div>
-        <div class="rd-dx">${esc(c.diagnosis)}</div>${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : (c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : '')}
+        <div class="rd-dx">${esc(c.diagnosis)}</div>${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
           <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
           <div class="rd-chips">${chips('inv', post ? POST_INV_CHIPS : ROUND_INV_CHIPS)}</div></div>
@@ -825,7 +835,7 @@ const App = (() => {
               <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b><div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
               <td class="nb-dx">${esc(c.diagnosis)}${post
                 ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}${podOf(c) != null ? `<span class="tag task">POD ${podOf(c)}</span>` : ''}`
-                : (c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : '')}</td>
+                : `${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}</td>
               <td class="nb-todo-cell">
                 <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea></label>
                 <label class="nb-lab">Opinion / To-do<textarea data-nb="op" rows="${lines(opTodoText(c))}">${esc(opTodoText(c))}</textarea></label>
@@ -1027,7 +1037,7 @@ const App = (() => {
           return;
         }
         // Opening the case from the row, but not while using a box or dropdown in it.
-        if (e.target.closest('textarea, input, select, label, button')) return;
+        if (e.target.closest('textarea, input, select, label, button, details')) return;
         const tr = e.target.closest('[data-go]');
         if (tr) location.hash = '#/case/' + tr.dataset.go;
       });
@@ -1088,6 +1098,7 @@ const App = (() => {
         const c = { id, ...Store.cases[id] };
         if (f === 'inv') Store.patch('cases', id, { invTodo: t.value.trim().toUpperCase() });
         else if (f === 'bed') Store.patch('cases', id, { bed: t.value.trim().toUpperCase() });
+        else if (f === 'procedureDone') Store.patch('cases', id, { procedureDone: t.value.trim().toUpperCase() });
         else if (f === 'op') {
           const ch = opTodoChanges(c, t.value, Store.who());
           if (Object.keys(ch).length) Store.patch('cases', id, ch);

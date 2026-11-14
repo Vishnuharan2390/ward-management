@@ -44,7 +44,10 @@ const SharePdf = (() => {
       if (post) {
         if (c.procedureDone || c.plan) dx.push('DONE: ' + U(c.procedureDone || c.plan));
         if (podOf(c) != null) dx.push('POD ' + podOf(c));
-      } else if (c.plan) dx.push('PLAN: ' + U(c.plan));
+      } else {
+        if (c.plan) dx.push('PLAN: ' + U(c.plan));
+        if (c.procedureDone) dx.push('DONE: ' + U(c.procedureDone)); // pre-op ward: only when entered
+      }
       const todo = [...lines(invTodoText(c)).map((x) => 'INV: ' + x), ...lines(opTodoText(c))];
       return [
         String(i + 1) + (c.status === 'posted' ? '\nBOT' : ''),

@@ -1640,3 +1640,11 @@ html[data-ui="graphite"] #toast { background: rgba(32,32,35,.92); color: #ededed
 .rs-top { border-bottom: 2px solid rgba(255,216,74,.55); box-shadow: 0 6px 24px rgba(255,216,74,.12); }
 .rs-bot { border-top: 2px solid rgba(255,216,74,.55); box-shadow: 0 -6px 24px rgba(255,216,74,.12); }
 .rs { background: radial-gradient(ellipse at center, rgba(14,14,17,.93), rgba(0,0,0,.98) 75%); }
+
+/* Pre-op ward: optional "procedure done" */
+.nb-done { margin-top: .3rem; }
+.nb-done > summary { list-style: none; cursor: pointer; display: inline-block; font-size: .82rem; color: var(--muted); padding: .1rem 0; -webkit-tap-highlight-color: transparent; }
+.nb-done > summary::-webkit-details-marker { display: none; }
+.nb-done.has > summary { color: var(--ok); font-weight: 600; font-size: .9rem; }
+.nb-done > textarea { display: block; width: 100%; margin-top: .3rem; font: inherit; }
+.rounds .nb-done > summary { font-size: .95rem; }
