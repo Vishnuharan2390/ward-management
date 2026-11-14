@@ -1506,12 +1506,7 @@ const App = (() => {
               <dt>Diagnosis</dt><dd>${esc(c.diagnosis) || '—'}</dd>
               <dt>Plan</dt><dd>${esc(c.plan) || '—'}</dd>
               ${c.comorbid ? `<dt>Comorbid</dt><dd>${esc(c.comorbid)}</dd>` : ''}
-              <dt>Level</dt><dd>${esc(c.level) || '—'}</dd>
-              <dt>Implants</dt><dd class="pre">${esc(c.implants) || '—'}</dd>
-              <dt>Scheme</dt><dd><select class="kv-sel" data-bind="scheme" aria-label="Scheme status">${schemeOpts(c.scheme)}</select></dd>
               ${c.mode ? `<dt>Mode</dt><dd>${esc(c.mode)}</dd>` : ''}
-              ${c.treatment ? `<dt>Treatment</dt><dd class="pre">${esc(c.treatment)}</dd>` : ''}
-              ${c.writtenBy ? `<dt>Case sheet</dt><dd>${esc(c.writtenBy)}</dd>` : ''}
             </dl>
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
