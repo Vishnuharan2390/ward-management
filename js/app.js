@@ -733,6 +733,31 @@ const App = (() => {
       </div></div>`;
   }
 
+  // "ROUND n" splash, fighting-game style, when rounds mode starts. n counts this ward's rounds today
+  // (morning round 1, evening round 2…). Tap to skip; skipped with Reduce Motion.
+  function roundSplash(post, count) {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    const key = `wm.rounds.${post ? 'post' : 'pre'}.${todayISO()}`;
+    const n = (+lsGet(key) || 0) + 1;
+    lsSet(key, String(n));
+    document.querySelector('.rs')?.remove();
+    const el = document.createElement('div');
+    el.className = 'rs';
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-label', `Round ${n}, ${post ? 'post-op' : 'pre-op'} ward, ${count} patients`);
+    el.innerHTML = `<div class="rs-bar rs-top"></div><div class="rs-bar rs-bot"></div><div class="rs-flash"></div><div class="rs-lines"></div>
+      <div class="rs-stage">
+        <div class="rs-round"><span class="rs-word">ROUND</span><span class="rs-num">${n}</span></div>
+        <div class="rs-sub">${post ? 'POST-OP' : 'PRE-OP'} WARD · ${count} PATIENT${count === 1 ? '' : 'S'}</div>
+        <div class="rs-go">BEGIN!</div>
+      </div>`;
+    const done = () => el.remove();
+    el.addEventListener('click', done);
+    el.addEventListener('animationend', (e) => { if (e.animationName === 'rs-out') done(); });
+    setTimeout(done, 3200); // never left behind
+    document.body.appendChild(el);
+  }
+
   // Rounds view: one patient per screen.
   function roundsHTML(W, list) {
     const post = W.kind === 'post';
@@ -843,6 +868,7 @@ const App = (() => {
       if (W.layout === '2') {
         const enter = W.entering;
         W.entering = null;
+        if (enter) W.splashPending = true;
         return `<div class="rm-wrap${enter ? ' rm-enter' : ''}"${enter ? ` style="--rx:${enter.x}px;--ry:${enter.y}px"` : ''}>
           <div class="rm-bar"><div class="rm-title"><b>Rounds · ${post ? 'Post-op' : 'Pre-op'} ward</b><div class="muted small">${fmtDate(todayISO())} · ${list.length} patient${list.length === 1 ? '' : 's'}</div></div>
             <button class="btn" data-exit-rounds>✕ Exit rounds</button></div>
@@ -889,6 +915,10 @@ const App = (() => {
       // The entry animation leaves nothing behind (no clip / transform once it has played).
       const ent = $('.rm-enter', el);
       if (ent) setTimeout(() => ent.classList.remove('rm-enter'), 1500);
+      if (W.splashPending) {
+        W.splashPending = false;
+        roundSplash(post, wardCases(W).length);
+      }
       // Esc on a computer leaves rounds (not while typing in a box).
       W.offEsc?.();
       W.offEsc = null;
