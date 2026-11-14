@@ -38,7 +38,17 @@ const Share = (() => {
   }
 
   // One case for WhatsApp: the identifying details, diagnosis, plan and procedure done (photos go with it).
-  function caseText(c) {
+  // By the phone's clock: before noon (small hours included) morning, noon–5 PM afternoon, then evening.
+  function greeting(now = new Date()) {
+    const h = now.getHours();
+    return h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
+  }
+
+  // One patient for WhatsApp: greeting, the details, THANK YOU SIR — all in capitals.
+  function caseText(c, now = new Date()) {
+    return [greeting(now), '', caseDetails(c), '', 'THANK YOU SIR'].join('\n').toUpperCase();
+  }
+  function caseDetails(c) {
     const row = (k, v) => (String(v ?? '').trim() ? `${k}: ${one(v)}\n` : '');
     return (`*${U(c.name)}*\n`
       + row('Age/Sex', U(ageSex(c)))
@@ -94,5 +104,5 @@ const Share = (() => {
       .catch((e) => { if (e.name !== 'AbortError') { toast('Couldn\'t share the photos — sending the text only.', 4000); send(text); } });
   }
 
-  return { otText, wardText, pendingText, caseText, send, imageFiles, sendWithFiles };
+  return { otText, wardText, pendingText, caseText, greeting, send, imageFiles, sendWithFiles };
 })();
