@@ -279,10 +279,19 @@ const App = (() => {
   if (TRANSFER_DEPTS[dashFilter]) dashFilter = 'active'; // those filter chips became the transfer-out buttons
   let dashQuery = '';
 
+  // Census tiles on the e-Case Sheet page: each one is also a filter for the case list below,
+  // using the same rule as its number (so the list length always equals the tile).
+  const TILE_FILTERS = {
+    ward: { label: 'Pre-op ward', test: (c) => isActive(c) },
+    ready: { label: 'Work-up complete', test: (c) => isActive(c) && readiness(c).ready },
+    posted: { label: 'Posted (BOT)', test: (c) => c.status === 'posted' },
+    postward: { label: 'Post-op ward', test: (c) => c.status === 'postop' && !isIncoming(c) },
+  };
   function filteredCases() {
     const q = dashQuery.toLowerCase();
+    const tile = TILE_FILTERS[dashFilter];
     return inOrder(caseList()
-      .filter((c) => (dashFilter === 'active' ? isActive(c) : dashFilter === 'all' || (c.status || 'preop') === dashFilter))
+      .filter((c) => (tile ? tile.test(c) : dashFilter === 'active' ? isActive(c) : dashFilter === 'all' || (c.status || 'preop') === dashFilter))
       .filter((c) => !q || [c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toLowerCase().includes(q)));
   }
 
@@ -307,10 +316,10 @@ const App = (() => {
           <div class="hosp-l4">ORTHO UNIT ${esc(u.id)} · ${esc(u.chief)}</div>
         </div>
         <div class="stats">
-          <div><b>${preWard.length}</b><span>Pre-op ward</span></div>
-          <div><b>${ready}</b><span>Work-up complete</span></div>
-          <div><b>${cnt('posted')}</b><span>Posted (BOT)</span></div>
-          <div><b>${postWard.length}</b><span>Post-op ward${incoming ? `<br><em class="st-inc">+${incoming} incoming</em>` : ''}</span></div>
+          ${[['ward', preWard.length, 'Pre-op ward'], ['ready', ready, 'Work-up complete'], ['posted', cnt('posted'), 'Posted (BOT)'],
+    ['postward', postWard.length, `Post-op ward${incoming ? `<br><em class="st-inc">+${incoming} incoming</em>` : ''}`]]
+    .map(([k, n, l]) => `<div class="stat-btn${dashFilter === k ? ' on' : ''}" role="button" tabindex="0" data-filter="${k}" data-tile aria-pressed="${dashFilter === k}" title="Show these cases">
+            <b>${n}</b><span>${l}</span></div>`).join('')}
         </div>
         <div class="toolbar">
           <label class="search-lab">Search<input type="search" id="q" aria-label="Search name, IP, ward, diagnosis" value="${esc(dashQuery)}"></label>
@@ -324,6 +333,8 @@ const App = (() => {
           <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order' : 'By date of admission (oldest first)'}</span>
           ${Store.meta.caseOrder?.length ? '<button class="btn small" id="order-reset">Back to DOA order</button>' : ''}
         </div>
+        ${TILE_FILTERS[dashFilter] ? `<div class="tile-filter"><span>Showing <b>${esc(TILE_FILTERS[dashFilter].label)}</b> — ${filteredCases().length} case${filteredCases().length === 1 ? '' : 's'}</span>
+          <button class="btn small" data-filter="active">✕ Show all active</button></div>` : ''}
         <div class="cards">${cardsHTML(all.length)}</div>`;
     },
     mount(el) {
@@ -342,9 +353,20 @@ const App = (() => {
         }
         const f = e.target.closest('[data-filter]');
         if (!f) return;
-        dashFilter = f.dataset.filter;
+        const tile = f.dataset.tile !== undefined;
+        // A tile tapped again goes back to all active cases.
+        dashFilter = tile && dashFilter === f.dataset.filter ? 'active' : f.dataset.filter;
         sessionStorage.setItem('wm.filter', dashFilter);
         render();
+        // From a tile: bring the list into view (below the sticky header).
+        if (tile && dashFilter !== 'active') {
+          const top = $('.tile-filter')?.getBoundingClientRect().top;
+          if (top != null) window.scrollTo({ top: window.scrollY + top - 110, behavior: 'smooth' });
+        }
+      });
+      // Tiles are buttons for the keyboard too.
+      el.addEventListener('keydown', (e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-tile]')) { e.preventDefault(); e.target.click(); }
       });
     },
   };

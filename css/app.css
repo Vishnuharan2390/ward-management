@@ -1483,3 +1483,10 @@ body.rounds-mode .rd-card { min-height: calc(100dvh - 15rem); }
 }
 .stats .st-inc { font-style: normal; font-weight: 700; color: var(--brand); }
 .st-retained { background: #fff4e0; color: #8a5300; }
+
+/* Census tiles as filters */
+.stats .stat-btn { cursor: pointer; transition: transform .12s, box-shadow .12s, border-color .12s; -webkit-tap-highlight-color: transparent; }
+.stats .stat-btn:active { transform: scale(.96); }
+.stats .stat-btn.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand) inset; }
+.stats .stat-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.tile-filter { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin: 0 0 .6rem; padding: .45rem .6rem; border: 1px solid var(--brand); border-radius: var(--radius, 8px); }
