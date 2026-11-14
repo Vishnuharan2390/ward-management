@@ -321,14 +321,14 @@ const App = (() => {
     .map(([k, n, l]) => `<div class="stat-btn${dashFilter === k ? ' on' : ''}" role="button" tabindex="0" data-filter="${k}" data-tile aria-pressed="${dashFilter === k}" title="Show these cases">
             <b>${n}</b><span>${l}</span></div>`).join('')}
         </div>
-        <div class="toolbar">
+        <div class="toolbar dash-tools">
           <label class="search-lab">Search<input type="search" id="q" aria-label="Search name, IP, ward, diagnosis" value="${esc(dashQuery)}"></label>
           <a class="btn primary" href="#/new">+ New case</a>
           <a class="btn wa" href="#/import">From WhatsApp</a>
           <a class="btn" href="#/import">From PowerPoint</a>
         </div>
         <div class="xfer-links">${Object.entries(TRANSFER_DEPTS).map(([k, D]) => `<a class="btn small" href="#/${k}" title="${esc(D.tab)}">${esc(D.btn || D.tab)}${cnt(k) ? ` <span class="pill">${cnt(k)}</span>` : ''}</a>`).join('')}</div>
-        <div class="chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
+        <div class="chips dash-chips">${filters.map(([k, l]) => `<button class="chip${dashFilter === k ? ' on' : ''}" data-filter="${k}">${l}</button>`).join('')}</div>
         <div class="order-bar">
           <span class="muted small">${Store.meta.caseOrder?.length ? 'Your own order' : 'By date of admission (oldest first)'}</span>
           ${Store.meta.caseOrder?.length ? '<button class="btn small" id="order-reset">Back to DOA order</button>' : ''}
@@ -850,7 +850,7 @@ const App = (() => {
         </div>`;
       }
       return `
-        <div class="toolbar">
+        <div class="toolbar ward-tools">
           <h2>${post ? 'Post-op ward' : 'Pre-op ward'} <span class="muted small">${fmtDate(todayISO())}</span></h2>
           <button class="btn primary" data-layout="2">▶ Rounds mode</button>
           <button class="btn" id="print-ward">Print / PDF</button>
@@ -872,7 +872,7 @@ const App = (() => {
           ${W.sort !== 'bed' && Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}
         </div>
         <div class="table-wrap">${W.detailed ? detailed : notebook}</div>
-        <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
+        <details class="help" data-keep="ward-help"><summary>How this page works</summary><p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p></details>`;
     },
     mount(el) {
       document.body.classList.toggle('rounds-mode', W.layout === '2');
@@ -1487,13 +1487,18 @@ const App = (() => {
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               ${isActive(c) ? '<button class="btn primary" id="to-postop">Transfer to post-op ward</button>' : ''}
               ${c.status === 'postop' ? `<span class="tag ok">In the post-op ward</span>` : ''}
-              ${canTransferOut(c) ? Object.keys(TRANSFER_DEPTS).map((k) => `<button class="btn" data-out-to="${k}">${esc(deptSay(k).outBtn)}</button>`).join('') : ''}
               ${TRANSFER_DEPTS[c.status] ? `<span class="tag task">${esc(deptSay(c.status).withTag)} ${esc(fmtDate(c[c.status]?.out))}${c[c.status]?.out ? ` (day ${daysSince(c[c.status].out)})` : ''}</span>
               <button class="btn primary" id="back-in">${esc(deptSay(c.status).backBtnLong)}</button>` : ''}
               <a class="btn" href="#/discharge/${id}">Discharge / transfer</a>
               <button class="btn wa" id="wa-case">WhatsApp${caseImages(id).length ? ` + ${caseImages(id).length} photo${caseImages(id).length === 1 ? '' : 's'}` : ''}</button>
-              <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
             </div>
+            <details class="more-acts" data-keep="more-acts">
+              <summary>More actions</summary>
+              <div class="actions">
+                ${canTransferOut(c) ? Object.keys(TRANSFER_DEPTS).map((k) => `<button class="btn" data-out-to="${k}">${esc(deptSay(k).outBtn)}</button>`).join('') : ''}
+                <button class="btn" id="ot-toggle">${c.otHidden ? 'Show in OT list' : 'Hide from OT list'}</button>
+              </div>
+            </details>
           </div>
 
           <section class="card cm-card" id="cm-card">${comorbCardHTML(c)}</section>
@@ -3608,11 +3613,14 @@ const App = (() => {
     if (!same) current = { hash: location.hash, view: resolve() };
     const v = current.view;
     // Swap in a fresh element so delegated listeners from the last render don't pile up.
+    // Drawers (details[data-keep]) stay open when the same page redraws — e.g. a teammate's edit syncing in.
+    const keepOpen = same ? $$('details[data-keep][open]', App.el).map((d) => d.dataset.keep) : [];
     const fresh = document.createElement('main');
     fresh.id = 'view';
     fresh.innerHTML = v.render();
     App.el.replaceWith(fresh);
     App.el = fresh;
+    keepOpen.forEach((k) => { const d = fresh.querySelector(`details[data-keep="${k}"]`); if (d) d.open = true; });
     v.mount?.(fresh);
     capsKeyboard(fresh);
     // Voice.attach(fresh); — dictation buttons switched off for now (js/voice.js)
