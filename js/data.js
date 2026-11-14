@@ -134,6 +134,8 @@ const imageKind = (k) => IMAGE_KINDS.find((x) => x.k === k)
 // Admission-day deck (same lists as the unit's admission-deck tool).
 const MODES = ['MLC/RTA', 'MLC/OLD RTA', 'MLC/TTA', 'NMLC/FALL', 'MLC/FALL FROM HEIGHT', 'MLC/ASSAULT', 'NMLC/ACCIDENTAL INJURY', 'MLC/WORKSPOT INJURY', 'MLC/SELF INFLICTED', 'MLC/ELECTROCUTION'];
 
+// One-tap opinion buttons on the e-case sheet.
+const QUICK_OPINIONS = ['Plastic Surgery', 'Vascular Surgery'];
 const OPINION_DEPTS = [
   'General Medicine', 'Cardiology', 'Pulmonology', 'Nephrology', 'Neurology',
   'Endocrinology', 'Diabetology', 'ENT', 'Dental', 'Psychiatry',
@@ -241,7 +243,7 @@ function pendingList(c) {
 // Ward notebook "To do's", two editable boxes shared with the e-case sheet.
 // Rounds view quick-tap chips (each adds one line to the box).
 const ROUND_INV_CHIPS = ['CBC', 'RFT', 'LFT', 'SERUM ELECTROLYTES', 'RBS', 'VCTC', 'VM', 'ECG', 'ECHO', 'COAGULATION PROFILE', 'CXR', 'X-RAY', 'CT', 'MRI'];
-const ROUND_OP_CHIPS = ['CARDIOLOGY OPINION', 'GENERAL MEDICINE OPINION', 'PULMONOLOGY OPINION', 'NEPHROLOGY OPINION', 'DIABETOLOGY OPINION', 'NEUROSURGERY OPINION', 'PAC', 'CROSS MATCH', 'BLOOD TRANSFUSION', 'DRESSING', 'WOUND WASH'];
+const ROUND_OP_CHIPS = ['CARDIOLOGY OPINION', 'GENERAL MEDICINE OPINION', 'PULMONOLOGY OPINION', 'NEPHROLOGY OPINION', 'DIABETOLOGY OPINION', 'NEUROSURGERY OPINION', 'PLASTIC SURGERY OPINION', 'VASCULAR SURGERY OPINION', 'PAC', 'CROSS MATCH', 'BLOOD TRANSFUSION', 'DRESSING', 'WOUND WASH'];
 
 // ---- Comorbidities (e-case sheet card): each one ticked carries years + current treatment.
 const COMORBIDITIES = [
@@ -296,7 +298,7 @@ function roundSuggestions(c) {
 }
 
 const POST_INV_CHIPS = ['CBC', 'RFT', 'ESR', 'CRP', 'SERUM ELECTROLYTES', 'RBS', 'CHECK X-RAY', 'WOUND C/S'];
-const POST_OP_CHIPS = ['DRESSING', 'SUTURE REMOVAL', 'DRAIN REMOVAL', 'PHYSIOTHERAPY', 'IV ANTIBIOTICS', 'BLOOD TRANSFUSION', 'DISCHARGE PLAN', 'GENERAL MEDICINE OPINION', 'PLASTIC SURGERY OPINION'];
+const POST_OP_CHIPS = ['DRESSING', 'SUTURE REMOVAL', 'DRAIN REMOVAL', 'PHYSIOTHERAPY', 'IV ANTIBIOTICS', 'BLOOD TRANSFUSION', 'DISCHARGE PLAN', 'GENERAL MEDICINE OPINION', 'PLASTIC SURGERY OPINION', 'VASCULAR SURGERY OPINION'];
 
 // 1. Investigation: only what someone typed (no automatic suggestions).
 function invTodoText(c) {

@@ -806,9 +806,18 @@ const App = (() => {
             </tr>`).join('') || `<tr><td colspan="${ALL_PARAMS.length + WORKUP.length + 5}" class="empty">No active pre-op cases.</td></tr>`}
           </tbody>
         </table>`;
+      // Rounds mode: the whole screen, one patient at a time (app header and ward page hidden).
+      if (W.layout === '2') {
+        return `<div class="rm-wrap">
+          <div class="rm-bar"><div class="rm-title"><b>Rounds · ${post ? 'Post-op' : 'Pre-op'} ward</b><div class="muted small">${fmtDate(todayISO())} · ${list.length} patient${list.length === 1 ? '' : 's'}</div></div>
+            <button class="btn" data-exit-rounds>✕ Exit rounds</button></div>
+          ${roundsHTML(W, list)}
+        </div>`;
+      }
       return `
         <div class="toolbar">
           <h2>${post ? 'Post-op ward' : 'Pre-op ward'} <span class="muted small">${fmtDate(todayISO())}</span></h2>
+          <button class="btn primary" data-layout="2">▶ Rounds mode</button>
           <button class="btn" id="print-ward">Print / PDF</button>
         </div>
         <div class="row wa-row">
@@ -819,7 +828,6 @@ const App = (() => {
         <label class="search-lab nb-search">Search<input type="search" id="nb-q" aria-label="Search name, IP, ward, diagnosis" value="${esc(W.q || '')}"></label>
         <div class="chips">
           <button class="chip ${W.layout === '0' ? 'on' : ''}" data-layout="0">Notebook</button>
-          <button class="chip ${W.layout === '2' ? 'on' : ''}" data-layout="2">Rounds</button>
           <button class="chip ${W.layout === '1' ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="order-bar">
@@ -829,12 +837,32 @@ const App = (() => {
           <span class="muted small">${W.sort === 'bed' ? 'Type each patient’s bed number once — cases without one go to the end.' : `Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}`}</span>
           ${W.sort !== 'bed' && Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}
         </div>
-        ${W.layout === '2' ? roundsHTML(W, list) : `<div class="table-wrap">${W.detailed ? detailed : notebook}</div>`}
+        <div class="table-wrap">${W.detailed ? detailed : notebook}</div>
         <p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p>`;
     },
     mount(el) {
+      document.body.classList.toggle('rounds-mode', W.layout === '2');
+      const exitRounds = () => {
+        W.layout = W.prevLayout || '0';
+        sessionStorage.setItem(K + 'Layout', W.layout);
+        document.body.classList.remove('rounds-mode');
+        if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+        render();
+        window.scrollTo(0, 0);
+      };
+      const xr = $('[data-exit-rounds]', el);
+      if (xr) xr.onclick = exitRounds;
+      // Esc on a computer leaves rounds (not while typing in a box).
+      W.offEsc?.();
+      W.offEsc = null;
+      if (W.layout === '2') {
+        const onKey = (e) => { if (e.key === 'Escape' && !e.target.closest?.('textarea, input, select')) exitRounds(); };
+        document.addEventListener('keydown', onKey);
+        W.offEsc = () => document.removeEventListener('keydown', onKey);
+      }
+      const pw = $('#print-ward', el);
       // Phones: the notebook as a PDF file (window.print is unreliable there).
-      $('#print-ward', el).onclick = () => (PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'));
+      if (pw) pw.onclick = () => (PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'));
       // Post-op PG receives a case transferred from the pre-op ward.
       el.addEventListener('click', (e) => {
         const r = e.target.closest('[data-receive]');
@@ -844,8 +872,10 @@ const App = (() => {
         toast(`${Store.cases[id]?.name || 'Case'} received into the post-op ward`);
       });
       // Sent as PDF files (share sheet → WhatsApp). Built straight from the tap, as Safari requires.
-      $('#wa-ward', el).onclick = () => SharePdf.ward(wardCases(W), Store.meta, post);
-      $('#wa-pending', el).onclick = () => SharePdf.pending(wardCases(W), Store.meta, post);
+      const waW = $('#wa-ward', el);
+      if (waW) waW.onclick = () => SharePdf.ward(wardCases(W), Store.meta, post);
+      const waP = $('#wa-pending', el);
+      if (waP) waP.onclick = () => SharePdf.pending(wardCases(W), Store.meta, post);
       // Rounds: go to the previous / next patient (saving the box being typed in first).
       const goRound = (id) => {
         document.activeElement?.blur?.();
@@ -879,9 +909,16 @@ const App = (() => {
       el.addEventListener('click', (e) => {
         const l = e.target.closest('[data-layout]');
         if (l) {
+          if (l.dataset.layout === '2') {
+            // Entering rounds: remember the table to come back to, and ask for true full screen
+            // (computers / Android; the iPhone home-screen app is full screen already).
+            W.prevLayout = W.layout === '2' ? '0' : W.layout;
+            document.documentElement.requestFullscreen?.().catch(() => {});
+          }
           W.layout = l.dataset.layout;
           sessionStorage.setItem(K + 'Layout', W.layout);
-          return render();
+          render();
+          return window.scrollTo(0, 0);
         }
         const ws = e.target.closest('[data-wsort]');
         if (ws) {
@@ -978,7 +1015,7 @@ const App = (() => {
         const q = String(W.q || '').trim().toUpperCase();
         $$('tbody tr[data-q]', el).forEach((tr) => { tr.hidden = !!q && !tr.dataset.q.includes(q); });
       };
-      $('#nb-q', el).addEventListener('input', (e) => { W.q = e.target.value; filter(); });
+      $('#nb-q', el)?.addEventListener('input', (e) => { W.q = e.target.value; filter(); });
       const nbReset = $('#nb-order-reset', el);
       if (nbReset) nbReset.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); };
       filter();
@@ -1474,6 +1511,7 @@ const App = (() => {
                   <button class="icon" data-del-op="${o.id}" title="Remove">✕</button>
                 </div>`).join('') || '<div class="muted small">No opinions sought.</div>'}
             </div>
+            <div class="op-quick">${QUICK_OPINIONS.map((d) => `<button type="button" class="btn small" data-op-quick="${esc(d)}">+ ${esc(d)}</button>`).join('')}</div>
             <form class="inline-add" id="add-op">
               <label class="mini-lab">Add opinion — department<input name="dept" list="dl-depts" required></label>
               <button class="btn small">Add</button>
@@ -1771,6 +1809,15 @@ const App = (() => {
           }
         });
 
+        $$('[data-op-quick]', el).forEach((b) => {
+          b.onclick = () => {
+            const dept = b.dataset.opQuick;
+            const open = listOf(Store.cases[id].opinions).some((o) => String(o.dept).toUpperCase() === dept.toUpperCase() && !hasText(o.note));
+            if (open) return toast(`${dept} opinion is already pending`);
+            Store.patch('cases', id, { ['opinions.' + uid()]: { dept, note: '', at: Date.now() } });
+            toast(`${dept} opinion added`);
+          };
+        });
         $('#add-op', el).onsubmit = (e) => {
           e.preventDefault();
           const dept = e.target.elements.dept.value.trim();
@@ -3536,6 +3583,7 @@ const App = (() => {
 
   function render() {
     deferred = false;
+    document.body.classList.remove('rounds-mode'); // the ward view puts it back while rounds are on
     Voice.stop();
     const y = window.scrollY;
     const same = current && current.hash === location.hash;

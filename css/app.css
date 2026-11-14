@@ -1441,3 +1441,13 @@ html, body { overscroll-behavior-x: none; }
 .st-plastic { color: #a3264a; }
 .st-neuro { color: #3b3fa3; }
 .xfer-links { display: flex; gap: .4rem; flex-wrap: wrap; margin: 0 0 .6rem; }
+
+/* Rounds mode: one patient at a time, filling the screen */
+body.rounds-mode .top { display: none; }
+body.rounds-mode main { max-width: 860px; padding: calc(env(safe-area-inset-top, 0px) + 0px) 12px calc(env(safe-area-inset-bottom, 0px) + 24px); }
+body.rounds-mode .rounds { max-width: none; }
+.rm-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: calc(env(safe-area-inset-top, 0px) + .55rem) 0 .55rem; background: var(--bg); border-bottom: 1px solid var(--line); margin-bottom: .3rem; }
+.rm-title { min-width: 0; line-height: 1.25; }
+.rm-bar .btn { white-space: nowrap; flex: none; }
+body.rounds-mode .rd-card { min-height: calc(100dvh - 15rem); }
+.op-quick { display: flex; gap: .4rem; flex-wrap: wrap; margin: .5rem 0 .3rem; }
