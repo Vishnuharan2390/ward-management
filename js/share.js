@@ -41,7 +41,7 @@ const Share = (() => {
   // By the phone's clock: before noon (small hours included) morning, noon–5 PM afternoon, then evening.
   function greeting(now = new Date()) {
     const h = now.getHours();
-    return h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING';
+    return `${h < 12 ? 'GOOD MORNING' : h < 17 ? 'GOOD AFTERNOON' : 'GOOD EVENING'} SIR`;
   }
 
   // One patient for WhatsApp: greeting, the details, THANK YOU SIR — all in capitals.
