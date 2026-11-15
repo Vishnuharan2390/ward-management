@@ -709,16 +709,31 @@ const App = (() => {
   const isIncoming = () => false;
   const postWardCases = () => inOrder(caseList().filter((c) => c.status === 'postop' && !isIncoming(c)));
   const podOf = (c) => { const d = c.surgeryDate || c.otDate; return d ? daysSince(d) : null; };
+  // Ward order (shared with the team, per ward): the bed list arranged on the ward page first, then
+  // everyone else by bed number. The e-case sheet and OT list keep their own (DOA) order.
+  const wardOrderKey = (W) => 'wardOrder_' + W.kind;
   function wardCases(W) {
     const list = W.kind === 'post' ? postWardCases() : activeCases();
-    if (W.sort !== 'bed') return list;
-    const pos = new Map(list.map((c, i) => [c.id, i]));
+    const pos = new Map((Store.meta[wardOrderKey(W)] || []).map((id, i) => [id, i]));
+    const base = new Map(list.map((c, i) => [c.id, i]));
     return [...list].sort((a, b) => {
+      const pa = pos.has(a.id);
+      const pb = pos.has(b.id);
+      if (pa && pb) return pos.get(a.id) - pos.get(b.id);
+      if (pa !== pb) return pa ? -1 : 1;
       const A = bedKey(a);
       const B = bedKey(b);
-      if (!A || !B) return (!A) - (!B) || pos.get(a.id) - pos.get(b.id); // no bed yet → end, in list order
-      return A.localeCompare(B, undefined, { numeric: true, sensitivity: 'base' }) || pos.get(a.id) - pos.get(b.id);
+      if (!A || !B) return (!A) - (!B) || base.get(a.id) - base.get(b.id); // no bed yet → end
+      return A.localeCompare(B, undefined, { numeric: true, sensitivity: 'base' }) || base.get(a.id) - base.get(b.id);
     });
+  }
+  // After a drag on the ward page: the shown rows take their new places in the ward order.
+  function setWardOrder(W, shown) {
+    const full = wardCases(W).map((c) => c.id);
+    const set = new Set(shown);
+    const slots = full.map((id, i) => (set.has(id) ? i : -1)).filter((i) => i >= 0);
+    slots.forEach((slot, k) => { full[slot] = shown[k]; });
+    Store.setMeta({ [wardOrderKey(W)]: full });
   }
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
@@ -813,7 +828,6 @@ const App = (() => {
     kind,
     layout: sessionStorage.getItem(K + 'Layout') || (!post && sessionStorage.getItem('wm.wardDetailed') === '1' ? '1' : '0'), // 0 notebook · 1 detailed · 2 rounds
     get detailed() { return this.layout === '1'; },
-    sort: lsGet(K + 'Sort') || 'bed',
     roundId: null,
     render() {
       const list = wardCases(W);
@@ -824,7 +838,7 @@ const App = (() => {
       // (the e-case sheet and the OT list show the same values).
       const lines = (t) => Math.max(1, String(t || '').split('\n').length);
       const notebook = `
-        <table class="board nb-screen nb-edit${W.sort === 'bed' ? ' by-bed' : ''}">
+        <table class="board nb-screen nb-edit by-bed">
           <thead><tr><th>S.No</th><th>Name</th><th>${post ? 'Diagnosis / procedure' : 'Diagnosis'}</th><th>To do's</th><th>${post ? 'Scheme' : 'Assessment / Scheme'}</th></tr></thead>
           <tbody>
             ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
@@ -897,12 +911,19 @@ const App = (() => {
           <button class="chip ${W.layout === '1' ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="order-bar">
-          <span class="muted small">Order</span>
-          <button class="chip ${W.sort === 'bed' ? 'on' : ''}" data-wsort="bed">By bed</button>
-          <button class="chip ${W.sort !== 'bed' ? 'on' : ''}" data-wsort="list">List order</button>
-          <span class="muted small">${W.sort === 'bed' ? 'Type each patient’s bed number once — cases without one go to the end.' : `Hold ⠿ and drag a row to reorder · ${Store.meta.caseOrder?.length ? 'your own order (same as the e-case sheet and OT list)' : 'earliest admitted first'}`}</span>
-          ${W.sort !== 'bed' && Store.meta.caseOrder?.length ? '<button class="btn small" id="nb-order-reset">Back to DOA order</button>' : ''}
+          <span class="muted small">${(Store.meta[wardOrderKey(W)] || []).length ? 'Order: your bed list, then the rest by bed number' : 'Order: by bed number'}</span>
+          ${(Store.meta[wardOrderKey(W)] || []).length ? '<button class="btn small" id="ward-order-reset">Back to bed numbers</button>' : ''}
         </div>
+        <details class="arrange" data-keep="arrange-${kind}">
+          <summary>Arrange by bed list</summary>
+          <div class="arrange-body">
+            <p class="muted small">One patient per line in bed order — e.g. <b>3 RAVI</b>, <b>BED 4 SELVI</b> or just the name (or IP number). A bed number on the line is saved to the patient.
+              ${Voice.supported ? 'Tap 🎤 and say it: “bed one Ravi, bed two Selvi…”.' : 'To dictate, use the 🎤 on your keyboard.'}</p>
+            <div class="arr-box"><textarea id="arr-text" rows="6" placeholder="3 RAVI&#10;4 SELVI&#10;5 MURUGAN">${esc(W.arrText || '')}</textarea></div>
+            <div class="form-actions"><button class="btn primary" id="arr-go">Rearrange</button><button class="btn" id="arr-clear">Clear</button></div>
+            ${W.arrResult || ''}
+          </div>
+        </details>
         <div class="table-wrap">${W.detailed ? detailed : notebook}</div>
         <details class="help" data-keep="ward-help"><summary>How this page works</summary><p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p></details>`;
     },
@@ -983,12 +1004,6 @@ const App = (() => {
           render();
           return window.scrollTo(0, 0);
         }
-        const ws = e.target.closest('[data-wsort]');
-        if (ws) {
-          W.sort = ws.dataset.wsort;
-          lsSet(K + 'Sort', W.sort);
-          return render();
-        }
         const rd = e.target.closest('[data-rd]');
         if (rd) return step(+rd.dataset.rd);
         const sb = e.target.closest('[data-sug-add],[data-sug-skip]');
@@ -1059,7 +1074,7 @@ const App = (() => {
           document.body.classList.remove('dragging');
           const after = $$('tr[data-nbcase]', tbody).filter((r) => !r.hidden).map((r) => r.dataset.nbcase);
           if (after.join() !== before.join()) {
-            setShownOrder(after);
+            setWardOrder(W, after);
             toast('Order saved');
           }
           render();
@@ -1079,8 +1094,35 @@ const App = (() => {
         $$('tbody tr[data-q]', el).forEach((tr) => { tr.hidden = !!q && !tr.dataset.q.includes(q); });
       };
       $('#nb-q', el)?.addEventListener('input', (e) => { W.q = e.target.value; filter(); });
-      const nbReset = $('#nb-order-reset', el);
-      if (nbReset) nbReset.onclick = () => { Store.setMeta({ caseOrder: [] }); toast('Back to date-of-admission order'); };
+      // Bed list → ward order
+      const arr = $('#arr-text', el);
+      if (arr) {
+        arr.addEventListener('input', () => { W.arrText = arr.value; });
+        Voice.attach(arr.parentElement);
+        $('#arr-clear', el).onclick = () => { W.arrText = ''; W.arrResult = ''; arr.value = ''; render(); };
+        $('#arr-go', el).onclick = () => {
+          Voice.stop();
+          W.arrText = arr.value;
+          const lines = BedArrange.parse(arr.value);
+          if (!lines.length) return toast('Type or dictate the patients in bed order first', 3500);
+          const cases = W.kind === 'post' ? postWardCases() : activeCases();
+          const r = BedArrange.match(lines, cases);
+          if (!r.order.length) {
+            W.arrResult = '<p class="arr-res bad">None of those lines matched a patient in this ward.</p>';
+            return render();
+          }
+          for (const [id, bed] of Object.entries(r.beds)) if (String(Store.cases[id]?.bed || '') !== bed) Store.patch('cases', id, { bed });
+          Store.setMeta({ [wardOrderKey(W)]: r.order });
+          const nm = (c) => esc(c.name);
+          W.arrResult = `<div class="arr-res"><p><b>Arranged ${r.order.length} of ${cases.length}.</b>${Object.keys(r.beds).length ? ` ${Object.keys(r.beds).length} bed number(s) saved.` : ''}</p>
+            ${r.unmatched.length ? `<p class="bad">Couldn’t match: ${r.unmatched.map(esc).join(' · ')}</p>` : ''}
+            ${r.missing.length ? `<p class="muted">Not in your list (placed after, by bed number): ${r.missing.map(nm).join(', ')}</p>` : ''}</div>`;
+          toast(`Ward arranged: ${r.order.length} of ${cases.length}`);
+          render();
+        };
+      }
+      const wReset = $('#ward-order-reset', el);
+      if (wReset) wReset.onclick = () => { Store.setMeta({ [wardOrderKey(W)]: [] }); W.arrResult = ''; toast('Back to bed-number order'); };
       filter();
       el.addEventListener('change', (e) => {
         const t = e.target;
