@@ -134,13 +134,19 @@ function workDone(c, w) {
   const v = c.work?.[w.k];
   return w.type === 'pac' ? v === 'Assessed' : hasText(v);
 }
+// PAC works (one per line in work.anaesPending). Each line's tick and notes live in
+// work.pacDone[pacKey(line)] = { done, note, by, at }, so editing one line keeps the others' ticks.
+const pacKey = (line) => 'k_' + String(line).toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
+const pacLines = (c) => String(c.work?.anaesPending || '').split('\n').map((l) => l.trim()).filter(Boolean);
+const pacOpen = (c) => pacLines(c).filter((l) => !c.work?.pacDone?.[pacKey(l)]?.done);
+
 function workText(c, w) {
   const v = c.work?.[w.k];
   if (w.type === 'check') return v ? 'Taken' : '';
   if (w.type === 'pac') {
     if (!v) return '';
-    const p = c.work?.anaesPending;
-    return v !== 'Assessed' && hasText(p) ? `${v} — pending: ${p}` : v;
+    const open = pacOpen(c);
+    return v !== 'Assessed' && open.length ? `${v} — pending: ${open.join(', ')}` : v;
   }
   return v || '';
 }
@@ -267,8 +273,8 @@ function pendingList(c) {
   if (!hasPreopXray(c)) out.push({ kind: 'inv', text: 'X-ray' });
   for (const w of WORKUP) {
     if (workDone(c, w) || !workNeeded(c, w)) continue;
-    const p = w.type === 'pac' ? c.work?.anaesPending : '';
-    out.push({ kind: 'inv', text: hasText(p) ? `PAC: ${p}` : w.label });
+    const open = w.type === 'pac' ? pacOpen(c) : [];
+    out.push({ kind: 'inv', text: open.length ? `PAC: ${open.join(', ')}` : w.label });
   }
   for (const o of listOf(c.opinions)) if (!hasText(o.note)) out.push({ kind: 'inv', text: o.dept + ' op.' });
   for (const t of listOf(c.tasks)) if (!t.done) out.push({ kind: 'task', text: t.text + (t.to ? ` → ${t.to}` : '') });

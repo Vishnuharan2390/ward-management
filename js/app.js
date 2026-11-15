@@ -186,9 +186,31 @@ const App = (() => {
         <label class="echo-line">ECHO <span class="hint">${form ? 'not needed under 40 yrs — fill only if taken' : echoOpt ? 'not needed (under 40) — fill only if taken' : ''}</span><input ${attr('echo')} value="${esc(work.echo)}" placeholder="${echoOpt ? 'Optional' : ''}"></label>
         <label>Anaesthesia assessment
           <select ${attr('anaes')} data-pac><option value="">—</option>${opts(PAC_OPTIONS, work.anaes || '')}</select></label>
-        <label class="pac-pending"${pend ? '' : ' hidden'}>Work pending to get assessment
-          <textarea ${attr('anaesPending')} rows="2">${esc(work.anaesPending)}</textarea></label>
+        <div class="pac-pending"${pend ? '' : ' hidden'}>
+          <label>Works to get assessed <span class="hint">one per line${form ? '' : ' — tick each below when done'}</span>
+            <textarea ${attr('anaesPending')} rows="2">${esc(work.anaesPending)}</textarea></label>
+          ${!form && c ? pacChecklistHTML(c) : ''}
+        </div>
       </div>`;
+  }
+
+  // Each PAC work as a row: a tick for done, and a box for what was done / the orders given.
+  function pacChecklistHTML(c) {
+    const lines = pacLines(c);
+    if (!lines.length) return '';
+    const done = lines.filter((l) => c.work?.pacDone?.[pacKey(l)]?.done).length;
+    return `<div class="pac-list">
+      <div class="pac-head"><span>Done / orders</span><span class="pill${done === lines.length ? ' ok' : ''}">${done}/${lines.length}</span></div>
+      ${lines.map((l) => {
+        const k = pacKey(l);
+        const st = c.work?.pacDone?.[k] || {};
+        return `<div class="pac-item${st.done ? ' done' : ''}">
+          <label class="pac-chk"><input type="checkbox" data-pac-done="${k}" ${st.done ? 'checked' : ''}><span>${esc(l)}</span></label>
+          <input class="pac-note" data-pac-note="${k}" value="${esc(st.note || '')}" placeholder="What was done / orders given" aria-label="Notes for ${esc(l)}">
+        </div>`;
+      }).join('')}
+      ${c.work?.anaes === 'Provisionally assessed' ? '<p class="muted small">When every work is ticked, PAC turns to <b>Assessed</b> by itself.</p>' : ''}
+    </div>`;
   }
 
   // ---------------------------------------------------------------- Case order
@@ -1722,6 +1744,21 @@ const App = (() => {
 
         el.addEventListener('change', async (e) => {
           const t = e.target;
+          if (t.dataset.pacDone || t.dataset.pacNote) {
+            const k = t.dataset.pacDone || t.dataset.pacNote;
+            const base = `work.pacDone.${k}`;
+            if (t.dataset.pacNote) {
+              Store.patch('cases', id, { [`${base}.note`]: t.value.trim().toUpperCase() });
+              return;
+            }
+            Store.patch('cases', id, { [`${base}.done`]: t.checked, [`${base}.by`]: Store.who(), [`${base}.at`]: Date.now() });
+            const cur = Store.cases[id];
+            if (t.checked && cur.work?.anaes === 'Provisionally assessed' && pacLines(cur).length && !pacOpen(cur).length) {
+              Store.patch('cases', id, { 'work.anaes': 'Assessed' });
+              toast('All PAC works done — marked Assessed', 3500);
+            }
+            return;
+          }
           if (t.dataset.lab) {
             const base = `labs.${t.dataset.lab}`;
             const cur = Store.cases[id].labs?.[t.dataset.lab]?.v?.[t.dataset.lk] ?? '';
