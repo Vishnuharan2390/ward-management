@@ -1627,3 +1627,6 @@ details.arrange[open] { padding-bottom: .7rem; }
 .arr-res { margin-top: .6rem; font-size: .9rem; }
 .arr-res p { margin: .25rem 0; }
 .arr-res .bad, .arr-res.bad { color: var(--red); }
+.rd-head-acts { display: flex; flex-direction: column; align-items: stretch; gap: .35rem; flex: none; }
+.rd-head-acts .btn { justify-content: center; white-space: nowrap; }
+.rd-head-acts .muted { text-align: center; }

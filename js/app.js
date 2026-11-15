@@ -803,7 +803,10 @@ const App = (() => {
           <label class="bed-lab rd-bed">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label>
           <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="tag task">BOT</span>' : ''}</div>
             <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
-          <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
+          <div class="rd-head-acts">
+            <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
+            ${caseImages(c.id).length ? `<button type="button" class="btn small" data-rd-imgs="${c.id}">🖼 Images (${caseImages(c.id).length})</button>` : '<span class="muted small">No images</span>'}
+          </div>
         </div>
         <div class="rd-dx">${esc(c.diagnosis)}</div>${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
@@ -1004,6 +1007,9 @@ const App = (() => {
           render();
           return window.scrollTo(0, 0);
         }
+        // Rounds: this patient's X-rays, CT, MRI and pictures in the full-screen viewer.
+        const ri = e.target.closest('[data-rd-imgs]');
+        if (ri) return openViewer(ri.dataset.rdImgs);
         const rd = e.target.closest('[data-rd]');
         if (rd) return step(+rd.dataset.rd);
         const sb = e.target.closest('[data-sug-add],[data-sug-skip]');
