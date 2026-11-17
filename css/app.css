@@ -1630,3 +1630,10 @@ details.arrange[open] { padding-bottom: .7rem; }
 .rd-head-acts { display: flex; flex-direction: column; align-items: stretch; gap: .35rem; flex: none; }
 .rd-head-acts .btn { justify-content: center; white-space: nowrap; }
 .rd-head-acts .muted { text-align: center; }
+
+/* Image icon beside a patient's name (OT list, ward notebook) */
+.img-ico { display: inline-flex; align-items: center; gap: .2rem; vertical-align: middle; margin-left: .3rem; padding: .12rem .4rem; min-height: 0;
+  border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: .75rem; font-weight: 600; line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.img-ico:hover, .img-ico:active { color: var(--ink); border-color: var(--ink); }
+.img-ico svg { flex: none; }
+@media (max-width: 700px) { .ot-rg { display: none !important; } }

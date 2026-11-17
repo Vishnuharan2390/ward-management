@@ -846,7 +846,7 @@ const App = (() => {
           <tbody>
             ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
               <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span>${c.status === 'posted' ? '<br><span class="tag task">BOT</span>' : ''}</td>
-              <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b><div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
+              <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b> ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
               <td class="nb-dx">${esc(c.diagnosis)}${post
                 ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}${podOf(c) != null ? `<span class="tag task">POD ${podOf(c)}</span>` : ''}`
                 : `${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}</td>
@@ -1007,6 +1007,8 @@ const App = (() => {
           render();
           return window.scrollTo(0, 0);
         }
+        const wi = e.target.closest('[data-imaging]');
+        if (wi) { e.preventDefault(); return openViewer(wi.dataset.imaging); }
         // Rounds: this patient's X-rays, CT, MRI and pictures in the full-screen viewer.
         const ri = e.target.closest('[data-rd-imgs]');
         if (ri) return openViewer(ri.dataset.rdImgs);
@@ -1935,6 +1937,13 @@ const App = (() => {
     .filter((i) => !kind || i.kind === kind)
     .sort((a, b) => IMG_ORDER.indexOf(a.kind) - IMG_ORDER.indexOf(b.kind) || (a.at || 0) - (b.at || 0));
 
+  // Small picture icon + count beside a name; opens this patient's images in the viewer.
+  const IMG_SVG = '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><rect x="3" y="4.5" width="18" height="15" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8.5" cy="9.5" r="1.8" fill="currentColor"/><path d="M4 18l5.2-5.2 3.3 3.3 2.6-2.6L20 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
+  function imgIcon(c) {
+    const n = caseImages(c.id).length;
+    return n ? `<button type="button" class="img-ico" data-imaging="${c.id}" title="Radiographs & pictures (${n})" aria-label="Open ${n} image${n === 1 ? '' : 's'} of ${esc(c.name)}">${IMG_SVG}<span>${n}</span></button>` : '';
+  }
+
   function openViewer(caseId, imgId, kind) {
     const m = $('#modal');
     const c = Store.cases[caseId];
@@ -2057,19 +2066,19 @@ const App = (() => {
           </div>
           <div class="table-wrap">
             <table class="board picker">
-              <thead><tr><th title="Change the order">Order</th><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th>Radiographs</th><th></th></tr></thead>
+              <thead><tr><th title="Change the order">Order</th><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th class="ot-rg">Radiographs</th><th></th></tr></thead>
               <tbody>
                 ${pool.map((c, pi) => {
                   const n = listOf(c.images).length;
                   return `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}" data-case="${c.id}">
                   <td class="ot-move"><button class="icon" data-omove="-1" ${pi ? '' : 'disabled'} aria-label="Move up" title="Move up">↑</button><button class="icon" data-omove="1" ${pi < pool.length - 1 ? '' : 'disabled'} aria-label="Move down" title="Move down">↓</button></td>
                   <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
-                  <td><b>${esc(c.name)}</b>${c.otOnly ? '<br><span class="tag task">OT only</span>' : ''}</td><td class="nowrap">${esc(ageSex(c))}</td>
+                  <td><b>${esc(c.name)}</b> ${imgIcon(c)}${c.otOnly ? '<br><span class="tag task">OT only</span>' : ''}</td><td class="nowrap">${esc(ageSex(c))}</td>
                   <td>${esc(c.diagnosis)}</td><td>${esc(c.plan)}</td>
                   <td class="nowrap">${esc(fmtDate(c.doa))}</td>
                   <td><select class="ot-sel" data-f="work.anaes" aria-label="Anaesthesia assessment"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></td>
                   <td><select class="ot-sel" data-f="scheme" aria-label="Scheme status">${schemeOpts(c.scheme)}</select></td>
-                  <td class="nowrap">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
+                  <td class="nowrap ot-rg">${n ? `<a href="#" class="img-link" data-imaging="${c.id}">View ${n} ›</a>` : '<span class="muted">None</span>'}</td>
                   <td>${c.otOnly
                     ? `<span class="ot-only-acts"><label class="btn small">+ X-ray<input type="file" accept="image/*" multiple data-ot-xray="${c.id}" hidden></label><button class="btn small" data-ot-keep="${c.id}" title="Also put this case in the e-case sheet and ward">+ e-Case sheet</button><button class="btn small hide-btn" data-ot-del="${c.id}" title="Delete this OT-only case">Delete</button></span>`
                     : `<button class="btn small hide-btn" data-ot-hide="${c.id}" title="Hide from the OT list builder">Hide</button>`}</td>
