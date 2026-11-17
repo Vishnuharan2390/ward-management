@@ -50,15 +50,17 @@ const SharePdf = (() => {
       }
       const todo = [...lines(invTodoText(c)).map((x) => 'INV: ' + x), ...lines(opTodoText(c))];
       return [
-        String(i + 1) + (c.status === 'posted' ? '\nBOT' : ''),
+        String(i + 1),
         U(c.bed),
-        [U(c.name), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'),
+        [U(c.name) + (c.status === 'posted' ? ' (POSTED)' : ''), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'),
         dx.join('\n'),
         todo.join('\n'),
         post ? U(c.scheme) : clean(assessmentScheme(c)),
       ];
     });
-    table(d, hooks, ['S.NO', 'BED', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'ASSESSMENT / SCHEME'], body,
+    const postedRows = new Set(cases.map((c, i) => (c.status === 'posted' ? i : -1)).filter((i) => i >= 0));
+    table(d, { ...hooks, didParseCell: (h) => { if (h.section === 'body' && postedRows.has(h.row.index)) h.cell.styles.fillColor = [255, 243, 214]; } },
+      ['S.NO', 'BED', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'ASSESSMENT / SCHEME'], body,
       { 0: { cellWidth: 11 }, 1: { cellWidth: 13 }, 2: { cellWidth: 42 }, 3: { cellWidth: 78 }, 5: { cellWidth: 38 } });
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_WARD_STATUS_${stamp()}.pdf`, { type: 'application/pdf' });
   }

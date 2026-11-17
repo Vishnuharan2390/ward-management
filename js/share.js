@@ -23,7 +23,7 @@ const Share = (() => {
     cases.forEach((c, i) => {
       const ab = abnormalList(c).map((x) => x.text);
       const pend = pendingList(c).map((x) => x.text);
-      s += `*${i + 1}. ${who(c)}*${c.status === 'posted' ? ' — *BOT*' : ''}\n` + line('Dx', U(c.diagnosis)) + line('Plan', U(c.plan))
+      s += `*${i + 1}. ${who(c)}*${c.status === 'posted' ? ' *(POSTED)*' : ''}\n` + line('Dx', U(c.diagnosis)) + line('Plan', U(c.plan))
         + (ab.length ? `   ⚠️ ${ab.join(', ')}\n` : '') + (pend.length ? `   ⏳ ${pend.join(', ')}\n` : '   ✅ Work-up complete\n') + '\n';
     });
     return s.trim();

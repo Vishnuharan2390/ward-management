@@ -307,7 +307,7 @@ const App = (() => {
   const TILE_FILTERS = {
     ward: { label: 'Pre-op ward', test: (c) => isActive(c) },
     ready: { label: 'Work-up complete', test: (c) => isActive(c) && readiness(c).ready },
-    posted: { label: 'Posted (BOT)', test: (c) => c.status === 'posted' },
+    posted: { label: 'Posted', test: (c) => c.status === 'posted' },
     postward: { label: 'Post-op ward', test: (c) => c.status === 'postop' && !isIncoming(c) },
   };
   function filteredCases() {
@@ -324,7 +324,7 @@ const App = (() => {
       const all = caseList();
       const cnt = (s) => all.filter((c) => (c.status || 'preop') === s).length;
       // Census: counted from the very lists the ward pages show, so the numbers always match them.
-      const preWard = activeCases(); // pre-op + posted (BOT) patients — all still in the pre-op ward
+      const preWard = activeCases(); // pre-op + posted patients — all still in the pre-op ward
       const postWard = postWardCases(); // received into the post-op ward
       const ready = preWard.filter((c) => readiness(c).ready).length;
       const filters = [['active', 'Active'], ['preop', 'Pre-op'], ['posted', 'Posted'], ['postop', 'Post-op'], ['discharged', 'Discharged'], ['all', 'All']];
@@ -338,7 +338,7 @@ const App = (() => {
           <div class="hosp-l4">ORTHO UNIT ${esc(u.id)} · ${esc(u.chief)}</div>
         </div>
         <div class="stats">
-          ${[['ward', preWard.length, 'Pre-op ward'], ['ready', ready, 'Work-up complete'], ['posted', cnt('posted'), 'Posted (BOT)'],
+          ${[['ward', preWard.length, 'Pre-op ward'], ['ready', ready, 'Work-up complete'], ['posted', cnt('posted'), 'Posted'],
     ['postward', postWard.length, 'Post-op ward']]
     .map(([k, n, l]) => `<div class="stat-btn${dashFilter === k ? ' on' : ''}" role="button" tabindex="0" data-filter="${k}" data-tile aria-pressed="${dashFilter === k}" title="Show these cases">
             <b>${n}</b><span>${l}</span></div>`).join('')}
@@ -801,7 +801,7 @@ const App = (() => {
       <div class="card rd-card">
         <div class="rd-head">
           <label class="bed-lab rd-bed">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label>
-          <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="tag task">BOT</span>' : ''}</div>
+          <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''}</div>
             <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
           <div class="rd-head-acts">
             <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
@@ -844,9 +844,9 @@ const App = (() => {
         <table class="board nb-screen nb-edit by-bed">
           <thead><tr><th>S.No</th><th>Name</th><th>${post ? 'Diagnosis / procedure' : 'Diagnosis'}</th><th>To do's</th><th>${post ? 'Scheme' : 'Assessment / Scheme'}</th></tr></thead>
           <tbody>
-            ${list.map((c, i) => `<tr data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
-              <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span>${c.status === 'posted' ? '<br><span class="tag task">BOT</span>' : ''}</td>
-              <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b> ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
+            ${list.map((c, i) => `<tr class="${c.status === 'posted' ? 'is-posted' : ''}" data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
+              <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span></td>
+              <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''} ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
               <td class="nb-dx">${esc(c.diagnosis)}${post
                 ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}${podOf(c) != null ? `<span class="tag task">POD ${podOf(c)}</span>` : ''}`
                 : `${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}</td>
@@ -928,7 +928,7 @@ const App = (() => {
           </div>
         </details>
         <div class="table-wrap">${W.detailed ? detailed : notebook}</div>
-        <details class="help" data-keep="ward-help"><summary>How this page works</summary><p class="muted small">Tap a name or diagnosis to open the case. BOT = posted for OT. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p></details>`;
+        <details class="help" data-keep="ward-help"><summary>How this page works</summary><p class="muted small">Tap a name or diagnosis to open the case. Patients posted for OT show (POSTED) and a lightly shaded row. In the notebook, type straight into the boxes: <b>Investigation</b> (what to send or repeat) and <b>Opinion / To-do</b> — one per line; a line with “OPINION” or a department name becomes an opinion on the e-case sheet, any other line a pending work; delete a line once it’s done. Assessment and scheme are the same as on the e-case sheet and OT list. Red bold = outside the normal range. Detailed shows the most recent value of each investigation (hover or long-press for its date). Any empty investigation except ESR, qCRP and pus C/S counts as pending.</p></details>`;
     },
     mount(el) {
       document.body.classList.toggle('rounds-mode', W.layout === '2');
@@ -2159,7 +2159,7 @@ const App = (() => {
         </div>
 
         <div class="card print-card">
-          <label class="small"><input type="checkbox" id="ot-mark" checked> Mark these cases as “Posted” (BOT)</label>
+          <label class="small"><input type="checkbox" id="ot-mark" checked> Mark these cases as “Posted”</label>
           <div class="form-actions">
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>

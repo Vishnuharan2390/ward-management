@@ -1637,3 +1637,12 @@ details.arrange[open] { padding-bottom: .7rem; }
 .img-ico:hover, .img-ico:active { color: var(--ink); border-color: var(--ink); }
 .img-ico svg { flex: none; }
 @media (max-width: 700px) { .ot-rg { display: none !important; } }
+
+/* Posted for OT: "(POSTED)" after the name, and a light amber row in the ward */
+.posted-mark { font-weight: 700; font-size: .85em; color: #b77900; letter-spacing: .02em; white-space: nowrap; }
+.nb-edit tbody tr.is-posted, html[data-ui] .nb-edit tbody tr.is-posted { background: rgba(255, 196, 64, .10); box-shadow: inset 3px 0 0 rgba(255, 196, 64, .75); }
+html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, html[data-ui="dos"] .posted-mark { color: #ffcf66; }
+@media (prefers-color-scheme: dark) { html:not([data-ui]) .posted-mark { color: #ffcf66; } }
+.rd-name .posted-mark { font-size: .7em; vertical-align: .15em; }
+/* printed ward board */
+.pr-posted td { background: #fff3d6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
