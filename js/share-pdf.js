@@ -80,7 +80,6 @@ const SharePdf = (() => {
       const todo = [...lines(invTodoText(c)).map((x) => 'INV: ' + x), ...lines(opTodoText(c))];
       return [
         String(i + 1),
-        U(c.bed),
         [U(c.name) + (c.status === 'posted' ? ' (POSTED)' : ''), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'),
         dx.join('\n'),
         todo.join('\n'),
@@ -89,11 +88,11 @@ const SharePdf = (() => {
     });
     const postedRows = new Set(cases.map((c, i) => (c.status === 'posted' ? i : -1)).filter((i) => i >= 0));
     const d = tablePdf(`${unitName(meta.unitId)} - ${ward} STATUS`, `${fmtDate(todayISO())} - ${cases.length} cases${posted ? ` - ${posted} posted` : ''}`,
-      ['NO', 'BED', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'PAC / SCHEME'], body,
-      { 0: { cellWidth: 8.5 }, 1: { cellWidth: 9 }, 2: { cellWidth: 28 }, 3: { cellWidth: 36 }, 4: { cellWidth: todoColW(post) }, 5: { cellWidth: 25, fontSize: 8 } }, postedRows);
+      ['NO', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'PAC / SCHEME'], body,
+      { 0: { cellWidth: 8.5 }, 1: { cellWidth: 32 }, 2: { cellWidth: 41 }, 3: { cellWidth: todoColW(post) }, 4: { cellWidth: 25, fontSize: 8 } }, postedRows);
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_WARD_STATUS_${stamp()}.pdf`, { type: 'application/pdf' });
   }
-  const todoColW = () => PW - 2 * PM - (8.5 + 9 + 28 + 36 + 25);
+  const todoColW = () => PW - 2 * PM - (8.5 + 32 + 41 + 25);
 
   // Pending works: what is still to be done, case by case.
   function pendingPdf(cases, meta, post) {
@@ -102,11 +101,11 @@ const SharePdf = (() => {
       const items = [...lines(invTodoText(c)), ...pendingList(c).map((p) => U(p.text))];
       return [c, [...new Set(items)]];
     }).filter(([, items]) => items.length);
-    const body = rows.map(([c, items], i) => [String(i + 1), U(c.bed), [U(c.name) + (c.status === 'posted' ? ' (POSTED)' : ''), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'), items.join(', ')]);
-    if (!body.length) body.push(['', '', 'Nothing pending', '']);
+    const body = rows.map(([c, items], i) => [String(i + 1), [U(c.name) + (c.status === 'posted' ? ' (POSTED)' : ''), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'), items.join(', ')]);
+    if (!body.length) body.push(['', 'Nothing pending', '']);
     const postedRows = new Set(rows.map(([c], i) => (c.status === 'posted' ? i : -1)).filter((i) => i >= 0));
     const d = tablePdf(`${unitName(meta.unitId)} - ${ward} PENDING WORKS`, `${fmtDate(todayISO())} - ${rows.length} cases`,
-      ['NO', 'BED', 'NAME', 'PENDING'], body, { 0: { cellWidth: 8.5 }, 1: { cellWidth: 10 }, 2: { cellWidth: 36 } }, postedRows);
+      ['NO', 'NAME', 'PENDING'], body, { 0: { cellWidth: 8.5 }, 1: { cellWidth: 40 } }, postedRows);
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_PENDING_WORKS_${stamp()}.pdf`, { type: 'application/pdf' });
   }
 

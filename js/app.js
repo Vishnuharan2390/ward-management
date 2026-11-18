@@ -17,7 +17,7 @@ const App = (() => {
   const isActive = (c) => ['preop', 'posted', undefined, ''].includes(c.status);
   const byWard = (a, b) => String(a.ward || '').localeCompare(String(b.ward || ''), undefined, { numeric: true }) || (a.doa || '').localeCompare(b.doa || '');
   const flagged = (text, f) => (f ? `<b class="flag">${esc(text)}${FLAG_MARK[f]}</b>` : esc(text));
-  const metaLine = (c) => [ageSex(c), c.ipNo, c.ward, c.bed && 'BED ' + c.bed].filter(Boolean).join(' · ');
+  const metaLine = (c) => [ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · ');
   const tagHTML = (p) => `<span class="tag ${p.kind}">${esc(p.text)}</span>`;
 
   // ---------------------------------------------------------------- Lab entry
@@ -702,15 +702,14 @@ const App = (() => {
     return `<td class="v${f ? ' flag' : ''}" title="${esc(fmtDate(l.date))}">${esc(shown)}${FLAG_MARK[f]}</td>`;
   }
 
-  // Ward order: by bed number (default — follows the walk round the ward), or the shared list order.
-  const bedKey = (c) => String(c.bed || '').trim();
   // Post-op ward: every post-op case. There is no "incoming / receive" step any more — a transfer
   // lands in the post-op ward at once, and cases still marked "not received" from before count as in.
   const isIncoming = () => false;
   const postWardCases = () => inOrder(caseList().filter((c) => c.status === 'postop' && !isIncoming(c)));
   const podOf = (c) => { const d = c.surgeryDate || c.otDate; return d ? daysSince(d) : null; };
   // Ward order (shared with the team, per ward): the bed list arranged on the ward page first, then
-  // everyone else by bed number. The e-case sheet and OT list keep their own (DOA) order.
+  // everyone else in admission order. Bed numbers aren't kept. The e-case sheet and OT list keep
+  // their own (DOA) order.
   const wardOrderKey = (W) => 'wardOrder_' + W.kind;
   function wardCases(W) {
     const list = W.kind === 'post' ? postWardCases() : activeCases();
@@ -721,10 +720,7 @@ const App = (() => {
       const pb = pos.has(b.id);
       if (pa && pb) return pos.get(a.id) - pos.get(b.id);
       if (pa !== pb) return pa ? -1 : 1;
-      const A = bedKey(a);
-      const B = bedKey(b);
-      if (!A || !B) return (!A) - (!B) || base.get(a.id) - base.get(b.id); // no bed yet → end
-      return A.localeCompare(B, undefined, { numeric: true, sensitivity: 'base' }) || base.get(a.id) - base.get(b.id);
+      return base.get(a.id) - base.get(b.id);
     });
   }
   // After a drag on the ward page: the shown rows take their new places in the ward order.
@@ -793,14 +789,13 @@ const App = (() => {
     const chips = (box, list2) => list2.map((x) => `<button type="button" class="chip" data-add="${box}" data-text="${esc(x)}">+ ${esc(x)}</button>`).join('');
     const nav = (where) => `<div class="rd-nav rd-${where}">
         <button class="btn rd-btn" data-rd="-1" ${i ? '' : 'disabled'}>‹ Prev</button>
-        ${where === 'top' ? `<select id="rd-jump" aria-label="Go to patient">${list.map((x, j) => `<option value="${x.id}"${j === i ? ' selected' : ''}>${j + 1}. ${x.bed ? 'BED ' + esc(x.bed) + ' · ' : ''}${esc(x.name)}</option>`).join('')}</select>` : `<span class="muted small">${i + 1} of ${list.length}</span>`}
+        ${where === 'top' ? `<select id="rd-jump" aria-label="Go to patient">${list.map((x, j) => `<option value="${x.id}"${j === i ? ' selected' : ''}>${j + 1}. ${esc(x.name)}</option>`).join('')}</select>` : `<span class="muted small">${i + 1} of ${list.length}</span>`}
         <button class="btn primary rd-btn" data-rd="1" ${i < list.length - 1 ? '' : 'disabled'}>Next ›</button>
       </div>`;
     return `<div class="rounds" data-nbcase="${c.id}">
       ${nav('top')}
       <div class="card rd-card">
         <div class="rd-head">
-          <label class="bed-lab rd-bed">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label>
           <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''}</div>
             <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
           <div class="rd-head-acts">
@@ -844,9 +839,9 @@ const App = (() => {
         <table class="board nb-screen nb-edit by-bed">
           <thead><tr><th>S.No</th><th>Name</th><th>${post ? 'Diagnosis / procedure' : 'Diagnosis'}</th><th>To do's</th><th>${post ? 'Scheme' : 'Assessment / Scheme'}</th></tr></thead>
           <tbody>
-            ${list.map((c, i) => `<tr class="${c.status === 'posted' ? 'is-posted' : ''}" data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.bed && 'BED ' + c.bed, c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
+            ${list.map((c, i) => `<tr class="${c.status === 'posted' ? 'is-posted' : ''}" data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
               <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span></td>
-              <td class="nb-name"><label class="bed-lab">Bed<input data-nb="bed" value="${esc(c.bed || '')}" autocomplete="off"></label><b>${esc(c.name)}</b>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''} ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
+              <td class="nb-name"><b>${esc(c.name)}</b>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''} ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
               <td class="nb-dx">${esc(c.diagnosis)}${post
                 ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}${podOf(c) != null ? `<span class="tag task">POD ${podOf(c)}</span>` : ''}`
                 : `${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}</td>
@@ -914,13 +909,13 @@ const App = (() => {
           <button class="chip ${W.layout === '1' ? 'on' : ''}" data-layout="1">Detailed</button>
         </div>
         <div class="order-bar">
-          <span class="muted small">${(Store.meta[wardOrderKey(W)] || []).length ? 'Order: your bed list, then the rest by bed number' : 'Order: by bed number'}</span>
-          ${(Store.meta[wardOrderKey(W)] || []).length ? '<button class="btn small" id="ward-order-reset">Back to bed numbers</button>' : ''}
+          <span class="muted small">${(Store.meta[wardOrderKey(W)] || []).length ? 'Order: your bed list, then the rest by date of admission' : 'Order: by date of admission — arrange it by your bed list below'}</span>
+          ${(Store.meta[wardOrderKey(W)] || []).length ? '<button class="btn small" id="ward-order-reset">Clear bed order</button>' : ''}
         </div>
         <details class="arrange" data-keep="arrange-${kind}">
           <summary>Arrange by bed list</summary>
           <div class="arrange-body">
-            <p class="muted small">One patient per line in bed order — e.g. <b>3 RAVI</b>, <b>BED 4 SELVI</b> or just the name (or IP number). A bed number on the line is saved to the patient.
+            <p class="muted small">One patient per line in bed order — the name (or IP number), e.g. <b>RAVI</b>, <b>SELVI</b>; “3 RAVI” or “BED 4 SELVI” works too. The ward is then numbered 1, 2, 3… in that order.
               ${Voice.supported ? 'Tap 🎤 and say it: “bed one Ravi, bed two Selvi…”.' : 'To dictate, use the 🎤 on your keyboard.'}</p>
             <div class="arr-box"><textarea id="arr-text" rows="6" placeholder="3 RAVI&#10;4 SELVI&#10;5 MURUGAN">${esc(W.arrText || '')}</textarea></div>
             <div class="form-actions"><button class="btn primary" id="arr-go">Rearrange</button><button class="btn" id="arr-clear">Clear</button></div>
@@ -1119,18 +1114,17 @@ const App = (() => {
             W.arrResult = '<p class="arr-res bad">None of those lines matched a patient in this ward.</p>';
             return render();
           }
-          for (const [id, bed] of Object.entries(r.beds)) if (String(Store.cases[id]?.bed || '') !== bed) Store.patch('cases', id, { bed });
           Store.setMeta({ [wardOrderKey(W)]: r.order });
           const nm = (c) => esc(c.name);
-          W.arrResult = `<div class="arr-res"><p><b>Arranged ${r.order.length} of ${cases.length}.</b>${Object.keys(r.beds).length ? ` ${Object.keys(r.beds).length} bed number(s) saved.` : ''}</p>
+          W.arrResult = `<div class="arr-res"><p><b>Arranged ${r.order.length} of ${cases.length}.</b></p>
             ${r.unmatched.length ? `<p class="bad">Couldn’t match: ${r.unmatched.map(esc).join(' · ')}</p>` : ''}
-            ${r.missing.length ? `<p class="muted">Not in your list (placed after, by bed number): ${r.missing.map(nm).join(', ')}</p>` : ''}</div>`;
+            ${r.missing.length ? `<p class="muted">Not in your list (placed after, by date of admission): ${r.missing.map(nm).join(', ')}</p>` : ''}</div>`;
           toast(`Ward arranged: ${r.order.length} of ${cases.length}`);
           render();
         };
       }
       const wReset = $('#ward-order-reset', el);
-      if (wReset) wReset.onclick = () => { Store.setMeta({ [wardOrderKey(W)]: [] }); W.arrResult = ''; toast('Back to bed-number order'); };
+      if (wReset) wReset.onclick = () => { Store.setMeta({ [wardOrderKey(W)]: [] }); W.arrResult = ''; toast('Bed order cleared'); };
       filter();
       el.addEventListener('change', (e) => {
         const t = e.target;
@@ -1170,7 +1164,7 @@ const App = (() => {
           const d = p.out ? daysSince(p.out) : null;
           return `<div class="card pl-row">
             <div class="pl-main">
-              <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}${c.bed ? ' · Bed ' + esc(c.bed) : ''}</span></div>
+              <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''}</span></div>
               <div class="small">${esc(c.diagnosis) || '—'}</div>
               ${c.procedureDone ? `<div class="small muted">Done: ${esc(c.procedureDone)}</div>` : ''}
               <div class="muted small">From the ${esc(p.from === 'postop' ? 'post-op' : 'pre-op')} ward · ${esc(T.outWord)} ${esc(fmtDate(p.out))}${d != null ? ` · <b>day ${d}</b>` : ''}${p.by ? ' · by ' + esc(p.by) : ''}</div>
@@ -1221,7 +1215,6 @@ const App = (() => {
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
               <label>IP number<input name="ipNo" value="${esc(c.ipNo)}"></label>
               <label>Ward<input name="ward" value="${esc(c.ward)}"></label>
-              <label>Bed<input name="bed" value="${esc(c.bed)}" autocomplete="off"></label>
               <label>Date of admission<input type="date" name="doa" value="${esc(c.doa)}"></label>
               <label>Attender<input name="attender" value="${esc(c.attender)}"></label>
               <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
@@ -1310,7 +1303,7 @@ const App = (() => {
 
         // Scheme is set from rounds / the OT list; treatment and written-by aren't asked here (the admission
         // deck still has them). None of the three is in this form, so saving leaves them as they are.
-        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'bed', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'comorbid', 'implants', 'mode'];
+        const BASIC = ['name', 'age', 'sex', 'ipNo', 'ward', 'doa', 'attender', 'phone', 'address', 'diagnosis', 'plan', 'level', 'comorbid', 'implants', 'mode'];
 
         // Images picked before the case exists are held here and saved with it.
         const pending = [];
