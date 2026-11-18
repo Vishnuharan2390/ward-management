@@ -832,6 +832,121 @@ const ANTIBIOTICS = [
 const isSpinePelvis = (c) => /\b(spine|spinal|vertebra|vertebral|cervical spine|dorsal|lumbar|thoracolumbar|[CDTL]\d{1,2}\b|pelvi[sc]|acetabul|sacr|ilium|iliac|pubic|rami|si joint)/i.test(`${c.diagnosis || ''} ${c.plan || ''}`);
 const isCompound = (c) => /\b(compound|open (fracture|#)|gustilo|grade\s*(i{1,3}|[1-3])[abc]?\b)/i.test(c.diagnosis || '');
 
+// ---- Condition on discharge + discharge advice, written from the diagnosis ----------------------
+// Each injured part (limb / spine / pelvis) → its usual immobilisation and the local examination.
+// Tamil: how the "continue …" line is printed for the patient.
+const POP_TA = 'மாவுக்கட்டைத் தொடர்ந்து அணிந்து கொள்ளவும்; ஈரமாக்க வேண்டாம்.';
+const DC_SPLINTS = {
+  'BELOW ELBOW SLAB': POP_TA,
+  'VOLAR BELOW ELBOW SLAB': POP_TA,
+  'ABOVE ELBOW SLAB': POP_TA,
+  'U-SLAB': POP_TA,
+  'BODY ARM BANDAGE': 'உடலோடு சேர்த்துக் கட்டிய கைக்கட்டைத் தொடர்ந்து அணிந்து கொள்ளவும்.',
+  'CUFF AND COLLAR WITH FIGURE OF 8 BANDAGE': 'கை தொங்கு கட்டையும் (கஃப் அண்ட் காலர்) 8 வடிவத் தோள்பட்டைக் கட்டையும் தொடர்ந்து அணிந்து கொள்ளவும்.',
+  'CUFF AND COLLAR WITH JONES STRAPPING': 'கை தொங்கு கட்டையும் (கஃப் அண்ட் காலர்) ஜோன்ஸ் கட்டையும் தொடர்ந்து அணிந்து கொள்ளவும்.',
+  'CUFF AND COLLAR': 'கை தொங்கு கட்டைத் (கஃப் அண்ட் காலர்) தொடர்ந்து அணிந்து கொள்ளவும்.',
+  'ABOVE KNEE SLAB': POP_TA,
+  'BELOW KNEE SLAB': POP_TA,
+  'TUBE SLAB': POP_TA,
+  'PELVIC BINDER': 'இடுப்புக் கட்டைத் (பெல்விக் பைண்டர்) தொடர்ந்து அணிந்து கொள்ளவும்.',
+  'PHILADELPHIA COLLAR': 'கழுத்துப் பட்டையைத் (பிலடெல்பியா காலர்) தொடர்ந்து அணிந்து கொள்ளவும்.',
+  "TAYLOR'S BRACE": 'முதுகுப் பட்டையைத் (டெய்லர் பிரேஸ்) தொடர்ந்து அணிந்து கொள்ளவும்.',
+  'LS BELT': 'இடுப்புப் பட்டையைத் (LS பெல்ட்) தொடர்ந்து அணிந்து கொள்ளவும்.',
+  NONE: '',
+};
+
+// [test, part, limb, splint]; checked in order, the first match wins for each injured part.
+const DC_RULES = [
+  [/CERVICAL|\bC[1-7]\b/, 'spine', 'CERVICAL SPINE', 'PHILADELPHIA COLLAR'],
+  [/\bL[3-5]\b|SACRUM|SACRAL|LUMBOSACRAL|\bS1\b/, 'spine', 'LUMBOSACRAL SPINE', 'LS BELT'],
+  [/DORSAL|THORACIC|DORSOLUMBAR|THORACOLUMBAR|\b[DT]\d{1,2}\b|\bL[12]\b/, 'spine', 'DORSOLUMBAR SPINE', "TAYLOR'S BRACE"],
+  [/LUMBAR|SPINE|SPINAL|VERTEBRA|PIVD|LISTHESIS|POTT/, 'spine', 'LUMBAR SPINE', 'LS BELT'],
+  [/PELVI|ACETABUL|PUBIC|\bRAMI\b|ILIUM|ILIAC|SACROILIAC|SI JOINT|SYMPHYSIS/, 'pelvis', 'PELVIS', 'PELVIC BINDER'],
+  [/SHOULDER DISLOCATION|DISLOCATION (OF )?(THE )?(\w+ )?SHOULDER|PROXIMAL HUMERUS|SURGICAL NECK|NECK OF (THE )?HUMERUS|HUMERAL NECK|GREATER TUBEROSITY|ANATOMICAL NECK/, 'limb', 'UPPER LIMB', 'BODY ARM BANDAGE'],
+  [/(LATERAL|DISTAL|OUTER) (THIRD |END |1\/3 )?(OF )?(THE )?CLAVICLE|CLAVICLE.*(LATERAL|DISTAL|OUTER)/, 'limb', 'UPPER LIMB', 'CUFF AND COLLAR WITH JONES STRAPPING'],
+  [/CLAVICLE/, 'limb', 'UPPER LIMB', 'CUFF AND COLLAR WITH FIGURE OF 8 BANDAGE'],
+  [/\bTOE\b|METATARSAL|LISFRANC|\bFOOT\b|TALUS|CALCAN|TARSAL|MALLEOL|ANKLE|PILON|PLAFOND/, 'limb', 'LOWER LIMB', 'BELOW KNEE SLAB'],
+  [/PATELLA/, 'limb', 'LOWER LIMB', 'TUBE SLAB'],
+  [/SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?HUMERUS|INTERCONDYLAR (FRACTURE )?(OF )?(THE )?HUMERUS|DISTAL HUMERUS|CONDYLE.*HUMERUS|HUMERUS.*CONDYLE|OLECRANON|ELBOW|RADIAL HEAD|(HEAD|NECK) OF (THE )?RADIUS|MONTEGGIA|GALEAZZI|BOTH BONES? (OF )?(THE )?FOREARM|\bBBFA\b|FOREARM|SHAFT (OF )?(THE )?(RADIUS|ULNA)|\bULNA\b/, 'limb', 'UPPER LIMB', 'ABOVE ELBOW SLAB'],
+  [/HUMERUS/, 'limb', 'UPPER LIMB', 'U-SLAB'],
+  [/DISTAL (END )?(OF )?(THE )?RADIUS|COLLES|SMITH|BARTON|WRIST|SCAPHOID|CARPAL|METACARPAL|PHALAN|THUMB|FINGER|\bHAND\b|STYLOID/, 'limb', 'UPPER LIMB', 'BELOW ELBOW SLAB'],
+  [/RADIUS/, 'limb', 'UPPER LIMB', 'ABOVE ELBOW SLAB'],
+  [/FEMUR|FEMORAL|TROCHANTER|\bNOF\b|TIBIA|FIBULA|PLATEAU|KNEE|\bLEG\b|\bBBFL\b|\bHIP\b/, 'limb', 'LOWER LIMB', 'ABOVE KNEE SLAB'],
+];
+const DC_POWER_LEVELS = ['C5', 'C6', 'C7', 'C8', 'T1', 'L2', 'L3', 'L4', 'L5', 'S1'];
+
+// Diagnosis → the injured parts, in order: [{ part, limb, side, splint }]
+function dcRegions(c) {
+  const dx = String(c?.diagnosis || '').toUpperCase();
+  const sideIn = (t) => (/\b(BILATERAL|B\/L|BOTH SIDES?)\b/.test(t) ? 'BILATERAL' : /\b(LEFT|LT)\b/.test(t) ? 'LEFT' : /\b(RIGHT|RT)\b/.test(t) ? 'RIGHT' : '');
+  const out = [];
+  for (const seg of dx.split(/\bWITH\b|\+|;|,|\bALONG WITH\b|\bAND\b(?! (DISLOCATION|SUBLUXATION))/)) {
+    const rule = DC_RULES.find(([re]) => re.test(seg));
+    if (!rule) continue;
+    const [, part, limb, splint] = rule;
+    const side = part === 'limb' ? sideIn(seg) || sideIn(dx) : '';
+    if (out.some((r) => r.part === part && r.limb === limb && r.side === side)) continue; // one block per part and side
+    out.push({ part, limb, side, splint });
+  }
+  return out;
+}
+
+const dcPowerLine = (lvl, p = {}) => {
+  const v = (x) => (String(x ?? '').trim() ? `${String(x).trim()}/5` : '-/5');
+  return `${lvl.padEnd(6)}RT ${v(p[`pw_${lvl}R`])}    LT ${v(p[`pw_${lvl}L`])}`;
+};
+// Condition on discharge. splints: chosen immobilisation for each part (else the usual one);
+// p: the typed power grades (pw_C5R …).
+function dcConditionText(regions, splints = [], p = {}) {
+  const L = ['PATIENT VITALS STABLE'];
+  regions.forEach((r, i) => {
+    const splint = splints[i] || r.splint;
+    L.push('');
+    if (r.part === 'spine') {
+      L.push(`L/E OF ${r.limb}:`);
+      if (splint && splint !== 'NONE') L.push(`${splint} IN SITU`);
+      L.push('BULK: NORMAL', 'TONE: NORMAL', 'POWER:');
+      DC_POWER_LEVELS.forEach((lvl) => L.push(dcPowerLine(lvl, p)));
+    } else {
+      L.push(`L/E OF ${r.part === 'pelvis' ? 'PELVIS' : `${r.side ? r.side + ' ' : ''}${r.limb}`}:`);
+      if (splint && splint !== 'NONE') L.push(`${splint} IN SITU`);
+      L.push('DISTAL PULSES PRESENT');
+      L.push(r.limb === 'UPPER LIMB' ? 'ACTIVE FINGER MOVEMENTS PRESENT' : 'ACTIVE TOE MOVEMENTS PRESENT');
+    }
+  });
+  if (!regions.length) L.push('', 'L/E OF', '', 'DISTAL PULSES PRESENT', 'ACTIVE FINGER / TOE MOVEMENTS PRESENT');
+  return L.join('\n');
+}
+
+// A wound to look after: open fracture, wound / debridement / infection, or an operation (post-op wound).
+const dcHasWound = (c) => isCompound(c) || /\b(WOUND|DEBRIDEMENT|INFECT\w*|ULCER|DEGLOVING|LACERAT\w*|ABSCESS|SEQUESTR\w*)\b/i.test(`${c.diagnosis || ''} ${c.plan || ''} ${c.procedureDone || ''}`);
+const dcOperated = (c, d = {}) => !!(c.surgeryDate || d.dos || hasText(c.procedureDone) || hasText(c.opNotes));
+
+// The usual advice: [[english, tamil], …]
+function dcUsualAdvice(c, d = {}, splints = []) {
+  const out = [['CONTINUE ANALGESICS', 'வலி நிவாரண மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.']];
+  const wound = dcHasWound(c);
+  if (wound) out.push(['CONTINUE ANTIBIOTICS', 'ஆன்டிபயாடிக் மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.']);
+  if (wound || dcOperated(c, d)) out.push(['ALTERNATE DAY DRESSING AT NEARBY PHC OR GH', 'ஒரு நாள் விட்டு ஒரு நாள் அருகிலுள்ள அரசு மருத்துவமனை அல்லது ஆரம்ப சுகாதார நிலையத்தில் காயத்தைச் சுத்தம் செய்து கட்டுப் போட்டுக் கொள்ளவும்.']);
+  const seen = new Set();
+  dcRegions(c).forEach((r, i) => {
+    const s = splints[i] || r.splint;
+    if (!s || s === 'NONE' || seen.has(s)) return;
+    seen.add(s);
+    out.push([`CONTINUE ${s}`, DC_SPLINTS[s] || POP_TA]);
+  });
+  return out;
+}
+
+// Spine / pelvis advice set
+const DC_SPINE_ADVICE = [
+  ['LOG ROLL EVERY 2 HOURS', 'ஒவ்வொரு 2 மணி நேரத்திற்கும் ஒருமுறை உடலை ஒரே நேர்க்கோட்டில் வைத்து (லாக் ரோல்) பக்கவாட்டில் திருப்பவும்.'],
+  ['ACTIVE AND PASSIVE MOBILISATION OF ALL FOUR LIMBS', 'நான்கு கை கால்களையும் தானாகவும் பிறர் உதவியுடனும் அசைத்துப் பயிற்சி செய்யவும்.'],
+  ['INCENTIVE SPIROMETRY', 'ஸ்பைரோமீட்டர் கருவி மூலம் மூச்சுப் பயிற்சி செய்யவும்.'],
+  ['CHEST PHYSIOTHERAPY', 'நெஞ்சுப் பிசியோதெரபி (மூச்சுப் பயிற்சிகள்) தொடர்ந்து செய்யவும்.'],
+  ['BACK CARE TO PREVENT BED SORES', 'படுக்கைப் புண் வராமல் முதுகைச் சுத்தமாகவும் உலர்வாகவும் பராமரிக்கவும்.'],
+];
+
 
 function reviewPhrase(weeks, day, opd, time = '8AM') {
   const w = Number(weeks) || 2;

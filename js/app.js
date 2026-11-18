@@ -2940,7 +2940,7 @@ const App = (() => {
       ['investigations', 'Investigations (optional)', 3, ['inv', '↻ from case']],
       ['treatment', 'Treatment given', 6],
       ['course', 'Course in hospital', 5, ['course', '↻ auto-write']],
-      ['condition', 'Condition on discharge', 4],
+      ['condition', 'Condition on discharge', 10, ['cond', '↻ auto-write']],
       ['meds', 'Discharge medications (optional)', 3],
     ];
     return {
@@ -2965,7 +2965,9 @@ const App = (() => {
           past: pastTemplate(c),
           exam: EXAM_TEMPLATE,
           treatment: [...DRUGS_ALL, ...(isSpinePelvis(c) ? DRUGS_SPINE_PELVIS : [])].join('\n'),
-          condition: 'PATIENT VITALS STABLE',
+          // written from the diagnosis: immobilisation + local examination (spine: power table)
+          condition: dcConditionText(dcRegions(c)),
+          ...(() => { const adv = dcUsualAdvice(c, { dos: c.surgeryDate || c.otDate }); return { advice: adv.map((a) => a[0]).join('\n'), adviceTa: adv.map((a) => a[1]).join('\n') }; })(),
           ...(c.discharge || {}),
         };
         if (d.disposition === 'lama') d.disposition = 'ama';
@@ -2976,7 +2978,15 @@ const App = (() => {
             <button type="button" class="chip${sp ? ' suggest' : ''}" data-drugset="spine">+ Spine / pelvis set${sp ? ' (suggested)' : ''}</button>
           </div>
           <div class="span2 drug-btns"><span class="muted small">Antibiotics:</span>${ANTIBIOTICS.map((a, i) => `<button type="button" class="chip" data-abx="${i}">+ ${esc(a)}</button>`).join('')}</div>`;
-        const field = ([k, l, rows, btn]) => `<label class="span2">${l}${btn ? ` <button type="button" class="link small" data-tpl="${btn[0]}">${btn[1]}</button>` : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>${k === 'treatment' ? drugBtns : ''}`;
+        // Condition on discharge: the immobilisation for each injured part, and the power grid for spine cases.
+        const regs = dcRegions(c);
+        const condHelp = `<div class="span2 dc-cond">
+            ${regs.length ? `<div class="dc-splints">${regs.map((r, i) => `<label>${esc(r.part === 'pelvis' ? 'Pelvis' : `${r.side ? r.side[0] + r.side.slice(1).toLowerCase() + ' ' : ''}${r.limb.toLowerCase()}`)}<select name="splint_${i}" data-splint>${opts(Object.keys(DC_SPLINTS), d[`splint_${i}`] || r.splint)}</select></label>`).join('')}</div>`
+              : '<p class="muted small">No limb, spine or pelvis found in the diagnosis — type the local examination below.</p>'}
+            ${regs.some((r) => r.part === 'spine') ? `<div class="dc-power"><div class="dc-power-h"><b>Power</b> <span class="muted small">type the grade (0-5); blank stays “-/5”</span></div>
+              <table><thead><tr><th></th><th>RT</th><th>LT</th></tr></thead><tbody>${DC_POWER_LEVELS.map((lvl) => `<tr><th>${lvl}</th>${['R', 'L'].map((sd) => `<td><input name="pw_${lvl}${sd}" data-pw="${lvl}" value="${esc(d[`pw_${lvl}${sd}`] || '')}" inputmode="numeric" maxlength="2" aria-label="${lvl} ${sd === 'R' ? 'right' : 'left'} power"></td>`).join('')}</tr>`).join('')}</tbody></table></div>` : ''}
+          </div>`;
+        const field = ([k, l, rows, btn]) => `${k === 'condition' ? condHelp : ''}<label class="span2">${l}${btn ? ` <button type="button" class="link small" data-tpl="${btn[0]}">${btn[1]}</button>` : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>${k === 'treatment' ? drugBtns : ''}`;
         return `
           <h2>Discharge / transfer — ${esc(c.name)} <span class="muted small">${esc(ageSex(c))} · IP ${esc(c.ipNo)}</span></h2>
           <form id="dc-form" class="card form" autocomplete="off">
@@ -3005,6 +3015,10 @@ const App = (() => {
               ${FIELDS.map(field).join('')}
             </fieldset>
             <fieldset><legend>Discharge advice</legend>
+              <div class="span2 dc-adv-btns">
+                <button type="button" class="btn small primary" data-adv="usual">✦ Usual advice</button>
+                <button type="button" class="chip${sp ? ' suggest' : ''}" data-adv="spine">+ Spine / pelvis advice${sp ? ' (suggested)' : ''}</button>
+              </div>
               <div class="span2 chips">${ADVICE_PHRASES.map(([en], i) => `<button type="button" class="chip" data-phrase="${i}">+ ${esc(en)}</button>`).join('')}</div>
               <div class="span2 review-row">
                 <span>Review after</span>
@@ -3073,7 +3087,22 @@ const App = (() => {
           if (hit) course.value = course.value.trim().slice(0, -hit.length) + DISPOSITIONS[e.target.value].course;
         });
         loadThumbs(el);
+        // Condition on discharge: re-written from the chosen immobilisation; power grades go into their lines.
+        const splintsNow = () => dcRegions(c()).map((r, i) => f.elements[`splint_${i}`]?.value || r.splint);
+        const writeCondition = () => { f.elements.condition.value = dcConditionText(dcRegions(c()), splintsNow(), data()); };
+        f.addEventListener('change', (e) => { if (e.target.matches('[data-splint]')) writeCondition(); });
+        f.addEventListener('input', (e) => {
+          const lvl = e.target.dataset.pw;
+          if (!lvl) return;
+          const ta = f.elements.condition;
+          ta.value = ta.value.split('\n').map((l) => (new RegExp(`^${lvl}\\s`).test(l) ? dcPowerLine(lvl, data()) : l)).join('\n');
+        });
         f.addEventListener('click', (e) => {
+          const adv = e.target.closest('[data-adv]');
+          if (adv) {
+            (adv.dataset.adv === 'spine' ? DC_SPINE_ADVICE : dcUsualAdvice(c(), data(), splintsNow())).forEach(([en, ta]) => { addLine('advice', en); addLine('adviceTa', ta); });
+            return;
+          }
           const ds = e.target.closest('[data-drugset],[data-abx]');
           if (ds) {
             const lines = ds.dataset.abx !== undefined ? [ANTIBIOTICS[ds.dataset.abx]] : ds.dataset.drugset === 'spine' ? DRUGS_SPINE_PELVIS : DRUGS_ALL;
@@ -3090,6 +3119,7 @@ const App = (() => {
           else if (t.dataset.tpl === 'exam') f.elements.exam.value = EXAM_TEMPLATE;
           else if (t.dataset.tpl === 'past') f.elements.past.value = pastTemplate(c());
           else if (t.dataset.tpl === 'course') f.elements.course.value = courseTemplate(c(), data());
+          else if (t.dataset.tpl === 'cond') writeCondition();
         });
         $('#rv-add', el).onclick = () => {
           const opd = $('#rv-opd', el).value.trim();

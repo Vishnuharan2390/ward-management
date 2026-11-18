@@ -1655,3 +1655,13 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .opn-screw .opn-at { flex: 1 1 8rem; }
 .opn-screw label { display: flex; flex-direction: column; font-size: .78rem; }
 .opn-screw label input, .opn-screw label select { width: 100%; box-sizing: border-box; }
+
+/* Discharge: condition on discharge helpers */
+.dc-cond { display: flex; flex-direction: column; gap: .5rem; }
+.dc-splints { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dc-splints label { flex: 1 1 14rem; display: flex; flex-direction: column; font-size: .85rem; }
+.dc-power table { border-collapse: collapse; }
+.dc-power th, .dc-power td { padding: .15rem .35rem; text-align: center; font-size: .85rem; }
+.dc-power tbody th { text-align: left; font-family: var(--mono, monospace); }
+.dc-power input { width: 3.2rem; text-align: center; }
+.dc-adv-btns { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
