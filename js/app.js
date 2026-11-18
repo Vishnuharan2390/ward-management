@@ -753,6 +753,33 @@ const App = (() => {
 
   // ---- Rounds suggestion pop-up: shown once per patient per session for each new suggestion.
   const sugSeen = new Map(); // case id -> Set of suggestion lines already shown
+  // ---- Rounds: bed-sore check (spine / pelvis / hip cases), once a day per patient.
+  const bsSkipped = new Set(); // "Not now" for this session
+  function bedsoreHTML(c) {
+    if (!bedsoreRisk(c) || c.bedsore?.[bedsoreKey()] || bsSkipped.has(c.id)) return '';
+    return `<div class="sug-back bs-pop" data-bs-case="${c.id}">
+      <div class="sug-box card" role="dialog" aria-label="Bed sore check">
+        <h3>Bed sore check — ${esc(c.name)}</h3>
+        <p class="muted small">${esc(c.diagnosis)}. Look at the sacrum, both heels, trochanters, scapulae and occiput.</p>
+        <div class="form-actions"><button type="button" class="btn primary" data-bs="none">✓ No bed sore</button><button type="button" class="btn" data-bs="present">Bed sore present</button></div>
+        <div class="bs-detail" hidden>
+          <div class="bs-sites">${BEDSORE_SITES.map((s) => `<label class="chip"><input type="checkbox" data-bs-site="${esc(s)}"> ${esc(s[0] + s.slice(1).toLowerCase())}</label>`).join('')}</div>
+          <label class="bs-grade">Grade<select data-bs-grade>${['I', 'II', 'III', 'IV'].map((g) => `<option>${g}</option>`).join('')}</select></label>
+          <div class="form-actions"><button type="button" class="btn primary" data-bs="save">Save</button></div>
+        </div>
+        <div class="form-actions"><button type="button" class="link small" data-bs="skip">Not now</button></div>
+      </div></div>`;
+  }
+  // Today's result as a line on the rounds card.
+  function bedsoreLine(c) {
+    if (!bedsoreRisk(c)) return '';
+    const r = c.bedsore?.[bedsoreKey()];
+    if (!r) return '<div class="rd-bs muted small">Bed sore check: not done today</div>';
+    return r.status === 'present'
+      ? `<div class="rd-bs bad">Bed sore: ${esc((r.sites || []).join(', ').toLowerCase())} — grade ${esc(r.grade || '')}</div>`
+      : '<div class="rd-bs ok">Bed sore check today: none ✓</div>';
+  }
+
   function suggestHTML(c) {
     const seen = sugSeen.get(c.id) || new Set();
     const sug = roundSuggestions(c);
@@ -803,7 +830,7 @@ const App = (() => {
             ${caseImages(c.id).length ? `<button type="button" class="btn small" data-rd-imgs="${c.id}">🖼 Images (${caseImages(c.id).length})</button>` : '<span class="muted small">No images</span>'}
           </div>
         </div>
-        <div class="rd-dx">${esc(c.diagnosis)}</div>${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
+        <div class="rd-dx">${esc(c.diagnosis)}</div>${bedsoreLine(c)}${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
           <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
           <div class="rd-chips">${chips('inv', post ? POST_INV_CHIPS : ROUND_INV_CHIPS)}</div></div>
@@ -814,7 +841,7 @@ const App = (() => {
         <div class="rd-sec"><div class="rd-lab">Scheme</div><div class="rd-seg">${seg('scheme', c.scheme || '', SCHEMES)}</div></div>
       </div>
       ${nav('bottom')}
-      ${suggestHTML(c)}
+      ${bedsoreHTML(c) || suggestHTML(c)}
     </div>`;
   }
 
@@ -1009,6 +1036,33 @@ const App = (() => {
         if (ri) return openViewer(ri.dataset.rdImgs);
         const rd = e.target.closest('[data-rd]');
         if (rd) return step(+rd.dataset.rd);
+        // Bed-sore check
+        const bs = e.target.closest('[data-bs]');
+        if (bs) {
+          const pop = bs.closest('[data-bs-case]');
+          const cid = pop.dataset.bsCase;
+          const k = bs.dataset.bs;
+          if (k === 'present') { $('.bs-detail', pop).hidden = false; bs.closest('.form-actions').hidden = true; return; }
+          if (k === 'skip') { bsSkipped.add(cid); return render(); }
+          const at = { by: Store.who(), at: Date.now() };
+          if (k === 'none') {
+            Store.patch('cases', cid, { [`bedsore.${bedsoreKey()}`]: { status: 'none', ...at } });
+            toast('No bed sore — noted for today');
+            return;
+          }
+          // save: record it, and add the dressing (and a plastic surgery opinion for grade III / IV)
+          const sites = $$('[data-bs-site]', pop).filter((x) => x.checked).map((x) => x.dataset.bsSite);
+          if (!sites.length) return toast('Tick where the bed sore is', 2500);
+          const grade = $('[data-bs-grade]', pop).value;
+          const ch = { [`bedsore.${bedsoreKey()}`]: { status: 'present', sites, grade, ...at } };
+          const text = `BED SORE DRESSING - ${sites.join(', ')}, GRADE ${grade}`;
+          const cur = Store.cases[cid];
+          if (!listOf(cur.tasks).some((t) => !t.done && t.text === text)) ch[`tasks.${uid()}`] = { text, to: '', done: false, by: Store.who(), at: Date.now() };
+          if (['III', 'IV'].includes(grade) && !listOf(cur.opinions).some((o) => /PLASTIC/i.test(o.dept) && !hasText(o.note))) ch[`opinions.${uid()}`] = { dept: 'PLASTIC SURGERY', note: '', at: Date.now() };
+          Store.patch('cases', cid, ch);
+          toast(`Bed sore noted — dressing added${['III', 'IV'].includes(grade) ? ' + plastic surgery opinion' : ''}`, 3500);
+          return;
+        }
         const sb = e.target.closest('[data-sug-add],[data-sug-skip]');
         if (sb) {
           const back = sb.closest('[data-sug-case]');

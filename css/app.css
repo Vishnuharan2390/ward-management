@@ -1672,3 +1672,11 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .cm-pop-rv select { max-width: 11rem; }
 .cm-pop-rv input { width: 3.2rem; text-align: center; }
 .sug-row .cm-pop-rv { flex-direction: row; align-items: center; gap: .35rem; }
+
+/* Rounds: bed-sore check */
+.bs-sites { display: flex; flex-wrap: wrap; gap: .35rem; margin: .5rem 0; }
+.bs-sites .chip { display: inline-flex; align-items: center; gap: .3rem; }
+.bs-grade { display: inline-flex; align-items: center; gap: .4rem; }
+.rd-bs { margin-top: .25rem; font-size: .85rem; }
+.rd-bs.ok { color: var(--ok); }
+.rd-bs.bad { color: var(--red); font-weight: 700; }

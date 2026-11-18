@@ -830,6 +830,11 @@ const ANTIBIOTICS = [
   'T. PENICILLIN BD',
 ];
 const isSpinePelvis = (c) => /\b(spine|spinal|vertebra|vertebral|cervical spine|dorsal|lumbar|thoracolumbar|[CDTL]\d{1,2}\b|pelvi[sc]|acetabul|sacr|ilium|iliac|pubic|rami|si joint)/i.test(`${c.diagnosis || ''} ${c.plan || ''}`);
+// Bed-sore risk: spine, pelvis / acetabulum, neck of femur, intertrochanteric / subtrochanteric.
+const BEDSORE_SITES = ['SACRUM', 'RIGHT HEEL', 'LEFT HEEL', 'RIGHT TROCHANTER', 'LEFT TROCHANTER', 'SCAPULAE', 'OCCIPUT', 'OTHER'];
+const bedsoreRisk = (c) => isSpinePelvis(c) || /\b(NECK (OF )?(THE )?FEMUR|FEMORAL NECK|NOF|INTER\s*TROCHANTER\w*|PER\s*TROCHANTER\w*|SUB\s*TROCHANTER\w*|\bIT FEMUR|IT FRACTURE)\b/i.test(`${c.diagnosis || ''} ${c.plan || ''}`);
+// Today's check is kept per day: c.bedsore.bs_20261118 = { status: 'none' | 'present', sites, grade, by, at }
+const bedsoreKey = (iso = todayISO()) => 'bs_' + iso.replace(/-/g, '');
 const isCompound = (c) => /\b(compound|open (fracture|#)|gustilo|grade\s*(i{1,3}|[1-3])[abc]?\b)/i.test(c.diagnosis || '');
 
 // ---- Condition on discharge + discharge advice, written from the diagnosis ----------------------
