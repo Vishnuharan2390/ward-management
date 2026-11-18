@@ -947,6 +947,75 @@ const DC_SPINE_ADVICE = [
   ['BACK CARE TO PREVENT BED SORES', 'படுக்கைப் புண் வராமல் முதுகைச் சுத்தமாகவும் உலர்வாகவும் பராமரிக்கவும்.'],
 ];
 
+// ---- Discharge: continue comorbidity drugs + review at the right OPD ---------------------------
+// k: COMORBIDITIES key; text: how it's written in free text; drugs: names that belong to it;
+// generic: the line used when no drug is listed; dept: OPD for review.
+const DC_COMORB = [
+  { k: 'T2DM', text: /\b(T2DM|DM|DIABET\w*|T1DM)\b/, drugs: /METFORMIN|GLIMEPIRIDE|GLICLAZIDE|GLIPIZIDE|SITAGLIPTIN|VILDAGLIPTIN|TENELIGLIPTIN|LINAGLIPTIN|DAPAGLIFLOZIN|EMPAGLIFLOZIN|PIOGLITAZONE|VOGLIBOSE|ACARBOSE|INSULIN|ACTRAPID|MIXTARD|GLARGINE|HUMAN MIXTARD/,
+    generic: ['CONTINUE ANTI-DIABETIC MEDICATIONS', 'சர்க்கரை நோய் மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'DIABETOLOGY' },
+  { k: 'S.HTN', text: /\b(S\.?HTN|HTN|HYPERTENS\w*)\b/, drugs: /AMLODIPINE|TELMISARTAN|LOSARTAN|OLMESARTAN|ATENOLOL|METOPROLOL|BISOPROLOL|PROPRANOLOL|ENALAPRIL|RAMIPRIL|LISINOPRIL|NIFEDIPINE|CILNIDIPINE|HYDROCHLOROTHIAZIDE|CHLORTHALIDONE|PRAZOSIN|CLONIDINE/,
+    generic: ['CONTINUE ANTI-HYPERTENSIVE MEDICATIONS', 'இரத்த அழுத்த மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'GENERAL MEDICINE' },
+  { k: 'EPILEPSY', text: /\b(EPILEP\w*|SEIZURE\w*|CONVULS\w*|SZ)\b/, drugs: /PHENYTOIN|EPTOIN|LEVETIRACETAM|LEVIPIL|VALPRO\w*|CARBAMAZEPINE|OXCARBAZEPINE|PHENOBARB\w*|CLOBAZAM|LACOSAMIDE|LAMOTRIGINE|TOPIRAMATE/,
+    generic: ['CONTINUE ANTI-EPILEPTIC MEDICATIONS', 'வலிப்பு நோய் மருந்துகளைத் தவறாமல் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'NEUROLOGY' },
+  { k: 'THYROID', text: /\b(THYROID|HYPOTHYROID\w*|HYPERTHYROID\w*)\b/, drugs: /THYROXINE|LEVOTHYROXINE|ELTROXIN|THYRONORM|CARBIMAZOLE|METHIMAZOLE|PROPYLTHIOURACIL/,
+    generic: ['CONTINUE THYROID MEDICATIONS', 'தைராய்டு மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'ENDOCRINOLOGY' },
+  { k: 'CAD', text: /\b(CAD|IHD|CORONARY|MI|ANGINA|PTCA|CABG)\b/, drugs: /ASPIRIN|ECOSPRIN|CLOPIDOGREL|TICAGRELOR|ATORVASTATIN|ROSUVASTATIN|ISOSORBIDE|NITRATE|NICORANDIL|RANOLAZINE/,
+    generic: ['CONTINUE CARDIAC MEDICATIONS', 'இதய நோய் மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'CARDIOLOGY' },
+  { k: 'CKD', text: /\b(CKD|CHRONIC KIDNEY|RENAL FAILURE)\b/, drugs: /SEVELAMER|CALCIUM ACETATE|SODIUM BICARBONATE|SODABICARB|ERYTHROPOIETIN|FUROSEMIDE|TORSEMIDE/,
+    generic: ['CONTINUE RENAL MEDICATIONS AS ADVISED', 'சிறுநீரக நோய் மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'NEPHROLOGY' },
+  { k: 'TB', text: /\b(TB|TUBERCULOSIS|KOCH\w*|PTB)\b/, drugs: /RIFAMPICIN|ISONIAZID|PYRAZINAMIDE|ETHAMBUTOL|\bATT\b|\bAKT\b|\bHRZE\b|\bFDC\b/,
+    generic: ['CONTINUE ANTI-TUBERCULOUS TREATMENT (ATT) WITHOUT INTERRUPTION', 'காசநோய் மருந்துகளை (ATT) தவறாமல் தொடர்ந்து எடுத்துக் கொள்ளவும்.'], dept: 'PULMONOLOGY' },
+  { k: 'ASTHMA', text: /\b(ASTHMA\w*|BA|COPD)\b/, drugs: /SALBUTAMOL|LEVOSALBUTAMOL|BUDESONIDE|FORMOTEROL|SALMETEROL|FLUTICASONE|MONTELUKAST|TIOTROPIUM|INHALER|ROTACAP/,
+    generic: ['CONTINUE INHALERS / BRONCHODILATORS', 'ஆஸ்துமா மருந்துகளையும் இன்ஹேலரையும் தொடர்ந்து பயன்படுத்தவும்.'], dept: 'PULMONOLOGY' },
+];
+const DC_DEPT_TA = {
+  'GENERAL MEDICINE': 'பொது மருத்துவ', DIABETOLOGY: 'சர்க்கரை நோய் (டயபெட்டாலஜி)', NEUROLOGY: 'நரம்பியல் (நியூராலஜி)', ENDOCRINOLOGY: 'நாளமில்லாச் சுரப்பியல் (எண்டோக்ரைனாலஜி)',
+  CARDIOLOGY: 'இதயவியல் (கார்டியாலஜி)', NEPHROLOGY: 'சிறுநீரகவியல் (நெஃப்ராலஜி)', PULMONOLOGY: 'நுரையீரல் (புல்மனாலஜி)', PSYCHIATRY: 'மனநல', 'DERMATOLOGY': 'தோல் நோய்',
+};
+const DC_DEPTS = Object.keys(DC_DEPT_TA);
+
+// The patient's comorbidities with the drugs already written for them:
+// [{ k, label, dept, drugs: [line], generic: [en, ta] }]. other: free-text comorbidity not in the list.
+function dcComorbidities(c, d = {}) {
+  const on = COMORBIDITIES.filter(([k]) => c.comorb?.[k]?.on).map(([k]) => k);
+  const free = String(`${c.comorbid || ''} ${c.comorbOther || ''}`).toUpperCase();
+  const keys = DC_COMORB.filter((x) => on.includes(x.k) || x.text.test(free)).map((x) => x.k);
+  const lines = String(`${d.treatment || ''}\n${d.meds || ''}`).toUpperCase().split(/\n/).map((l) => l.trim()).filter(Boolean);
+  const out = keys.map((k) => {
+    const def = DC_COMORB.find((x) => x.k === k);
+    const rx = String(c.comorb?.[k]?.rx || '').toUpperCase().split(/[\n,;]+/).map((l) => l.trim()).filter(Boolean);
+    // in-hospital injections aren't continued at home (insulin is)
+    const athome = (l) => !/^INJ\b|\bI\.?V\.?\b|\bI\.?M\.?\b/.test(l) || /INSULIN|ACTRAPID|MIXTARD|GLARGINE/.test(l);
+    const drugs = [...new Set([...rx, ...lines.filter((l) => def.drugs.test(l) && athome(l))])];
+    return { k, label: (COMORBIDITIES.find(([x]) => x === k) || [k, k])[1], dept: def.dept, drugs, generic: def.generic };
+  });
+  // anything typed under "Other" that isn't one of the above
+  const other = String(c.comorbOther || '').toUpperCase().trim();
+  if (other && !DC_COMORB.some((x) => x.text.test(other))) {
+    out.push({ k: 'OTHER', label: other, dept: 'GENERAL MEDICINE', drugs: [], generic: [`CONTINUE MEDICATIONS FOR ${other}`, `${other} நோய்க்கான மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.`] });
+  }
+  return out;
+}
+
+// Chosen comorbidities → advice lines [[en, ta]]: continue the drugs (or the general line), then
+// one review line per OPD.
+function dcComorbAdvice(items) {
+  const out = [];
+  items.forEach((x) => {
+    if (x.drugs.length) x.drugs.forEach((l) => { const drug = l.replace(/^CONTINUE\s+/, ''); out.push([`CONTINUE ${drug}`, `${drug} மருந்தைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.`]); });
+    else out.push(x.generic);
+  });
+  const seen = new Set();
+  items.forEach((x) => {
+    const w = Math.max(1, parseInt(x.weeks, 10) || 1);
+    const key = `${x.dept}|${w}`;
+    if (!x.dept || seen.has(key)) return;
+    seen.add(key);
+    out.push([`REVIEW AT ${x.dept} OPD AFTER ${w} ${w === 1 ? 'WEEK' : 'WEEKS'}`, `${w} வாரம் கழித்து ${DC_DEPT_TA[x.dept] || x.dept} புறநோயாளிகள் பிரிவில் காண்பிக்கவும்.`]);
+  });
+  return out;
+}
+
 
 function reviewPhrase(weeks, day, opd, time = '8AM') {
   const w = Number(weeks) || 2;

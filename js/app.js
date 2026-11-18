@@ -3018,6 +3018,7 @@ const App = (() => {
               <div class="span2 dc-adv-btns">
                 <button type="button" class="btn small primary" data-adv="usual">✦ Usual advice</button>
                 <button type="button" class="chip${sp ? ' suggest' : ''}" data-adv="spine">+ Spine / pelvis advice${sp ? ' (suggested)' : ''}</button>
+                ${dcComorbidities(c, d).length ? '<button type="button" class="chip suggest" data-adv="comorb">+ Comorbidity advice</button>' : ''}
               </div>
               <div class="span2 chips">${ADVICE_PHRASES.map(([en], i) => `<button type="button" class="chip" data-phrase="${i}">+ ${esc(en)}</button>`).join('')}</div>
               <div class="span2 review-row">
@@ -3097,8 +3098,46 @@ const App = (() => {
           const ta = f.elements.condition;
           ta.value = ta.value.split('\n').map((l) => (new RegExp(`^${lvl}\\s`).test(l) ? dcPowerLine(lvl, data()) : l)).join('\n');
         });
+        // Comorbidities: continue their drugs (or the general line) and review at the right OPD.
+        const comorbPopup = () => {
+          $('.cm-pop', el)?.remove();
+          const items = dcComorbidities(c(), data());
+          if (!items.length) return;
+          const pop = document.createElement('div');
+          pop.className = 'sug-back cm-pop';
+          pop.innerHTML = `<div class="sug-box card" role="dialog" aria-label="Comorbidity medications">
+              <h3>Continue comorbidity medications?</h3>
+              <p class="muted small">Known ${esc(items.map((x) => x.k === 'OTHER' ? x.label : x.k).join(', '))}. Ticked ones go into the advice with a review at their OPD.</p>
+              ${items.map((x, i) => `<div class="sug-row cm-pop-row">
+                <input type="checkbox" data-cmi="${i}" checked aria-label="${esc(x.label)}">
+                <span><b>${esc(x.k === 'OTHER' ? x.label : `${x.k} · ${x.label}`)}</b>
+                  <span class="muted small">${x.drugs.length ? `Continue ${esc(x.drugs.join(', '))}` : esc(x.generic[0].toLowerCase().replace(/^continue/, 'Continue'))}</span>
+                  <span class="cm-pop-rv">Review at <select data-cmd="${i}">${opts(DC_DEPTS.includes(x.dept) ? DC_DEPTS : [x.dept, ...DC_DEPTS], x.dept)}</select> OPD after
+                    <input data-cmw="${i}" type="number" min="1" value="1" inputmode="numeric"> wk</span></span>
+              </div>`).join('')}
+              <div class="form-actions"><button type="button" class="btn primary" data-cm-add>Add to advice</button><button type="button" class="btn" data-cm-skip>Not now</button></div>
+            </div>`;
+          pop.addEventListener('click', (ev) => {
+            if (ev.target.closest('[data-cm-skip]') || ev.target === pop) return pop.remove();
+            if (!ev.target.closest('[data-cm-add]')) return;
+            const chosen = items.map((x, i) => ({ ...x, dept: $(`[data-cmd="${i}"]`, pop).value, weeks: $(`[data-cmw="${i}"]`, pop).value }))
+              .filter((x, i) => $(`[data-cmi="${i}"]`, pop).checked);
+            dcComorbAdvice(chosen).forEach(([en, ta]) => { addLine('advice', en); addLine('adviceTa', ta); });
+            pop.remove();
+            if (chosen.length) toast(`Added: continue ${chosen.length === 1 ? 'the medication' : 'medications'} + review`);
+          });
+          el.appendChild(pop);
+        };
+        // Ask once when the page opens, unless the advice already covers them.
+        {
+          const items = dcComorbidities(c(), data());
+          const adv = f.elements.advice.value.toUpperCase();
+          const covered = items.length && items.every((x) => adv.includes(`REVIEW AT ${x.dept} OPD`));
+          if (items.length && !covered) setTimeout(comorbPopup, 300);
+        }
         f.addEventListener('click', (e) => {
           const adv = e.target.closest('[data-adv]');
+          if (adv && adv.dataset.adv === 'comorb') return comorbPopup();
           if (adv) {
             (adv.dataset.adv === 'spine' ? DC_SPINE_ADVICE : dcUsualAdvice(c(), data(), splintsNow())).forEach(([en, ta]) => { addLine('advice', en); addLine('adviceTa', ta); });
             return;
