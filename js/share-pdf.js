@@ -10,35 +10,64 @@ const SharePdf = (() => {
   const stamp = () => fmtDate(todayISO()).replace(/\//g, '-');
   const podOf = (c) => { const d = c.surgeryDate || c.otDate; return d ? daysSince(d) : null; };
 
-  function newDoc(orientation, title, sub) {
+  // ---- Ward status / pending works: a table on a phone-shaped page ----
+  // Portrait and narrow (about a phone screen's shape) so the table fills the phone's width and the
+  // text is big enough to read without zooming. Never more than ROWS_PER_PAGE patients on a page;
+  // the column headings repeat on every page.
+  const PW = 150;
+  const PH = 290;
+  const PM = 6;
+  const ROWS_PER_PAGE = 10;
+  function tablePdf(title, sub, head, body, columnStyles, postedRows = new Set()) {
     const { jsPDF } = window.jspdf;
-    const d = new jsPDF({ orientation, unit: 'mm', format: 'a4' });
-    const W = d.internal.pageSize.getWidth();
-    const head = () => {
-      d.setFont('helvetica', 'bold'); d.setFontSize(12); d.setTextColor(0);
-      d.text(clean(title), 10, 12);
-      d.setFont('helvetica', 'normal'); d.setFontSize(9);
-      d.text(clean(sub), W - 10, 12, { align: 'right' });
-    };
-    const foot = () => {
-      d.setFontSize(7.5); d.setTextColor(110);
-      d.text(`Page ${d.internal.getCurrentPageInfo().pageNumber}`, W - 10, d.internal.pageSize.getHeight() - 6, { align: 'right' });
+    const mk = () => new jsPDF({ orientation: 'portrait', unit: 'mm', format: [PW, PH] });
+    const top = PM + 15;
+    const drawHead = (d) => {
+      d.setTextColor(0); d.setFont('helvetica', 'bold'); d.setFontSize(12);
+      d.text(d.splitTextToSize(clean(title), PW - 2 * PM)[0], PM, PM + 5);
+      d.setFont('helvetica', 'normal'); d.setFontSize(9); d.setTextColor(90);
+      d.text(clean(sub), PM, PM + 10.5);
       d.setTextColor(0);
     };
-    return { d, hooks: { didDrawPage: () => { head(); foot(); } } };
+    const draw = (d, start, rows) => d.autoTable({
+      head: [head], body: rows, startY: top, theme: 'grid',
+      margin: { top, left: PM, right: PM, bottom: PM + 6 },
+      styles: { font: 'helvetica', fontSize: 9, cellPadding: 1.5, valign: 'top', textColor: 0, lineColor: 0, lineWidth: 0.2, overflow: 'linebreak' },
+      headStyles: { fillColor: [228, 228, 228], textColor: 0, fontStyle: 'bold', fontSize: 8.5 },
+      columnStyles,
+      rowPageBreak: 'avoid',
+      didParseCell: (h) => { if (h.section === 'body' && postedRows.has(start + h.row.index)) h.cell.styles.fillColor = [255, 243, 214]; },
+      didDrawPage: () => drawHead(d),
+    });
+    // How many of the next rows (at most ROWS_PER_PAGE) fit on one page — measured on a scratch copy.
+    const fitting = (start) => {
+      for (let n = Math.min(ROWS_PER_PAGE, body.length - start); n > 1; n--) {
+        const t = mk();
+        draw(t, start, body.slice(start, start + n));
+        if (t.internal.getNumberOfPages() === 1) return n;
+      }
+      return 1;
+    };
+    const d = mk();
+    if (!body.length) draw(d, 0, []);
+    for (let start = 0; start < body.length;) {
+      const n = fitting(start);
+      if (start) d.addPage([PW, PH], 'portrait');
+      draw(d, start, body.slice(start, start + n));
+      start += n;
+    }
+    const pages = d.internal.getNumberOfPages();
+    for (let i = 1; i <= pages; i++) {
+      d.setPage(i); d.setFont('helvetica', 'normal'); d.setFontSize(8); d.setTextColor(110);
+      d.text(`Page ${i} of ${pages}`, PW - PM, PH - PM + 1, { align: 'right' });
+    }
+    return d;
   }
 
-  const table = (d, hooks, head, body, columnStyles) => d.autoTable({
-    head: [head], body, theme: 'grid', margin: { top: 17, left: 10, right: 10, bottom: 12 },
-    styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 1.6, valign: 'top', textColor: 0, lineColor: 0, lineWidth: 0.15, overflow: 'linebreak' },
-    headStyles: { fillColor: [228, 228, 228], textColor: 0, fontStyle: 'bold' },
-    columnStyles, ...hooks,
-  });
-
-  // Ward status: the notebook as a PDF.
+  // Ward status: the notebook as a table.
   function wardPdf(cases, meta, post) {
     const ward = post ? 'POST-OP WARD' : 'PRE-OP WARD';
-    const { d, hooks } = newDoc('landscape', `${unitName(meta.unitId)} - ${ward} STATUS`, `${fmtDate(todayISO())} - ${cases.length} cases`);
+    const posted = cases.filter((c) => c.status === 'posted').length;
     const body = cases.map((c, i) => {
       const dx = [U(c.diagnosis)];
       if (post) {
@@ -59,11 +88,12 @@ const SharePdf = (() => {
       ];
     });
     const postedRows = new Set(cases.map((c, i) => (c.status === 'posted' ? i : -1)).filter((i) => i >= 0));
-    table(d, { ...hooks, didParseCell: (h) => { if (h.section === 'body' && postedRows.has(h.row.index)) h.cell.styles.fillColor = [255, 243, 214]; } },
-      ['S.NO', 'BED', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'ASSESSMENT / SCHEME'], body,
-      { 0: { cellWidth: 11 }, 1: { cellWidth: 13 }, 2: { cellWidth: 42 }, 3: { cellWidth: 78 }, 5: { cellWidth: 38 } });
+    const d = tablePdf(`${unitName(meta.unitId)} - ${ward} STATUS`, `${fmtDate(todayISO())} - ${cases.length} cases${posted ? ` - ${posted} posted` : ''}`,
+      ['NO', 'BED', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'PAC / SCHEME'], body,
+      { 0: { cellWidth: 8.5 }, 1: { cellWidth: 9 }, 2: { cellWidth: 28 }, 3: { cellWidth: 36 }, 4: { cellWidth: todoColW(post) }, 5: { cellWidth: 25, fontSize: 8 } }, postedRows);
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_WARD_STATUS_${stamp()}.pdf`, { type: 'application/pdf' });
   }
+  const todoColW = () => PW - 2 * PM - (8.5 + 9 + 28 + 36 + 25);
 
   // Pending works: what is still to be done, case by case.
   function pendingPdf(cases, meta, post) {
@@ -72,10 +102,11 @@ const SharePdf = (() => {
       const items = [...lines(invTodoText(c)), ...pendingList(c).map((p) => U(p.text))];
       return [c, [...new Set(items)]];
     }).filter(([, items]) => items.length);
-    const { d, hooks } = newDoc('portrait', `${unitName(meta.unitId)} - ${ward} PENDING WORKS`, `${fmtDate(todayISO())} - ${rows.length} cases`);
-    const body = rows.map(([c, items], i) => [String(i + 1), U(c.bed), [U(c.name), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'), items.map((x) => '- ' + x).join('\n')]);
+    const body = rows.map(([c, items], i) => [String(i + 1), U(c.bed), [U(c.name) + (c.status === 'posted' ? ' (POSTED)' : ''), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'), items.join(', ')]);
     if (!body.length) body.push(['', '', 'Nothing pending', '']);
-    table(d, hooks, ['S.NO', 'BED', 'NAME', 'PENDING'], body, { 0: { cellWidth: 11 }, 1: { cellWidth: 13 }, 2: { cellWidth: 48 } });
+    const postedRows = new Set(rows.map(([c], i) => (c.status === 'posted' ? i : -1)).filter((i) => i >= 0));
+    const d = tablePdf(`${unitName(meta.unitId)} - ${ward} PENDING WORKS`, `${fmtDate(todayISO())} - ${rows.length} cases`,
+      ['NO', 'BED', 'NAME', 'PENDING'], body, { 0: { cellWidth: 8.5 }, 1: { cellWidth: 10 }, 2: { cellWidth: 36 } }, postedRows);
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_PENDING_WORKS_${stamp()}.pdf`, { type: 'application/pdf' });
   }
 
