@@ -108,6 +108,44 @@ const Store = (() => {
     });
   }
 
+  // ---- this phone's copy of the shared images (so they open with poor or no network) ----
+  let cdbP = null;
+  function cdb() {
+    cdbP ||= new Promise((res, rej) => {
+      const r = indexedDB.open('ward-img-cache', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('images', { keyPath: 'id' });
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    return cdbP;
+  }
+  async function cacheDo(method, arg) {
+    const db = await cdb();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('images', ['get', 'getAll', 'getAllKeys'].includes(method) ? 'readonly' : 'readwrite');
+      const r = tx.objectStore('images')[method](arg);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  }
+  let savedIds = null; // ids kept on this phone
+  let savedP = null;
+  function loadSaved() {
+    savedP ||= cacheDo('getAllKeys').then((k) => { savedIds = new Set(k); }).catch(() => { savedIds = new Set(); });
+    return savedP;
+  }
+  async function keep(id, data) {
+    try {
+      await cacheDo('put', { id, data, at: Date.now() });
+      (savedIds ||= new Set()).add(id);
+    } catch { /* phone storage full: still shown this time */ }
+  }
+  // From the server, waiting at most `ms` (a bad signal can otherwise hang for a long time).
+  async function fetchRemote(id, ms = 20000) {
+    const get = fb.fsM.getDoc(ref('images', id)).then((d) => d.data()?.data).catch(() => null);
+    return Promise.race([get, new Promise((res) => setTimeout(() => res(null), ms))]);
+  }
+
   // ---- firebase backend ----
   async function initFirebase() {
     status = 'connecting';
@@ -305,22 +343,71 @@ const Store = (() => {
   async function addImage(caseId, kind, dataUrl, caption = '') {
     const id = uid();
     const rec = { id, caseId, kind, data: dataUrl, caption, at: Date.now(), by: who() };
-    if (fb) await fb.fsM.setDoc(ref('images', id), rec);
-    else await idbDo('put', rec);
+    if (fb) {
+      await fb.fsM.setDoc(ref('images', id), rec);
+      keep(id, dataUrl);
+    } else await idbDo('put', rec);
     imgCache.set(id, dataUrl);
     await patch('cases', caseId, { ['images.' + id]: { kind, caption, at: rec.at, by: rec.by } });
   }
+  const inFlight = new Map();
   async function getImage(id) {
     if (imgCache.has(id)) return imgCache.get(id);
-    let rec;
-    if (fb) rec = (await fb.fsM.getDoc(ref('images', id))).data();
-    else rec = await idbDo('get', id);
-    if (rec) imgCache.set(id, rec.data);
-    return rec?.data;
+    if (!fb) {
+      const rec = await idbDo('get', id);
+      if (rec) imgCache.set(id, rec.data);
+      return rec?.data;
+    }
+    if (inFlight.has(id)) return inFlight.get(id);
+    const p = (async () => {
+      // 1. this phone's copy, 2. Firestore's offline copy, 3. the server
+      let data = (await cacheDo('get', id).catch(() => null))?.data;
+      if (!data) data = await fb.fsM.getDocFromCache(ref('images', id)).then((d) => d.data()?.data).catch(() => null);
+      if (!data) data = await fetchRemote(id);
+      if (data) {
+        imgCache.set(id, data);
+        if (!savedIds?.has(id)) keep(id, data);
+      }
+      return data;
+    })().finally(() => inFlight.delete(id));
+    inFlight.set(id, p);
+    return p;
+  }
+  // Save these images on this phone ahead of time (not kept in memory). Returns how many are saved.
+  async function saveOffline(ids, onProgress) {
+    if (!fb) return { saved: ids.length, total: ids.length, failed: 0 };
+    await loadSaved();
+    const todo = ids.filter((id) => !savedIds.has(id));
+    let failed = 0;
+    const work = async () => {
+      while (todo.length) {
+        const id = todo.shift();
+        let data = imgCache.get(id) || await fb.fsM.getDocFromCache(ref('images', id)).then((d) => d.data()?.data).catch(() => null);
+        if (!data) data = await fetchRemote(id, 30000);
+        if (data) await keep(id, data); else failed++;
+        onProgress?.();
+      }
+    };
+    await Promise.all([work(), work(), work()]);
+    return { saved: ids.filter((id) => savedIds.has(id)).length, total: ids.length, failed };
+  }
+  // Drop saved images that no longer belong to a case on the lists.
+  async function pruneOffline(keepIds) {
+    if (!fb) return;
+    await loadSaved();
+    const want = new Set(keepIds);
+    for (const id of [...savedIds]) {
+      if (want.has(id)) continue;
+      await cacheDo('delete', id).catch(() => {});
+      savedIds.delete(id);
+    }
   }
   async function deleteImage(caseId, id) {
-    if (fb) await fb.fsM.deleteDoc(ref('images', id)).catch(remoteFail);
-    else await idbDo('delete', id);
+    if (fb) {
+      await fb.fsM.deleteDoc(ref('images', id)).catch(remoteFail);
+      cacheDo('delete', id).catch(() => {});
+      savedIds?.delete(id);
+    } else await idbDo('delete', id);
     imgCache.delete(id);
     await patch('cases', caseId, { ['images.' + id]: DELETE });
   }
@@ -395,6 +482,9 @@ const Store = (() => {
     signOut: () => fb && fb.authM.signOut(fb.auth),
     create, patch, remove,
     addImage, getImage, deleteImage,
+    saveOffline, pruneOffline,
+    loadSaved,
+    isSaved: (id) => !fb || !!savedIds?.has(id),
     addMember, removeMember,
     exportAll, importAll,
   };

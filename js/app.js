@@ -2032,7 +2032,12 @@ const App = (() => {
           </div>
           <div class="viewer-strip">${all.map((x, i) => `<button class="v-dot${i === idx ? ' on' : ''}" data-go-img="${x.id}">${esc(imageKind(x.kind).label)} ${all.filter((y, j) => y.kind === x.kind && j <= i).length}</button>`).join('')}</div>
         </div>`;
-      $('img', m).src = (await Store.getImage(im.id)) || '';
+      {
+        const src = await Store.getImage(im.id);
+        if (cur !== iid) return;
+        if (src) $('img', m).src = src;
+        else $('img', m).insertAdjacentHTML('afterend', `<div class="viewer-msg">This picture isn't saved on this phone yet and the network isn't reaching the server. It will open once you have signal${navigator.onLine ? ' — try again in a moment' : ''}.</div>`);
+      }
       // Swipe on phones.
       const area = $('.viewer-img', m);
       let x0 = null;
@@ -2105,6 +2110,7 @@ const App = (() => {
           <a class="btn primary" href="#/ot/list" ${sel.length ? '' : 'aria-disabled="true"'} id="ot-next">Next (${sel.length}) →</a>
         </div>
         <div class="card">
+          <p class="offline-line small" id="offline-line">${offlineLine()}</p>
           <div class="row-between"><p class="muted small">Tap a row to add it to the list. Radiographs open in a viewer; use → to step through X-ray, CT and MRI.</p>
             <label class="small nowrap"><input type="checkbox" id="ot-all" ${OT.showAll ? 'checked' : ''}> show all statuses</label></div>
           <div class="order-bar">
@@ -2166,6 +2172,7 @@ const App = (() => {
       return `
         <div class="toolbar"><a class="btn" href="#/ot">← Pick cases</a></div>
         <h2>OT list · details</h2>
+        <p class="offline-line small" id="offline-line">${offlineLine()}</p>
         <div class="card form">
           <fieldset><legend>List details</legend>
             <label>Date<input type="date" id="ot-date" value="${esc(d.date)}"></label>
@@ -2184,7 +2191,7 @@ const App = (() => {
             ${sel.map((c, i) => `
               <div class="ot-row" data-case="${c.id}">
                 <div class="ot-row-head">
-                  <b>${i + 1}. ${esc(c.name)}</b>${d.standby.includes(c.id) ? ' <span class="tag task">(STANDBY)</span>' : ''} <span class="muted">${esc(ageSex(c))} · IP ${esc(c.ipNo)} · DOA ${esc(fmtDate(c.doa))}</span>
+                  <b>${i + 1}. ${esc(c.name)}</b>${d.standby.includes(c.id) ? ' <span class="tag task">(STANDBY)</span>' : ''} ${imgIcon(c)} <span class="muted">${esc(ageSex(c))} · IP ${esc(c.ipNo)} · DOA ${esc(fmtDate(c.doa))}</span>
                   <span class="right">
                     <button class="btn small${d.standby.includes(c.id) ? ' primary' : ''}" data-standby title="Print “(STANDBY)” under the name">Standby</button>
                     <button class="icon" data-move="-1" ${i ? '' : 'disabled'} title="Move up">↑</button>
@@ -3939,7 +3946,51 @@ const App = (() => {
     if (n) toast(`Admission dates corrected for ${n} case(s): 02/11 → 01/11, 03/11 → 02/11`, 5000);
   }
 
+  // ---- Radiographs kept on this phone, so the OT list and rounds work in a room with no signal.
+  // Every case still on the lists (not discharged) is saved in the background; the OT list's cases first.
+  const offline = { running: false, again: false, saved: 0, total: 0, failed: 0, timer: 0 };
+  const offlineIds = () => {
+    const sel = new Set(otDraft().selected);
+    const cs = allCases().filter((c) => c.status !== 'discharged' || sel.has(c.id))
+      .sort((a, b) => (sel.has(b.id) ? 1 : 0) - (sel.has(a.id) ? 1 : 0));
+    return cs.flatMap((c) => listOf(c.images).map((im) => im.id));
+  };
+  function offlineLine() {
+    if (Store.mode !== 'firebase') return '';
+    // On the OT list: that list's radiographs. On the picker: everything on the lists.
+    const list = /^#\/ot\/list/.test(location.hash)
+      ? otDraft().selected.flatMap((cid) => listOf(Store.cases[cid]?.images).map((im) => im.id))
+      : offlineIds();
+    if (!list.length) return '';
+    const n = list.filter((id) => Store.isSaved(id)).length;
+    if (n === list.length) return `<span class="ok">✓ All ${n} radiograph${n === 1 ? '' : 's'} saved on this phone — they open without network.</span>`;
+    return `<span class="warn">⏳ ${n} of ${list.length} radiographs saved on this phone${offline.running ? ' — saving the rest…' : navigator.onLine ? '' : ' — the rest will save when you have signal'}.</span>`;
+  }
+  const paintOffline = () => { const p = $('#offline-line'); if (p) p.innerHTML = offlineLine(); };
+  async function saveImagesOffline() {
+    if (Store.mode !== 'firebase' || !Store.synced) return;
+    if (offline.running) { offline.again = true; return; }
+    offline.running = true;
+    try {
+      await Store.loadSaved();
+      const ids = [...new Set(offlineIds())];
+      paintOffline();
+      const r = await Store.saveOffline(ids, paintOffline);
+      Object.assign(offline, r);
+      await Store.pruneOffline(ids);
+    } catch (e) { console.error(e); }
+    offline.running = false;
+    paintOffline();
+    if (offline.again) { offline.again = false; queueOffline(); }
+  }
+  function queueOffline(ms = 4000) {
+    clearTimeout(offline.timer);
+    offline.timer = setTimeout(saveImagesOffline, ms);
+  }
+  window.addEventListener('online', () => queueOffline(1000));
+
   function onStoreChange() {
+    if (Store.synced) queueOffline();
     const gateNeeded = Store.mode === 'firebase' && Store.status !== 'ok';
     if (gateNeeded !== (current?.view === Gate)) {
       current = null;
@@ -3977,6 +4028,9 @@ const App = (() => {
     });
     render();
     Store.init();
+    // Ask the phone not to clear the saved radiographs when space runs low.
+    try { navigator.storage?.persist?.(); } catch { /* not supported */ }
+    Store.loadSaved?.().then(paintOffline);
   }
 
   return { start, el: null };
