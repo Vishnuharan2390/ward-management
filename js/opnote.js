@@ -5,12 +5,16 @@
 
 const OPN_CATEGORIES = [
   ['trauma', 'Trauma'], ['spine', 'Spine'], ['arthroplasty', 'Arthroplasty'], ['arthroscopy', 'Arthroscopy'], ['tumour', 'Tumour'], ['paediatrics', 'Paediatrics'],
+  ['general', 'Others (debridement, implant removal, amputation…)'],
 ];
-const OPN_READY = ['trauma'];
 
 const OPN_ANAES = ['SPINAL ANAESTHESIA', 'COMBINED SPINAL EPIDURAL ANAESTHESIA', 'GENERAL ANAESTHESIA', 'SUPRACLAVICULAR BRACHIAL PLEXUS BLOCK', 'INFRACLAVICULAR BRACHIAL PLEXUS BLOCK', 'AXILLARY BRACHIAL PLEXUS BLOCK', 'INTERSCALENE BLOCK', 'REGIONAL BLOCK WITH GENERAL ANAESTHESIA', 'LOCAL ANAESTHESIA'];
-const OPN_POSITIONS = ['SUPINE', 'SUPINE ON FRACTURE TABLE', 'SUPINE WITH ARM ON HAND TABLE', 'SUPINE WITH SANDBAG UNDER IPSILATERAL HIP', 'SUPINE WITH KNEE FLEXED OVER BOLSTER', 'BEACH CHAIR', 'LATERAL', 'LATERAL WITH ARM OVER BOLSTER', 'PRONE', 'PRONE WITH ARM OVER BOLSTER'];
-const OPN_SCREWS = ['3.5MM CORTICAL SCREWS', '4.5MM CORTICAL SCREWS', '2.7MM CORTICAL SCREWS', '3.5MM LOCKING SCREWS', '5MM LOCKING SCREWS', '2.4MM LOCKING SCREWS', '4MM CANCELLOUS SCREWS', '6.5MM CANCELLOUS SCREWS (PARTIALLY THREADED)', '4MM CANNULATED CANCELLOUS SCREWS', '6.5MM CANNULATED CANCELLOUS SCREWS', '7MM CANNULATED CANCELLOUS SCREWS', '4.9MM DISTAL LOCKING BOLTS', '3.9MM LOCKING BOLTS', 'HERBERT SCREWS', 'K-WIRES', '18G SS WIRE'];
+const OPN_POSITIONS = ['SUPINE', 'SUPINE ON FRACTURE TABLE', 'SUPINE WITH ARM ON HAND TABLE', 'SUPINE WITH SANDBAG UNDER IPSILATERAL HIP', 'SUPINE WITH KNEE FLEXED OVER BOLSTER', 'BEACH CHAIR', 'LATERAL', 'LATERAL WITH ARM OVER BOLSTER', 'PRONE', 'PRONE WITH ARM OVER BOLSTER', 'PRONE ON BOLSTERS', 'LATERAL DECUBITUS', 'SUPINE WITH ARTHROSCOPY LEG HOLDER', 'SUPINE WITH NECK EXTENDED'];
+const OPN_SCREWS = ['3.5MM CORTICAL SCREWS', '4.5MM CORTICAL SCREWS', '2.7MM CORTICAL SCREWS', '3.5MM LOCKING SCREWS', '5MM LOCKING SCREWS', '2.4MM LOCKING SCREWS', '4MM CANCELLOUS SCREWS', '6.5MM CANCELLOUS SCREWS (PARTIALLY THREADED)', '4MM CANNULATED CANCELLOUS SCREWS', '6.5MM CANNULATED CANCELLOUS SCREWS', '7MM CANNULATED CANCELLOUS SCREWS', '4.9MM LOCKING BOLTS', '5MM LOCKING BOLTS', '3.9MM LOCKING BOLTS', '4.9MM DISTAL LOCKING BOLTS',
+  'LAG SCREW', 'ANTI-ROTATION SCREW', 'HELICAL BLADE', 'HERBERT SCREWS', 'K-WIRES', '18G SS WIRE', 'SCHANZ PINS', 'STEINMANN PINS',
+  'PEDICLE SCREWS', 'SUTURE ANCHORS', 'INTERFERENCE SCREW', 'CORTICAL BUTTON (ENDOBUTTON)'];
+// Where a group of screws goes; used to place them in the right sentence of the note.
+const OPN_SCREW_AT = [['PROXIMAL', 'Proximal'], ['DISTAL', 'Distal'], ['NECK', 'Neck / head'], ['SHAFT', 'Shaft'], ['ACROSS FRACTURE', 'Across fracture (lag)']];
 
 // ---- Approaches: what is done between incision and the fracture.
 // pos = usual position, tq = tourniquet usually used, closed = closed / percutaneous technique.
@@ -367,11 +371,11 @@ const opnBoneLabel = (b) => OPN_TRAUMA[b.region]?.bones[b.bone]?.label || '';
 // Older saves were one flat procedure.
 function opnNormalize(b) {
   if (!b) return null;
-  if (b.procs) return b;
+  if (b.procs) { b.procs.forEach((p) => { p.cat ||= b.cat || 'trauma'; }); return b; }
   return {
     v: 2, cat: b.cat || 'trauma', anaes: b.anaes || '',
     procs: [{
-      region: b.region || '', bone: b.bone || '', site: b.site || '', side: b.side || '', position: b.position || '', tourniquet: b.tourniquet || 'no',
+      cat: b.cat || 'trauma', region: b.region || '', bone: b.bone || '', site: b.site || '', side: b.side || '', position: b.position || '', tourniquet: b.tourniquet || 'no',
       approach: b.approach || '', drain: b.drain || 'no', slab: b.slab || 'NONE',
       implants: [{ implant: b.implant || '', implantCustom: b.implantCustom || '', size: b.size || '', screws: b.screws || [] }],
     }],
@@ -379,11 +383,35 @@ function opnNormalize(b) {
 }
 
 const opnImp = (i) => (i.implant === 'custom' ? { label: i.implantCustom || 'IMPLANT', k: 'plate' } : OPN_IMPLANTS[i.implant]);
-const opnScrewList = (i) => (i.screws || []).filter((s) => s.type).map((s) => `${s.n ? s.n + ' X ' : ''}${s.type === 'custom' ? (s.custom || '') : s.type}`.trim()).filter(Boolean);
+// Screw length(s): "40" → "40MM", "36, 38 40" → "36, 38, 40MM". Nothing typed → nothing written.
+const opnLen = (len) => {
+  const t = String(len || '').toUpperCase().trim();
+  if (!t) return '';
+  // anything other than plain numbers ("6.5 X 45") is written as typed
+  if (/[A-Z]/.test(t.replace(/MM\b/g, ''))) return /\d$/.test(t) ? `${t}MM` : t;
+  const parts = t.split(/[,;/\s]+/).map((x) => x.replace(/MM$/, '')).filter(Boolean);
+  return parts.length ? `${parts.join(', ')}MM` : '';
+};
+const opnScrewType = (s) => (s.type === 'custom' ? (s.custom || '') : s.type || '').trim();
+// "3 X 3.5MM LOCKING SCREWS (36, 38, 40MM)" — without its position (the sentence says where).
+const opnScrewBase = (s) => { const len = opnLen(s.len); return `${s.n ? s.n + ' X ' : ''}${opnScrewType(s)}${len ? ` (${len})` : ''}`.trim(); };
+const opnScrews = (i) => (i.screws || []).filter((s) => opnScrewType(s));
+// For the IMPLANTS line: with its position.
+const opnScrewList = (i) => opnScrews(i).map((s) => `${opnScrewBase(s)}${s.at ? ` - ${s.at}` : ''}`).filter(Boolean);
+const opnJoin = (arr) => (arr.length > 1 ? `${arr.slice(0, -1).join(', ')} and ${arr.at(-1)}` : arr[0] || '');
+const OPN_AT_WORD = { PROXIMAL: 'proximally', DISTAL: 'distally', NECK: 'into the neck and head', SHAFT: 'to the shaft', 'ACROSS FRACTURE': 'across the fracture' };
+// "proximally with A, distally with B and with C"
+function opnFixWith(screws) {
+  const order = ['PROXIMAL', 'DISTAL', 'NECK', 'SHAFT', 'ACROSS FRACTURE', ''];
+  const parts = order.map((at) => [at, screws.filter((x) => (x.at || '') === at)]).filter(([, g]) => g.length)
+    .map(([at, g]) => `${at ? OPN_AT_WORD[at] + ' ' : ''}with ${opnJoin(g.map(opnScrewBase))}`);
+  return opnJoin(parts);
+}
 const opnImpName = (i) => [String(i.size || '').trim(), opnImp(i)?.label].filter(Boolean).join(' ');
 
 // One procedure → its name, implant list and the body lines.
 function opnProc(p) {
+  if (p.cat && p.cat !== 'trauma') return opnTplProc(p);
   const U = (s) => String(s || '').toUpperCase();
   const site = opnSite(p);
   const ap = OPN_APPROACHES[p.approach];
@@ -415,16 +443,21 @@ function opnProc(p) {
     const imp = opnImp(i);
     const impName = opnImpName(i);
     const size = String(i.size || '').trim();
-    const sl = opnScrewList(i);
-    const screwText = sl.join(', ');
-    const scr = screwText ? ` and fixed with ${screwText}` : '';
+    const sc = opnScrews(i);
+    const screwText = opnJoin(sc.map(opnScrewBase));
+    const scr = sc.length ? ` and fixed ${opnFixWith(sc)}` : '';
+    const at = (w) => sc.filter((x) => x.at === w);
+    const notAt = (...w) => sc.filter((x) => !w.includes(x.at || ''));
+    const list = (g) => opnJoin(g.map(opnScrewBase));
     switch (imp.k) {
       case 'plate': {
         reduce();
         if (ap.both && plates.length === 1) L.push(`Two ${impName}s were contoured as required and applied, ${ap.both}${scr}.`);
         else {
           const surface = (ap.bothSurfaces && ap.bothSurfaces[plateNo]) || ap.surface || imp.surface || 'appropriate';
-          L.push(`A ${impName} was contoured as required and applied on the ${surface}${/surface|border/.test(surface) ? '' : ' surface'}${scr}.`);
+          // "volar, proximal to the watershed line" → "volar surface, proximal to the watershed line"
+          const [s1, ...more] = surface.split(', ');
+          L.push(`A ${impName} was contoured as required and applied on the ${s1}${/surface|border/.test(s1) ? '' : ' surface'}${more.length ? `, ${more.join(', ')},` : ''}${scr}.`);
         }
         plateNo++;
         break;
@@ -434,7 +467,12 @@ function opnProc(p) {
         break;
       case 'nail':
         L.push('Guide wire passed across the fracture site into the distal fragment after closed reduction and confirmed under C-arm. Sequential reaming done.');
-        L.push(`${impName} inserted over the guide wire and the fracture reduction maintained. Proximal locking done using the jig and distal locking done by free-hand technique under C-arm${screwText ? `, using ${screwText}` : ''}.`);
+        {
+          const px = at('PROXIMAL');
+          const ds = at('DISTAL');
+          const other = notAt('PROXIMAL', 'DISTAL');
+          L.push(`${impName} inserted over the guide wire and the fracture reduction maintained. Proximal locking done using the jig${px.length ? ` with ${list(px)}` : ''} and distal locking done by free-hand technique under C-arm${ds.length ? ` with ${list(ds)}` : ''}${other.length ? `, using ${list(other)}` : ''}.`);
+        }
         L.push(`Nail position and ${imp.bone || 'bone'} length / rotation checked.`);
         break;
       case 'tens':
@@ -442,12 +480,20 @@ function opnProc(p) {
         break;
       case 'pfn':
         L.push('Entry made at the tip of the greater trochanter with an awl under C-arm; guide wire passed into the femoral canal across the fracture.');
-        L.push(`Proximal femur opened with the entry reamer and the ${impName} inserted with the jig. Guide wires for the neck screws placed centre-inferior on AP and central on lateral view; lag screw and anti-rotation screw inserted after measurement.`);
-        L.push(`Distal locking done${screwText ? ` with ${screwText}` : ''} through the jig.`);
+        {
+          const neck = at('NECK');
+          const rest = notAt('NECK');
+          L.push(`Proximal femur opened with the entry reamer and the ${impName} inserted with the jig. Guide wires for the neck screws placed centre-inferior on AP and central on lateral view; ${neck.length ? list(neck) : 'lag screw and anti-rotation screw'} inserted after measurement.`);
+          L.push(`Distal locking done${rest.length ? ` with ${list(rest)}` : ''} through the jig.`);
+        }
         break;
       case 'dhs':
         L.push('Guide wire inserted at 135 degrees from the lateral cortex into the femoral head, centre-centre on AP and lateral views with tip-apex distance less than 25mm; length measured.');
-        L.push(`Triple reaming done and the lag screw inserted; ${impName} applied and fixed to the femoral shaft${screwText ? ` with ${screwText}` : ''}. Compression screw applied.`);
+        {
+          const neck = at('NECK');
+          const rest = notAt('NECK');
+          L.push(`Triple reaming done and the ${neck.length ? list(neck) : 'lag screw'} inserted; ${impName} applied and fixed to the femoral shaft${rest.length ? ` with ${list(rest)}` : ''}. Compression screw applied.`);
+        }
         break;
       case 'ccNeck':
         L.push(`Three guide wires passed parallel in an inverted triangle configuration along the calcar and posterior cortex under C-arm; ${screwText || '6.5MM CANNULATED CANCELLOUS SCREWS'} inserted after measurement with threads crossing the fracture.`);
@@ -499,7 +545,7 @@ function opNoteText(raw) {
   const U = (s) => String(s || '').toUpperCase();
   const parts = b.procs.map((p) => ({ p, r: opnProc(p) })).filter((x) => x.r);
   if (!parts.length) return '';
-  const fx = String(raw.dx || '').trim() || parts.map(({ p }) => `FRACTURE ${opnSite(p).label} ${opnBoneLabel(p)} ${U(p.side)}`).join(' + ');
+  const fx = String(raw.dx || '').trim() || parts.map(({ p, r }) => (p.cat && p.cat !== 'trauma' ? r.name : `FRACTURE ${opnSite(p).label} ${opnBoneLabel(p)} ${U(p.side)}`)).join(' + ');
   const multi = parts.length > 1;
   const positions = [...new Set(parts.map(({ p }) => U(p.position)).filter(Boolean))];
   const L = [];
@@ -528,7 +574,7 @@ function opNoteText(raw) {
     r.lines.forEach((l) => L.push(l));
   });
   if (multi) L.push('');
-  L.push('Distal neurovascular status checked and found intact.');
+  L.push(parts.every(({ p }) => p.cat === 'spine') ? 'Neurological status of both lower limbs checked post-operatively.' : 'Distal neurovascular status checked and found intact.');
   L.push('Patient shifted to the post-operative ward in stable condition.');
   return L.join('\n').toUpperCase();
 }
@@ -580,7 +626,13 @@ const OPN_GUESS = [
 function opnNewProc(c, prev, used = []) {
   const d = String(c?.diagnosis || '').toUpperCase();
   const sideIn = (t) => (/\b(LEFT|LT)\b/.test(t) ? 'LEFT' : /\b(RIGHT|RT)\b/.test(t) ? 'RIGHT' : '');
-  const p = { side: '', tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [] };
+  // A procedure named in the plan (TKR, ACL reconstruction…) comes first; then a fracture in the
+  // diagnosis (trauma); then a condition in the diagnosis (PIVD, GCT…).
+  const tplFrom = (t) => { const g = typeof opnTplGuess === 'function' ? opnTplGuess(t) : null; return g && !used.includes(g.tpl) ? g : null; };
+  const asTpl = (g) => opnTplFill({ cat: g.cat, tpl: g.tpl, side: sideIn(d) || prev?.side || '', tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [], f: {} });
+  const fromPlan = tplFrom(c?.plan);
+  if (fromPlan) return asTpl(fromPlan);
+  const p = { cat: 'trauma', side: '', tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [] };
   const hits = OPN_GUESS.map(([re, region, bone, siteOf]) => { const m = re.exec(d); return m && { at: m.index, region, bone, site: siteOf(d) }; })
     .filter(Boolean).sort((a, b) => a.at - b.at);
   const g = hits.find((h) => !used.includes(h.bone));
@@ -589,6 +641,9 @@ function opnNewProc(c, prev, used = []) {
     const seg = d.slice(g.at).split(/\bWITH\b|\+|,|;|\bAND\b/)[0];
     p.side = sideIn(seg) || sideIn(d);
   } else {
+    const fromDx = tplFrom(d);
+    if (fromDx) return asTpl(fromDx);
+    if (prev?.cat && prev.cat !== 'trauma') return { cat: prev.cat, tpl: '', side: prev.side || sideIn(d), tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [], f: {} };
     p.region = prev?.region || '';
     p.side = prev?.side || sideIn(d);
   }
@@ -597,10 +652,21 @@ function opnNewProc(c, prev, used = []) {
 
 function opnDefaults(c) {
   const p = opnNewProc(c);
-  return { v: 2, cat: 'trauma', anaes: p.region ? OPN_TRAUMA[p.region].anaes : '', procs: [p] };
+  const anaes = p.cat === 'trauma' ? (p.region ? OPN_TRAUMA[p.region].anaes : '') : (opnTpl(p)?.anaes || '');
+  return { v: 2, cat: p.cat, anaes, procs: [p] };
 }
 
-const opnNewImp = (site, k) => ({ implant: k || '', implantCustom: '', size: '', screws: (site?.sc || []).map((t) => ({ type: t, n: '' })) });
+// Screw rows an implant starts with: nails get proximal + distal bolts, PFN / DHS neck screws + distal.
+function opnDefScrews(site, k) {
+  const kind = OPN_IMPLANTS[k]?.k;
+  const sc = site?.sc || [];
+  const bolt = (sc.find((t) => /BOLT/.test(t)) || '4.9MM LOCKING BOLTS').replace('DISTAL ', '');
+  if (kind === 'nail') return [{ type: bolt, n: '', len: '', at: 'PROXIMAL' }, { type: bolt, n: '', len: '', at: 'DISTAL' }];
+  if (kind === 'pfn') return [{ type: k === 'pfna' ? 'HELICAL BLADE' : 'LAG SCREW', n: '1', len: '', at: 'NECK' }, ...(k === 'pfna' ? [] : [{ type: 'ANTI-ROTATION SCREW', n: '1', len: '', at: 'NECK' }]), { type: bolt, n: '', len: '', at: 'DISTAL' }];
+  if (kind === 'dhs') return [{ type: 'LAG SCREW', n: '1', len: '', at: 'NECK' }, { type: '4.5MM CORTICAL SCREWS', n: '', len: '', at: 'SHAFT' }];
+  return sc.map((t) => ({ type: t, n: '', len: '', at: '' }));
+}
+const opnNewImp = (site, k) => ({ implant: k || '', implantCustom: '', size: '', screws: opnDefScrews(site, k) });
 
 // Fill whatever follows from what was just chosen in a procedure.
 function opnFill(p, changed) {
@@ -630,6 +696,30 @@ function opnApplyChange(B, t) {
   }
   const p = B.procs[+d.p];
   if (!p) return false;
+  if (d.pf === 'cat') {
+    // another section: start this procedure afresh (side kept)
+    const side = p.side;
+    Object.keys(p).forEach((k) => delete p[k]);
+    Object.assign(p, t.value === 'trauma' || !t.value
+      ? { cat: 'trauma', region: '', bone: '', site: '', side, tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [] }
+      : { cat: t.value, tpl: '', side, tourniquet: 'no', drain: 'no', slab: 'NONE', implants: [], f: {} });
+    return true;
+  }
+  if (d.pf === 'tpl') {
+    p.tpl = t.value;
+    opnTplFill(p);
+    if (!B.anaes && opnTpl(p)?.anaes) B.anaes = opnTpl(p).anaes;
+    return true;
+  }
+  if (d.ff) {
+    p.f = p.f || {};
+    p.f[d.ff] = t.value;
+    return true;
+  }
+  if (d.pf && p.cat && p.cat !== 'trauma') {
+    p[d.pf] = t.value;
+    return true;
+  }
   if (d.pf) {
     const k = d.pf;
     p[k] = t.value;
@@ -642,7 +732,7 @@ function opnApplyChange(B, t) {
   if (!imp) return false;
   if (d.if) {
     imp[d.if] = t.value;
-    if (d.if === 'implant' && t.value && t.value !== 'custom' && !imp.screws.some((s) => s.n)) imp.screws = (opnSite(p)?.sc || []).map((x) => ({ type: x, n: '' }));
+    if (d.if === 'implant' && t.value && t.value !== 'custom' && !imp.screws.some((s) => s.n || s.len)) imp.screws = opnDefScrews(opnSite(p), t.value);
     return true;
   }
   if (d.sf) {
@@ -655,15 +745,18 @@ function opnApplyChange(B, t) {
 // A button in the builder → the model.
 function opnApplyClick(B, el, c) {
   const d = el.dataset;
-  if (d.addProc !== undefined) { B.procs.push(opnNewProc(c, B.procs.at(-1), B.procs.map((x) => x.bone))); return true; }
+  if (d.addProc !== undefined) { B.procs.push(opnNewProc(c, B.procs.at(-1), B.procs.map((x) => x.bone || x.tpl))); return true; }
   if (d.rmProc !== undefined) { B.procs.splice(+d.rmProc, 1); if (!B.procs.length) B.procs.push(opnNewProc(c)); return true; }
   const p = B.procs[+d.p];
   if (!p) return false;
-  if (d.addImp !== undefined) { const site = opnSite(p); p.implants.push(opnNewImp(site, '')); return true; }
+  if (d.addImp !== undefined) {
+    p.implants.push(p.cat && p.cat !== 'trauma' ? { implant: 'custom', implantCustom: '', size: '', screws: [] } : opnNewImp(opnSite(p), ''));
+    return true;
+  }
   if (d.rmImp !== undefined) { p.implants.splice(+d.i, 1); return true; }
   const imp = p.implants[+d.i];
   if (!imp) return false;
-  if (d.addScr !== undefined) { imp.screws.push({ type: '', n: '' }); return true; }
+  if (d.addScr !== undefined) { imp.screws.push({ type: '', n: '', len: '', at: '' }); return true; }
   if (d.rmScr !== undefined) { imp.screws.splice(+d.s, 1); return true; }
   return false;
 }
@@ -673,10 +766,56 @@ function opnHTML(raw) {
   const o = (list, sel) => '<option value="">—</option>' + list.map(([v, l]) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(l)}</option>`).join('');
   const pairs = (arr) => arr.map((x) => [x, x]);
   const top = `<div class="opn-grid">
-      <label>Category<select data-ob="cat">${o(OPN_CATEGORIES, B.cat || '')}</select></label>
-      <label>Anaesthesia<select data-ob="anaes">${o(pairs(OPN_ANAES), B.anaes || '')}</select></label></div>`;
-  if (B.cat && !OPN_READY.includes(B.cat)) return top + '<p class="muted small">Only trauma is ready for now — the others are coming.</p>';
+      <label class="span2">Anaesthesia<select data-ob="anaes">${o(pairs(OPN_ANAES), B.anaes || '')}</select></label></div>`;
+  // Screw / wire rows, the same for every section
+  const screwRows = (imp, ia) => (imp.screws || []).map((s, si) => `<div class="opn-screw">
+          <select ${ia} data-s="${si}" data-sf="type" aria-label="Screw / wire">${o([...pairs(OPN_SCREWS), ['custom', 'Custom…']], s.type || '')}</select>
+          ${s.type === 'custom' ? `<input ${ia} data-s="${si}" data-sf="custom" value="${esc(s.custom || '')}" aria-label="Custom screw / wire">` : ''}
+          <label class="opn-n">No.<input ${ia} data-s="${si}" data-sf="n" inputmode="numeric" value="${esc(s.n || '')}"></label>
+          <label class="opn-len">Length (mm)<input ${ia} data-s="${si}" data-sf="len" inputmode="decimal" value="${esc(s.len || '')}" placeholder="e.g. 40 or 36, 38"></label>
+          <label class="opn-at">Where<select ${ia} data-s="${si}" data-sf="at">${o(OPN_SCREW_AT, s.at || '')}</select></label>
+          <button type="button" class="icon" ${ia} data-s="${si}" data-rm-scr title="Remove">✕</button></div>`).join('');
+  const catSel = (p, pi) => `<label class="span2">Section<select data-p="${pi}" data-pf="cat">${o(OPN_CATEGORIES, p.cat || 'trauma')}</select></label>`;
+  // A template procedure (spine, arthroplasty, arthroscopy, tumour, paediatrics, others)
+  const tplHTML = (p, pi) => {
+    const at = `data-p="${pi}"`;
+    const t = opnTpl(p);
+    const sel = (k, label, list, cls = '') => `<label class="${cls}">${label}<select ${at} data-pf="${k}">${o(list, p[k] || '')}</select></label>`;
+    const items = Object.entries(OPN_TPL[p.cat]?.items || {}).map(([k, v]) => [k, v.label]);
+    const field = (fd) => (fd.opts
+      ? `<label class="span2">${esc(fd.label)}<select ${at} data-ff="${fd.k}">${fd.opts.map((v) => `<option${(p.f?.[fd.k] ?? fd.def) === v ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select></label>`
+      : `<label class="span2">${esc(fd.label)}<input ${at} data-ff="${fd.k}" value="${esc(p.f?.[fd.k] ?? '')}" placeholder="${esc(fd.ph || '')}"></label>`);
+    const impHTML = (imp, ii) => {
+      const ia = `${at} data-i="${ii}"`;
+      return `<div class="opn-imp">
+          <div class="opn-imp-head"><b>Implant ${ii + 1}</b><button type="button" class="link small" ${ia} data-rm-imp>Remove</button></div>
+          <div class="opn-grid">
+            <label class="span2">Implant<input ${ia} data-if="implantCustom" list="dl-opn-${pi}" value="${esc(imp.implantCustom || '')}" placeholder="Type or pick"></label>
+            <label class="span2">Size / details<input ${ia} data-if="size" value="${esc(imp.size || '')}" placeholder="e.g. 52MM, SIZE 4, 8MM X 25MM"></label>
+            <div class="span2"><div class="opn-lab">Screws / wires / anchors</div>${screwRows(imp, ia)}<button type="button" class="btn small" ${ia} data-add-scr>+ Add screw / wire</button></div>
+          </div></div>`;
+    };
+    return `<div class="opn-proc">
+      <div class="opn-proc-head"><b>Procedure ${pi + 1}</b>${B.procs.length > 1 ? `<button type="button" class="link small" data-rm-proc="${pi}">Remove procedure</button>` : ''}</div>
+      <div class="opn-grid">
+        ${catSel(p, pi)}
+        ${sel('tpl', 'Procedure', items, 'span2')}
+        ${t ? `${t.side === false ? '' : sel('side', 'Side', pairs(['LEFT', 'RIGHT']))}
+        ${sel('position', 'Position', pairs(OPN_POSITIONS))}
+        ${sel('tourniquet', 'Tourniquet', [['yes', 'Used'], ['no', 'Not used']])}
+        ${t.fields.map(field).join('')}` : ''}
+      </div>
+      ${t ? `${(p.implants || []).map(impHTML).join('')}
+      <datalist id="dl-opn-${pi}">${(t.imps || []).map((v) => `<option value="${esc(v)}">`).join('')}</datalist>
+      <button type="button" class="btn small" ${at} data-add-imp>+ Add implant</button>
+      <div class="opn-grid opn-end">
+        ${sel('drain', 'Drain', [['yes', 'Placed'], ['no', 'No drain']])}
+        ${sel('slab', 'Slab / splint / cast', pairs(OPN_SLABS))}
+      </div>` : ''}
+    </div>`;
+  };
   const procHTML = (p, pi) => {
+    if (p.cat && p.cat !== 'trauma') return tplHTML(p, pi);
     const site = opnSite(p);
     const at = `data-p="${pi}"`;
     const sel = (k, label, list, cls = '') => `<label class="${cls}">${label}<select ${at} data-pf="${k}">${o(list, p[k] || '')}</select></label>`;
@@ -695,11 +834,7 @@ function opnHTML(raw) {
     };
     const impHTML = (imp, ii) => {
       const ia = `${at} data-i="${ii}"`;
-      const screws = (imp.screws || []).map((s, si) => `<div class="opn-screw">
-          <select ${ia} data-s="${si}" data-sf="type" aria-label="Screw / wire">${o([...pairs(OPN_SCREWS), ['custom', 'Custom…']], s.type || '')}</select>
-          ${s.type === 'custom' ? `<input ${ia} data-s="${si}" data-sf="custom" value="${esc(s.custom || '')}" aria-label="Custom screw / wire">` : ''}
-          <label class="opn-n">No.<input ${ia} data-s="${si}" data-sf="n" inputmode="numeric" value="${esc(s.n || '')}"></label>
-          <button type="button" class="icon" ${ia} data-s="${si}" data-rm-scr title="Remove">✕</button></div>`).join('');
+      const screws = screwRows(imp, ia);
       return `<div class="opn-imp">
           <div class="opn-imp-head"><b>Implant ${ii + 1}</b>${p.implants.length > 1 ? `<button type="button" class="link small" ${ia} data-rm-imp>Remove implant</button>` : ''}</div>
           <div class="opn-grid">
@@ -712,6 +847,7 @@ function opnHTML(raw) {
     return `<div class="opn-proc">
       <div class="opn-proc-head"><b>Procedure ${pi + 1}</b>${B.procs.length > 1 ? `<button type="button" class="link small" data-rm-proc="${pi}">Remove procedure</button>` : ''}</div>
       <div class="opn-grid">
+        ${catSel(p, pi)}
         ${sel('region', 'Region', Object.entries(OPN_TRAUMA).map(([k, v]) => [k, v.label]))}
         ${sel('bone', 'Bone', bones)}
         ${sel('site', 'Fracture site', sites)}
