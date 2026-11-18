@@ -829,7 +829,8 @@ const ANTIBIOTICS = [
   'C. CEPHALEXIN BD',
   'T. PENICILLIN BD',
 ];
-const isSpinePelvis = (c) => /\b(spine|spinal|vertebra|vertebral|cervical spine|dorsal|lumbar|thoracolumbar|[CDTL]\d{1,2}\b|pelvi[sc]|acetabul|sacr|ilium|iliac|pubic|rami|si joint)/i.test(`${c.diagnosis || ''} ${c.plan || ''}`);
+const PELVIS_RE = /\b(pelvi[sc]|acetabul\w*|sacr\w*|ilium|iliac|pubic|pubis|rami|ramus|ischi\w*|coccy\w*|symphysis|si joint|open book|vertical shear|apc\s*(i{1,3}|[1-3])|lc\s*(i{1,3}|[1-3]))\b/i;
+const isSpinePelvis = (c) => /\b(spine|spinal|vertebra|vertebral|cervical spine|dorsal|lumbar|thoracolumbar|[CDTL]\d{1,2}\b)/i.test(`${c.diagnosis || ''} ${c.plan || ''}`) || PELVIS_RE.test(`${c.diagnosis || ''} ${c.plan || ''}`);
 // Bed-sore risk: spine, pelvis / acetabulum, neck of femur, intertrochanteric / subtrochanteric.
 const BEDSORE_SITES = ['SACRUM', 'RIGHT HEEL', 'LEFT HEEL', 'RIGHT TROCHANTER', 'LEFT TROCHANTER', 'SCAPULAE', 'OCCIPUT', 'OTHER'];
 const bedsoreRisk = (c) => isSpinePelvis(c) || /\b(NECK (OF )?(THE )?FEMUR|FEMORAL NECK|NOF|INTER\s*TROCHANTER\w*|PER\s*TROCHANTER\w*|SUB\s*TROCHANTER\w*|\bIT FEMUR|IT FRACTURE)\b/i.test(`${c.diagnosis || ''} ${c.plan || ''}`);
@@ -866,7 +867,9 @@ const DC_RULES = [
   [/\bL[3-5]\b|SACRUM|SACRAL|LUMBOSACRAL|\bS1\b/, 'spine', 'LUMBOSACRAL SPINE', 'LS BELT'],
   [/DORSAL|THORACIC|DORSOLUMBAR|THORACOLUMBAR|\b[DT]\d{1,2}\b|\bL[12]\b/, 'spine', 'DORSOLUMBAR SPINE', "TAYLOR'S BRACE"],
   [/LUMBAR|SPINE|SPINAL|VERTEBRA|PIVD|LISTHESIS|POTT/, 'spine', 'LUMBAR SPINE', 'LS BELT'],
-  [/PELVI|ACETABUL|PUBIC|\bRAMI\b|ILIUM|ILIAC|SACROILIAC|SI JOINT|SYMPHYSIS/, 'pelvis', 'PELVIS', 'PELVIC BINDER'],
+  [/PELVI|ACETABUL|PUBIC|PUBIS|\bRAMI\b|\bRAMUS\b|ILIUM|ILIAC|ISCHI|COCCY|SACROILIAC|SI JOINT|SYMPHYSIS|OPEN BOOK|VERTICAL SHEAR|\bAPC\s*(I{1,3}|[1-3])\b|\bLC\s*(I{1,3}|[1-3])\b/, 'pelvis', 'PELVIS', 'PELVIC BINDER'],
+  // hip fractures: AK slab unless fixed (then no immobilisation — see dcRegions)
+  [/NECK (OF )?(THE )?FEMUR|FEMORAL NECK|\bNOF\b|INTER\s*TROCHANTER|PER\s*TROCHANTER|SUB\s*TROCHANTER|TROCHANTER|PROXIMAL FEMUR|\bHIP\b/, 'limb', 'LOWER LIMB', 'ABOVE KNEE SLAB', 'hip'],
   [/SHOULDER DISLOCATION|DISLOCATION (OF )?(THE )?(\w+ )?SHOULDER|PROXIMAL HUMERUS|SURGICAL NECK|NECK OF (THE )?HUMERUS|HUMERAL NECK|GREATER TUBEROSITY|ANATOMICAL NECK/, 'limb', 'UPPER LIMB', 'BODY ARM BANDAGE'],
   [/(LATERAL|DISTAL|OUTER) (THIRD |END |1\/3 )?(OF )?(THE )?CLAVICLE|CLAVICLE.*(LATERAL|DISTAL|OUTER)/, 'limb', 'UPPER LIMB', 'CUFF AND COLLAR WITH JONES STRAPPING'],
   [/CLAVICLE/, 'limb', 'UPPER LIMB', 'CUFF AND COLLAR WITH FIGURE OF 8 BANDAGE'],
@@ -881,17 +884,21 @@ const DC_RULES = [
 const DC_POWER_LEVELS = ['C5', 'C6', 'C7', 'C8', 'T1', 'L2', 'L3', 'L4', 'L5', 'S1'];
 
 // Diagnosis → the injured parts, in order: [{ part, limb, side, splint }]
-function dcRegions(c) {
+function dcRegions(c, d = {}) {
   const dx = String(c?.diagnosis || '').toUpperCase();
+  const fixed = dcOperated(c || {}, d);
+  // a joint replacement (TKR, THR, hemiarthroplasty) needs no slab afterwards
+  const replaced = fixed && /\bTKR\b|TOTAL KNEE|\bTHR\b|TOTAL HIP|HEMIARTHROPLASTY|BIPOLAR|AUSTIN MOORE|THOMPSON/.test(String(`${d.procedure || ''} ${c?.procedureDone || ''} ${c?.plan || ''}`).toUpperCase());
   const sideIn = (t) => (/\b(BILATERAL|B\/L|BOTH SIDES?)\b/.test(t) ? 'BILATERAL' : /\b(LEFT|LT)\b/.test(t) ? 'LEFT' : /\b(RIGHT|RT)\b/.test(t) ? 'RIGHT' : '');
   const out = [];
   for (const seg of dx.split(/\bWITH\b|\+|;|,|\bALONG WITH\b|\bAND\b(?! (DISLOCATION|SUBLUXATION))/)) {
     const rule = DC_RULES.find(([re]) => re.test(seg));
     if (!rule) continue;
-    const [, part, limb, splint] = rule;
+    const [, part, limb, usual, tag] = rule;
     const side = part === 'limb' ? sideIn(seg) || sideIn(dx) : '';
     if (out.some((r) => r.part === part && r.limb === limb && r.side === side)) continue; // one block per part and side
-    out.push({ part, limb, side, splint });
+    const none = (tag === 'hip' && fixed) || (replaced && part === 'limb' && limb === 'LOWER LIMB');
+    out.push({ part, limb, side, splint: none ? 'NONE' : usual, hip: tag === 'hip' });
   }
   return out;
 }
@@ -934,12 +941,41 @@ function dcUsualAdvice(c, d = {}, splints = []) {
   if (wound) out.push(['CONTINUE ANTIBIOTICS', 'ஆன்டிபயாடிக் மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.']);
   if (wound || dcOperated(c, d)) out.push(['ALTERNATE DAY DRESSING AT NEARBY PHC OR GH', 'ஒரு நாள் விட்டு ஒரு நாள் அருகிலுள்ள அரசு மருத்துவமனை அல்லது ஆரம்ப சுகாதார நிலையத்தில் காயத்தைச் சுத்தம் செய்து கட்டுப் போட்டுக் கொள்ளவும்.']);
   const seen = new Set();
-  dcRegions(c).forEach((r, i) => {
+  dcRegions(c, d).forEach((r, i) => {
     const s = splints[i] || r.splint;
     if (!s || s === 'NONE' || seen.has(s)) return;
     seen.add(s);
     out.push([`CONTINUE ${s}`, DC_SPLINTS[s] || POP_TA]);
   });
+  if (dcOperated(c, d)) dcPostopAdvice(c, d).forEach((a) => { if (!out.some((x) => x[0] === a[0])) out.push(a); });
+  return out;
+}
+
+// Standard post-op mobilisation advice, by what was operated.
+const DC_MOB = {
+  fwbWalker: ['FULL WEIGHT BEARING WALK WITH WALKER SUPPORT', 'வாக்கர் உதவியுடன் முழு எடை போட்டு நடக்கவும்.'],
+  nwbWalker: ['NON-WEIGHT BEARING WALK WITH WALKER SUPPORT', 'வாக்கர் உதவியுடன், அடிபட்ட காலில் எடை போடாமல் நடக்கவும்.'],
+  hipPrec: ['HIP PRECAUTIONS: AVOID SQUATTING, CROSS-LEGGED SITTING AND LOW CHAIRS', 'குத்துக்கால் இட்டு அமர்வது, சம்மணம் போட்டு அமர்வது, தாழ்வான நாற்காலியில் அமர்வதைத் தவிர்க்கவும்.'],
+  quads: ['STATIC QUADRICEPS, ANKLE PUMP AND ACTIVE TOE MOVEMENTS', 'தொடைத் தசை இறுக்கும் பயிற்சி, கணுக்கால் அசைவுப் பயிற்சி மற்றும் கால் விரல் அசைவுகளைச் செய்யவும்.'],
+  kneeRom: ['KNEE RANGE OF MOTION AND QUADRICEPS STRENGTHENING EXERCISES', 'முழங்கால் மடக்கி நீட்டும் பயிற்சிகளையும் தொடைத் தசைப் பயிற்சிகளையும் செய்யவும்.'],
+  elevate: ['LIMB ELEVATION', 'அறுவை சிகிச்சை செய்த கை / காலை உயர்த்தி வைக்கவும்.'],
+  fingers: ['ACTIVE FINGER MOVEMENTS', 'விரல்களை அடிக்கடி அசைத்துக் கொண்டே இருக்கவும்.'],
+  noLift: ['AVOID LIFTING WEIGHTS WITH THE OPERATED LIMB', 'அறுவை சிகிச்சை செய்த கையால் எடை தூக்க வேண்டாம்.'],
+  pelvisNwb: ['NON-WEIGHT BEARING ON THE AFFECTED SIDE WITH WALKER SUPPORT', 'வாக்கர் உதவியுடன், அடிபட்ட பக்கக் காலில் எடை போடாமல் நடக்கவும்.'],
+  spineMob: ['GRADUAL SITTING AND WALKING WITH BRACE AS ADVISED', 'கொடுக்கப்பட்ட பட்டையை அணிந்து, அறிவுறுத்தியபடி மெதுவாக அமர்ந்து நடக்கப் பழகவும்.'],
+};
+function dcPostopAdvice(c, d = {}) {
+  const proc = String(`${d.procedure || ''} ${c.procedureDone || ''} ${c.plan || ''}`).toUpperCase();
+  const regs = dcRegions(c, d);
+  const out = [];
+  const add = (k) => { if (!out.includes(DC_MOB[k])) out.push(DC_MOB[k]); };
+  const arthroplasty = /HEMIARTHROPLASTY|BIPOLAR|AUSTIN MOORE|THOMPSON|\bTHR\b|TOTAL HIP/.test(proc);
+  if (/\bTKR\b|TOTAL KNEE/.test(proc)) { add('fwbWalker'); add('kneeRom'); add('quads'); }
+  if (regs.some((r) => r.hip) && arthroplasty) { add('fwbWalker'); add('hipPrec'); add('quads'); }
+  if (regs.some((r) => r.part === 'limb' && r.limb === 'LOWER LIMB') && !arthroplasty && !/\bTKR\b|TOTAL KNEE/.test(proc)) { add('nwbWalker'); add('quads'); add('elevate'); }
+  if (regs.some((r) => r.part === 'pelvis')) { add('pelvisNwb'); add('quads'); }
+  if (regs.some((r) => r.part === 'limb' && r.limb === 'UPPER LIMB')) { add('fingers'); add('noLift'); add('elevate'); }
+  if (regs.some((r) => r.part === 'spine')) add('spineMob');
   return out;
 }
 

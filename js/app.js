@@ -3020,7 +3020,7 @@ const App = (() => {
           exam: EXAM_TEMPLATE,
           treatment: [...DRUGS_ALL, ...(isSpinePelvis(c) ? DRUGS_SPINE_PELVIS : [])].join('\n'),
           // written from the diagnosis: immobilisation + local examination (spine: power table)
-          condition: dcConditionText(dcRegions(c)),
+          condition: dcConditionText(dcRegions(c, { dos: c.surgeryDate || c.otDate })),
           ...(() => { const adv = dcUsualAdvice(c, { dos: c.surgeryDate || c.otDate }); return { advice: adv.map((a) => a[0]).join('\n'), adviceTa: adv.map((a) => a[1]).join('\n') }; })(),
           ...(c.discharge || {}),
         };
@@ -3033,7 +3033,7 @@ const App = (() => {
           </div>
           <div class="span2 drug-btns"><span class="muted small">Antibiotics:</span>${ANTIBIOTICS.map((a, i) => `<button type="button" class="chip" data-abx="${i}">+ ${esc(a)}</button>`).join('')}</div>`;
         // Condition on discharge: the immobilisation for each injured part, and the power grid for spine cases.
-        const regs = dcRegions(c);
+        const regs = dcRegions(c, d);
         const condHelp = `<div class="span2 dc-cond">
             ${regs.length ? `<div class="dc-splints">${regs.map((r, i) => `<label>${esc(r.part === 'pelvis' ? 'Pelvis' : `${r.side ? r.side[0] + r.side.slice(1).toLowerCase() + ' ' : ''}${r.limb.toLowerCase()}`)}<select name="splint_${i}" data-splint>${opts(Object.keys(DC_SPLINTS), d[`splint_${i}`] || r.splint)}</select></label>`).join('')}</div>`
               : '<p class="muted small">No limb, spine or pelvis found in the diagnosis — type the local examination below.</p>'}
@@ -3143,8 +3143,8 @@ const App = (() => {
         });
         loadThumbs(el);
         // Condition on discharge: re-written from the chosen immobilisation; power grades go into their lines.
-        const splintsNow = () => dcRegions(c()).map((r, i) => f.elements[`splint_${i}`]?.value || r.splint);
-        const writeCondition = () => { f.elements.condition.value = dcConditionText(dcRegions(c()), splintsNow(), data()); };
+        const splintsNow = () => dcRegions(c(), data()).map((r, i) => f.elements[`splint_${i}`]?.value || r.splint);
+        const writeCondition = () => { f.elements.condition.value = dcConditionText(dcRegions(c(), data()), splintsNow(), data()); };
         f.addEventListener('change', (e) => { if (e.target.matches('[data-splint]')) writeCondition(); });
         f.addEventListener('input', (e) => {
           const lvl = e.target.dataset.pw;
