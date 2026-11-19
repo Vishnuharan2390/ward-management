@@ -1703,8 +1703,8 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .rounds { perspective: 1400px; }
 .rd-card.flip-next { animation: rd-flip-next .45s cubic-bezier(.2, .7, .2, 1) both; transform-origin: center; backface-visibility: hidden; }
 .rd-card.flip-prev { animation: rd-flip-prev .45s cubic-bezier(.2, .7, .2, 1) both; transform-origin: center; backface-visibility: hidden; }
-@keyframes rd-flip-next { from { transform: rotateY(-95deg); opacity: .2; } 60% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
-@keyframes rd-flip-prev { from { transform: rotateY(95deg); opacity: .2; } 60% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
+@keyframes rd-flip-next { from { transform: rotateY(95deg); opacity: .2; } 60% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
+@keyframes rd-flip-prev { from { transform: rotateY(-95deg); opacity: .2; } 60% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .rd-card.flip-next, .rd-card.flip-prev { animation: none; } }
 .icon-btn { min-width: 2.6rem; justify-content: center; font-size: 1.15rem; }
 
