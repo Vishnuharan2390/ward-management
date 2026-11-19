@@ -338,6 +338,7 @@ const ConsentForm = (() => {
 
   // Draw one page; `pt` is the body size. Returns the y where the page content ends.
   function draw(g, c, draft, pt) {
+    const gapK = Math.max(0.7, Math.min(1, (pt - 7.5) / 3.5 * 0.3 + 0.7));
     const tpl = CONSENT_TPLS[consentKind(c)];
     const M = 12.7 * MM;
     const CW = W - 2 * M;
@@ -446,7 +447,7 @@ const ConsentForm = (() => {
     // Three ruled lines for anything added by hand (above the signatures, so it is signed for).
     g.fillStyle = '#555';
     for (let i = 0; i < 3; i++) {
-      y += 8 * MM;
+      y += 8 * MM * gapK;
       g.fillRect(M, y, CW, Math.max(1.5, PT * 0.45));
     }
     g.fillStyle = '#000';
@@ -464,7 +465,7 @@ const ConsentForm = (() => {
     y += slh;
     const by = 'இப்படிக்கு,';
     g.fillText(by, M + CW - g.measureText(by).width, y + spt * PT);
-    y += slh + 13 * MM;
+    y += slh + 13 * MM * gapK;
     const bw = 68 * MM;
     rule(M, y, bw);
     rule(M + CW - bw, y, bw);
@@ -481,6 +482,16 @@ const ConsentForm = (() => {
       if (r) right(r, y + spt * PT);
       y += slh;
     }
+    // Doctor's signature, centred below
+    y += 11 * MM * gapK;
+    rule((W - bw) / 2, y, bw);
+    y += 1.5 * MM;
+    font(spt, 700);
+    center("மருத்துவரின் கையொப்பம் / Doctor's Signature", y + spt * PT);
+    y += slh;
+    font(spt);
+    center('பெயர் & பதவி / Name & Designation:', y + spt * PT);
+    y += slh;
     return y;
   }
 
@@ -504,8 +515,8 @@ const ConsentForm = (() => {
     const g = cv.getContext('2d');
     g.textBaseline = 'alphabetic';
     const bottom = H - 8 * MM;
-    for (let pt = 11; pt >= 8; pt -= 0.25) {
-      if (draw(g, c, draft, pt) <= bottom || pt <= 8) break;
+    for (let pt = 11; pt >= 7.5; pt -= 0.25) {
+      if (draw(g, c, draft, pt) <= bottom || pt <= 7.5) break;
     }
     return cv;
   }
