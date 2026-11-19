@@ -353,7 +353,7 @@ const ConsentForm = (() => {
 
     // Header
     font(14, 700); y += 14 * PT; center('அரசு இராசாசி மருத்துவமனை, மதுரை', y);
-    font(10); y += 16 * PT; center('எலும்பு முறிவு சிகிச்சைத் துறை — Department of Orthopaedics', y);
+    font(10); y += 16 * PT; center('எலும்பு முறிவு சிகிச்சைத் துறை — Department of Orthopaedics and Traumatology', y);
     font(12, 700); y += 19 * PT;
     {
       const t = `${tpl.title} — ${tpl.spine ? 'High Risk ' : ''}Informed Consent${c.standby ? '  (STANDBY)' : ''}`;
