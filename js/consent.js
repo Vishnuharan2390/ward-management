@@ -109,7 +109,8 @@ function consentExitBone(c) {
 // உலோகத்தினால் ஆன செயற்கை மூட்டு (arthroplasty), தகடு (plate).
 const CONSENT_IMPLANT_PARTS = [
   ['joint', /ARTHROPLASTY|BIPOLAR|AUSTIN MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTKR\b|TOTAL HIP|TOTAL KNEE|PROSTHES/, 'உலோகத்தினால் ஆன செயற்கை மூட்டு'],
-  ['exfix', /EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|ILIZAROV|\bLRS\b|LIMB RECONSTRUCTION|RAIL FIXATOR|FIXATOR/, 'வெளிப்புறக் கம்பி'],
+  ['ring', /ILIZAROV|RING FIXATOR|CIRCULAR FIXATOR|\bTSF\b|TAYLOR SPATIAL/, 'வெளிப்புற வளையக் கம்பி'],
+  ['exfix', /EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|\bLRS\b|LIMB RECONSTRUCTION|RAIL FIXATOR|FIXATOR/, 'வெளிப்புறக் கம்பி'],
   ['plate', /PLATE|PLATING|\bLCP\b|\bDCP\b|\bDHS\b|\bDCS\b|DYNAMIC HIP/, 'தகடு'],
   ['rod', /NAIL|ILIM|IMIL|\bIMN\b|\bPFNA?\b|\bTENS\b|INTRAMEDULLARY|\bRODS?\b|K[\s-]?WIRE|\bTBW\b|TENSION BAND|\bWIRES?\b|PEDICLE|\bPSF\b/, 'உள்புறக் கம்பி'],
   ['screw', /SCREW|\bCC\b|CANNULATED|PLATE|PLATING|\bLCP\b|\bDCP\b|\bDHS\b|\bDCS\b|\bPFNA?\b|ILIM|IMIL|INTERLOCK|PEDICLE|\bPSF\b|BOLT/, 'திருகாணி'],
@@ -122,7 +123,9 @@ function consentExitFracture(c) {
 function consentImplantTa(...texts) {
   for (const t of texts) {
     const u = String(t || '').toUpperCase();
-    const parts = CONSENT_IMPLANT_PARTS.filter(([, re]) => re.test(u)).map(([, , ta]) => ta);
+    let hits = CONSENT_IMPLANT_PARTS.filter(([, re]) => re.test(u));
+    if (hits.some(([k]) => k === 'ring')) hits = hits.filter(([k]) => k !== 'exfix' && k !== 'rod'); // Ilizarov wires are part of the frame
+    const parts = hits.map(([, , ta]) => ta);
     if (parts.length) return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} மற்றும் ${parts.at(-1)}`;
   }
   return '';
