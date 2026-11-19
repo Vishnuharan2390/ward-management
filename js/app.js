@@ -2204,6 +2204,7 @@ const App = (() => {
                   <label>Level<select data-f="level">${levelOpts(c.level)}</select></label>
                   <label>Scheme status<select data-f="scheme">${schemeOpts(c.scheme)}</select></label>
                   <label>Anaesthesia assessment<select data-f="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
+                  <label>Consent form<select data-f="consentTpl"><option value="">Auto (${esc(ConsentForm.label({ ...c, consentTpl: '' }))})</option>${opts(Object.entries(CONSENT_TPLS).map(([k, t]) => [k, t.label]), c.consentTpl || '')}</select></label>
                   <label class="span3">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
                   <label class="span3">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
                   <label class="span3">Implants <button type="button" class="link small" data-refill>↻ implants & level from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
@@ -2435,7 +2436,7 @@ const App = (() => {
         SharePdf.otEmail(cases, dd, to);
       };
       // Phones get a real PDF file (window.print is unreliable there); computers keep the print dialog.
-      $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); if (PhonePdf.isPhone()) PhonePdf.consents(cases, dd); else Print.consents(cases, dd, Store.meta); };
+      $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); if (PhonePdf.isPhone()) PhonePdf.consents(cases, dd); else Print.consents(cases, dd); };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
         toast('Collecting X-rays, CT and MRI…', 8000);

@@ -215,137 +215,13 @@ const PhonePdf = (() => {
     return out;
   }
 
-  function consentPage(c, draft) {
-    const cv = document.createElement('canvas');
-    cv.width = W;
-    cv.height = H;
-    const g = cv.getContext('2d');
-    g.fillStyle = '#fff';
-    g.fillRect(0, 0, W, H);
-    g.fillStyle = '#000';
-    g.strokeStyle = '#000';
-    g.textBaseline = 'alphabetic';
-    const M = 12 * MM;
-    const CW = W - 2 * M;
-    const font = (pt, weight = 400) => { g.font = `${weight} ${pt * PT}px ${TAMIL}`; };
-    let y = M;
-
-    // title
-    font(15, 700);
-    const title = 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்';
-    const tw = g.measureText(title).width;
-    let sw = 0;
-    if (c.standby) { font(11, 700); sw = g.measureText('  (STANDBY)').width; font(15, 700); }
-    const tx = (W - tw - sw) / 2;
-    y += 15 * PT;
-    g.fillText(title, tx, y);
-    g.fillRect(tx, y + 2.5 * PT, tw, Math.max(2, PT * 0.8));
-    if (c.standby) { font(11, 700); g.fillText('  (STANDBY)', tx + tw, y); }
-    y += 6 * PT + 3 * MM;
-
-    // details box: label | value | label | value, two rows
-    const rows = [
-      [['பெயர் ', '/ NAME'], c.name, ['வயது / பாலினம்', ''], ageSex(c)],
-      [['உள்நோயாளி எண் ', '/ IP NO'], c.ipNo, ['வார்டு ', '/ WARD'], c.ward],
-    ];
-    const bpt = 9.5;
-    const pad = 2 * MM;
-    const vpad = 0.8 * MM;
-    const blh = bpt * PT * 1.55;
-    const labW = (l) => { font(bpt, 600); let w = g.measureText(l[0]).width; font(8, 400); w += g.measureText(l[1]).width; return w + 2 * pad; };
-    const lw0 = Math.max(...rows.map((r) => labW(r[0])));
-    const lw2 = Math.max(...rows.map((r) => labW(r[2])));
-    const vw = (CW - lw0 - lw2) / 2;
-    const colX = [M, M + lw0, M + lw0 + vw, M + lw0 + vw + lw2, M + CW];
-    g.lineWidth = Math.max(2, PT * 0.75);
-    for (const r of rows) {
-      font(bpt, 400);
-      const vals = [r[1], r[3]].map((v) => wrap(g, up(v), vw - 2 * pad));
-      const rh = Math.max(...vals.map((v) => v.length)) * blh + 2 * vpad;
-      const base = y + vpad + bpt * PT * 1.15;
-      [r[0], r[2]].forEach((l, k) => {
-        const x = colX[k * 2] + pad;
-        font(bpt, 600);
-        g.fillText(l[0], x, base);
-        const w = g.measureText(l[0]).width;
-        font(8, 400);
-        g.fillText(l[1], x + w, base);
-      });
-      font(bpt, 400);
-      vals.forEach((lines, k) => lines.forEach((t, i) => g.fillText(t, colX[k * 2 + 1] + pad, base + i * blh)));
-      for (const x of colX) { g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + rh); g.stroke(); }
-      g.beginPath(); g.moveTo(M, y); g.lineTo(M + CW, y); g.moveTo(M, y + rh); g.lineTo(M + CW, y + rh); g.stroke();
-      y += rh;
-    }
-    y += 3 * MM;
-
-    // body paragraphs: 10.5pt, line height 1.55, first-line indent 10mm, justified
-    const pt = 10.5;
-    const lh = pt * PT * 1.55;
-    const indent = 10 * MM;
-    const para = (text) => {
-      font(pt, 400);
-      const lines = wrap(g, text, CW, indent);
-      lines.forEach((ln, i) => {
-        const x = M + (i === 0 ? indent : 0);
-        const width = CW - (i === 0 ? indent : 0);
-        const words = ln.split(' ');
-        if (i < lines.length - 1 && words.length > 1) {
-          const space = (width - words.reduce((a, w) => a + g.measureText(w).width, 0)) / (words.length - 1);
-          let cx = x;
-          for (const w of words) { g.fillText(w, cx, y + pt * PT * 1.1); cx += g.measureText(w).width + space; }
-        } else {
-          g.fillText(ln, x, y + pt * PT * 1.1);
-        }
-        y += lh;
-      });
-      y += 2 * MM;
-    };
-    const field = (label, value) => {
-      font(pt, 700);
-      const x = M + indent;
-      g.fillText(label, x, y + pt * PT * 1.1);
-      const lw = g.measureText(label + ' ').width;
-      font(pt, 400);
-      const lines = String(value || '').trim() ? wrap(g, up(value), CW - indent - lw) : [''];
-      lines.forEach((ln) => { g.fillText(ln, x + lw, y + pt * PT * 1.1); y += lh; });
-      y += 2 * MM;
-    };
-
-    para(`நான் அரசு இராசாசி மருத்துவமனையில் ${c.doa ? `${fmtDate(c.doa)} அன்று ` : ''}அனுமதிக்கப்பட்டேன். ${Print.CONSENT_PARAS[0]}`);
-    field('Δ :', c.diagnosis);
-    field('PLAN :', c.plan);
-    Print.CONSENT_RISK_PARAS.forEach(para);
-
-    // date (left) and signature block (right)
-    y += 6 * MM - 2 * MM;
-    const spt = 9.5;
-    const slh = spt * PT * 1.55;
-    const sx = M + CW - 70 * MM;
-    font(spt, 400);
-    g.fillText('இப்படிக்கு,', sx, y + spt * PT * 1.1);
-    y += slh;
-    const sig = (label) => {
-      y += 11 * MM;
-      g.fillRect(sx, y, 70 * MM, Math.max(2, PT * 0.75));
-      y += 1 * MM;
-      g.fillText(label, sx, y + spt * PT * 1.1);
-      y += slh;
-    };
-    sig('கையொப்பம் / பெருவிரல் ரேகை');
-    sig('பெயர் & உறவுமுறை');
-    font(pt, 400);
-    g.fillText(`நாள் : ${fmtDate(draft.date)}`, M, y - 2);
-    return cv;
-  }
-
   async function consents(cases, draft) {
-    await fontsReady();
+    await ConsentForm.fontsReady();
     const { jsPDF } = window.jspdf;
     const d = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
     cases.forEach((c, i) => {
       if (i) d.addPage();
-      const cv = consentPage(c, draft);
+      const cv = ConsentForm.page(c, draft);
       d.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
       cv.width = cv.height = 0; // free the canvas memory right away (iPhone Safari is stingy)
     });

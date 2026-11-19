@@ -1389,20 +1389,9 @@ html, body { overscroll-behavior-x: none; }
 .sug-row span { display: flex; flex-direction: column; gap: 2px; }
 
 /* ---- Tamil consent forms (print) */
-.pr.cf { font-family: 'Noto Sans Tamil', 'Latha', sans-serif; color: #000; }
-.cf-page { page-break-after: always; break-after: page; font-size: 10.5pt; line-height: 1.55; }
-.cf-page:last-child { page-break-after: auto; break-after: auto; }
-.cf-title { text-align: center; font-size: 15pt; margin: 0 0 3mm; text-decoration: underline; }
-.cf-box { width: 100%; border-collapse: collapse; margin-bottom: 3mm; font-size: 9.5pt; }
-.cf-box th, .cf-box td { border: 1px solid #000; padding: .8mm 2mm; text-align: left; vertical-align: top; }
-.cf-box th { font-weight: 600; white-space: nowrap; width: 1%; }
-.cf-box th span { font-weight: 400; font-size: 8pt; }
-.cf-blank { display: inline-block; min-width: 45mm; }
-.cf-p { margin: 0 0 2mm; text-indent: 10mm; text-align: justify; }
-.cf-dx { margin: 0 0 2mm 10mm; }
-.cf-end { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 6mm; break-inside: avoid; }
-.cf-by { width: 70mm; font-size: 9.5pt; }
-.cf-line { display: block; border-bottom: 1px solid #000; height: 11mm; margin-bottom: 1mm; }
+.pr.cf { margin: 0; }
+.cf-img { display: block; width: 210mm; height: 296.5mm; page-break-after: always; break-after: page; }
+.cf-img:last-child { page-break-after: auto; break-after: auto; }
 
 /* Reload button (menu bar) and the "new version" bar */
 .reload-btn { font: inherit; font-size: 12px; padding: .15rem .55rem; margin-left: .5rem; border-radius: 6px; border: 1px solid var(--line, rgba(127,127,127,.4)); background: transparent; color: inherit; cursor: pointer; white-space: nowrap; }

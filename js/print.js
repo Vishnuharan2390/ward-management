@@ -270,48 +270,19 @@ const Print = (() => {
   }
 
   // ---------------------------------------------------------------- Consent forms (Tamil)
-  // The hospital's own "எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்", typed out: one A4 page per OT list case,
-  // with the patient's details, diagnosis (Δ) and plan filled in. கால் / கை and the implant options
-  // are printed as on the form, to be struck off by hand.
-  const CF_IMPL = 'உள்புறக் கம்பி / வெளிப்புறச் சட்டம் / தகடு / திருகாணி';
-  const CONSENT_PARAS = [
-    'என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எனது கால் / கை எலும்பு முறிவு ஏற்பட்டுள்ளது என்று கூறினர். அதற்கு '
-      + CF_IMPL + ' கொண்டு அறுவை சிகிச்சை செய்து சரிசெய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
-  ];
-  const CONSENT_RISK_PARAS = [
-    'மேலும், அறுவை சிகிச்சையின் போது மயக்க மருந்து கொடுப்பதால் மூச்சுத்திணறல், மாரடைப்பு மற்றும் மேசை மேல் மரணம் போன்றவை ஏற்படலாம் என அறிவேன். தேவைப்பட்டால் அறுவை சிகிச்சைக்குப் பின்னர் செயற்கை சுவாசம் பொருத்தும் நிலை வரலாம் என அறிவேன்.',
-    'மேலும், இரத்த நாளங்கள் சேதம் அடைந்து அதிக இரத்தம் இழக்க வாய்ப்புள்ளது என அறிவேன். அதற்கு இரத்தம் ஏற்றும் நிலை வரலாம் என அறிவேன். அவ்வாறு ஏற்றும் இரத்தத்தினால் ஒவ்வாமை ஏற்பட வாய்ப்புள்ளது என அறிவேன். மேலும் கால் / கைக்கு இரத்த ஓட்டம் இல்லாமல் கால் / கை கருகும் நிலை வரலாம் என அறிவேன்.',
-    'மேலும், கிருமித் தொற்று ஏற்பட்டு கால் / கை சீழ்பிடித்து அழுகும் நிலை வரலாம் என அறிவேன். அதற்கு கால் / கையைத் தக்க நிலையில் வெட்டி அகற்றும் நிலை வரலாம் என அறிவேன்.',
-    'மேலும், நரம்புகள் சேதம் அடைந்து கால் / கை உணர்ச்சியற்றோ மற்றும் செயல் இழந்து போகவோ வாய்ப்புள்ளது என அறிவேன்.',
-    'மேலும், ' + CF_IMPL + ' கொண்டு அறுவை சிகிச்சை செய்யும் போது எனது கை / கால் எலும்புகள் உடைய வாய்ப்புள்ளது என அறிவேன். அதனைப் பொருத்த இயலாத நிலை வரலாம் என அறிவேன். அறுவை சிகிச்சைக்குப் பின்னர் எலும்புகள் கூடாமல் போகவும் வாய்ப்புள்ளது என அறிவேன். மேலும் எலும்பில் பொருத்திய உலோகம் உடைய வாய்ப்புள்ளது என அறிவேன். தேவைப்பட்டால் மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.',
-    'மேலும், அறுவை சிகிச்சைக்குப் பின்னர் ஆழ்சிரை இரத்த உறைவு (DVT), இரத்தத்தில் கிருமித் தொற்று ஏற்படுதல் (SEPTICAEMIA) மற்றும் எலும்புகளில் சீழ்பிடித்தல் (OSTEOMYELITIS) போன்ற பல சிக்கல்கள் ஏற்பட வாய்ப்புள்ளது என அறிவேன்.',
-    'ஆகவே, இவ்வறுவை சிகிச்சை எனது பூரண சம்மதத்துடன் செய்யப்படுவதால், மேற்குறிப்பிட்ட சிக்கல்கள் ஏற்படுமாயின் அதற்கு மருத்துவரோ மருத்துவமனை நிர்வாகமோ பொறுப்பல்ல என்பதை ஒப்புக்கொள்கிறேன்.',
-  ];
-  function consents(cases, draft, meta = {}) {
-    const blank = '<span class="cf-blank"></span>';
-    const val = (v) => (String(v || '').trim() ? esc(up(v)) : blank);
-    const page = (c) => `
-      <section class="cf-page">
-        <h1 class="cf-title">எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்${c.standby ? ' <small>(STANDBY)</small>' : ''}</h1>
-        <table class="cf-box">
-          <tr><th>பெயர் <span>/ NAME</span></th><td>${val(c.name)}</td><th>வயது / பாலினம்</th><td>${val(ageSex(c))}</td></tr>
-          <tr><th>உள்நோயாளி எண் <span>/ IP NO</span></th><td>${val(c.ipNo)}</td><th>வார்டு <span>/ WARD</span></th><td>${val(c.ward)}</td></tr>
-        </table>
-        <p class="cf-p">நான் அரசு இராசாசி மருத்துவமனையில் ${c.doa ? `${esc(fmtDate(c.doa))} அன்று ` : ''}அனுமதிக்கப்பட்டேன். ${CONSENT_PARAS[0]}</p>
-        <div class="cf-dx"><b>Δ :</b> ${val(c.diagnosis)}</div>
-        <div class="cf-dx"><b>PLAN :</b> ${val(c.plan)}</div>
-        ${CONSENT_RISK_PARAS.map((t) => `<p class="cf-p">${t}</p>`).join('')}
-        <div class="cf-end">
-          <div class="cf-date">நாள் : ${esc(fmtDate(draft.date))}</div>
-          <div class="cf-by">இப்படிக்கு,
-            <span class="cf-line"></span>கையொப்பம் / பெருவிரல் ரேகை
-            <span class="cf-line"></span>பெயர் &amp; உறவுமுறை</div>
-        </div>
-      </section>`;
-    go(`<div class="pr cf">${cases.map(page).join('')}</div>`, { title: `CONSENT ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`.replace(/\s+/g, ' '), page: 'A4 portrait', margin: '12mm', noHeader: true });
+  // The unit's own templates (js/consent.js), drawn exactly as on the phone PDF: one A4 page per case.
+  async function consents(cases, draft) {
+    await ConsentForm.fontsReady();
+    const pages = cases.map((c) => {
+      const cv = ConsentForm.page(c, draft);
+      const url = cv.toDataURL('image/jpeg', 0.92);
+      cv.width = cv.height = 0;
+      return `<img class="cf-img" src="${url}" alt="">`;
+    });
+    go(`<div class="pr cf">${pages.join('')}</div>`, { title: `CONSENT ${draft.unit || ''} ${fmtDate(draft.date).replace(/\//g, '')}`.replace(/\s+/g, ' '), page: 'A4 portrait', margin: '0' });
   }
 
-  return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, consents, OT_COLUMNS, otTitle, CONSENT_PARAS, CONSENT_RISK_PARAS };
+  return { otList, wardBoard, discharge, chart, imagesPdf, otXrays, consents, OT_COLUMNS, otTitle };
 })();
 
 // Shared with the on-screen ward view.
