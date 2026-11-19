@@ -879,6 +879,9 @@ const DC_RULES = [
   [/HUMERUS/, 'limb', 'UPPER LIMB', 'U-SLAB'],
   [/DISTAL (END )?(OF )?(THE )?RADIUS|COLLES|SMITH|BARTON|WRIST|SCAPHOID|CARPAL|METACARPAL|PHALAN|THUMB|FINGER|\bHAND\b|STYLOID/, 'limb', 'UPPER LIMB', 'BELOW ELBOW SLAB'],
   [/RADIUS/, 'limb', 'UPPER LIMB', 'ABOVE ELBOW SLAB'],
+  // distal femur keeps the AK slab; a fixed femur shaft gets none (bed rest instead — see dcRegions)
+  [/DISTAL FEMUR|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR|INTERCONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR|FEMORAL CONDYLE|CONDYLE (OF )?(THE )?FEMUR|HOFFA/, 'limb', 'LOWER LIMB', 'ABOVE KNEE SLAB'],
+  [/FEMUR|FEMORAL/, 'limb', 'LOWER LIMB', 'ABOVE KNEE SLAB', 'femur'],
   [/FEMUR|FEMORAL|TROCHANTER|\bNOF\b|TIBIA|FIBULA|PLATEAU|KNEE|\bLEG\b|\bBBFL\b|\bHIP\b/, 'limb', 'LOWER LIMB', 'ABOVE KNEE SLAB'],
 ];
 const DC_POWER_LEVELS = ['C5', 'C6', 'C7', 'C8', 'T1', 'L2', 'L3', 'L4', 'L5', 'S1'];
@@ -897,8 +900,10 @@ function dcRegions(c, d = {}) {
     const [, part, limb, usual, tag] = rule;
     const side = part === 'limb' ? sideIn(seg) || sideIn(dx) : '';
     if (out.some((r) => r.part === part && r.limb === limb && r.side === side)) continue; // one block per part and side
-    const none = (tag === 'hip' && fixed) || (replaced && part === 'limb' && limb === 'LOWER LIMB');
-    out.push({ part, limb, side, splint: none ? 'NONE' : usual, hip: tag === 'hip' });
+    // after fixation: femur shaft and pelvis / acetabulum → no slab or binder, bed rest instead
+    const bed = fixed && (tag === 'femur' || part === 'pelvis');
+    const none = (tag === 'hip' && fixed) || (replaced && part === 'limb' && limb === 'LOWER LIMB') || bed;
+    out.push({ part, limb, side, splint: none ? 'NONE' : usual, hip: tag === 'hip', bed });
   }
   return out;
 }
@@ -962,6 +967,7 @@ const DC_MOB = {
   fingers: ['ACTIVE FINGER MOVEMENTS', 'விரல்களை அடிக்கடி அசைத்துக் கொண்டே இருக்கவும்.'],
   noLift: ['AVOID LIFTING WEIGHTS WITH THE OPERATED LIMB', 'அறுவை சிகிச்சை செய்த கையால் எடை தூக்க வேண்டாம்.'],
   pelvisNwb: ['NON-WEIGHT BEARING ON THE AFFECTED SIDE WITH WALKER SUPPORT', 'வாக்கர் உதவியுடன், அடிபட்ட பக்கக் காலில் எடை போடாமல் நடக்கவும்.'],
+  bedRest: ['BED REST', 'படுக்கையில் முழு ஓய்வு எடுக்கவும்.'],
   spineMob: ['GRADUAL SITTING AND WALKING WITH BRACE AS ADVISED', 'கொடுக்கப்பட்ட பட்டையை அணிந்து, அறிவுறுத்தியபடி மெதுவாக அமர்ந்து நடக்கப் பழகவும்.'],
 };
 function dcPostopAdvice(c, d = {}) {
@@ -972,8 +978,10 @@ function dcPostopAdvice(c, d = {}) {
   const arthroplasty = /HEMIARTHROPLASTY|BIPOLAR|AUSTIN MOORE|THOMPSON|\bTHR\b|TOTAL HIP/.test(proc);
   if (/\bTKR\b|TOTAL KNEE/.test(proc)) { add('fwbWalker'); add('kneeRom'); add('quads'); }
   if (regs.some((r) => r.hip) && arthroplasty) { add('fwbWalker'); add('hipPrec'); add('quads'); }
-  if (regs.some((r) => r.part === 'limb' && r.limb === 'LOWER LIMB') && !arthroplasty && !/\bTKR\b|TOTAL KNEE/.test(proc)) { add('nwbWalker'); add('quads'); add('elevate'); }
-  if (regs.some((r) => r.part === 'pelvis')) { add('pelvisNwb'); add('quads'); }
+  const bed = regs.some((r) => r.bed); // fixed femur shaft or pelvis / acetabulum
+  if (bed) { add('bedRest'); add('quads'); }
+  if (!bed && regs.some((r) => r.part === 'limb' && r.limb === 'LOWER LIMB') && !arthroplasty && !/\bTKR\b|TOTAL KNEE/.test(proc)) { add('nwbWalker'); add('quads'); add('elevate'); }
+  if (!bed && regs.some((r) => r.part === 'pelvis')) { add('pelvisNwb'); add('quads'); }
   if (regs.some((r) => r.part === 'limb' && r.limb === 'UPPER LIMB')) { add('fingers'); add('noLift'); add('elevate'); }
   if (regs.some((r) => r.part === 'spine')) add('spineMob');
   return out;
