@@ -340,7 +340,7 @@ const ConsentForm = (() => {
     font(10); y += 16 * PT; center('எலும்பு முறிவு சிகிச்சைத் துறை — Department of Orthopaedics', y);
     font(12, 700); y += 19 * PT;
     {
-      const t = `${tpl.title} — Informed Consent${c.standby ? '  (STANDBY)' : ''}`;
+      const t = `${tpl.title} — ${tpl.spine ? 'High Risk ' : ''}Informed Consent${c.standby ? '  (STANDBY)' : ''}`;
       for (let fs = 12; fs > 8 && g.measureText(t).width > CW; fs -= 0.25) font(fs, 700); // fit the page width
       center(t, y);
     }
