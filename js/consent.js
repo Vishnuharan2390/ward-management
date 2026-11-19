@@ -118,14 +118,24 @@ function consentExitFracture(c) {
   if (String(c.exitBone || '').trim()) return `${c.exitBone.trim()}${/முறிவு\s*$/.test(c.exitBone) ? '' : ' எலும்பு முறிவு'}`;
   return consentExitBone(c);
 }
-function consentExitImplant(c) {
-  if (String(c.exitImplant || '').trim()) return c.exitImplant;
-  for (const t of [c.plan, c.diagnosis, c.implants]) {
+// The implant in the unit's Tamil words, from the first text that names one.
+function consentImplantTa(...texts) {
+  for (const t of texts) {
     const u = String(t || '').toUpperCase();
     const parts = CONSENT_IMPLANT_PARTS.filter(([, re]) => re.test(u)).map(([, , ta]) => ta);
     if (parts.length) return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} மற்றும் ${parts.at(-1)}`;
   }
   return '';
+}
+const consentTyped = (c) => String(c.consentImplant || c.exitImplant || '').trim();
+// Implant exit: what is in the bone now.
+function consentExitImplant(c) {
+  return consentTyped(c) || consentImplantTa(c.plan, c.diagnosis, c.implants);
+}
+// Every other form: what the operation will use ("____ கொண்டு அறுவை சிகிச்சை"); the plan as written
+// if it names no implant (e.g. debridement).
+function consentProcImplant(c) {
+  return consentTyped(c) || consentImplantTa(c.plan, c.implants) || c.plan || '';
 }
 
 // Which form: chosen on the OT list (c.consentTpl), else from the diagnosis, then the plan.
@@ -152,13 +162,129 @@ function consentKind(c) {
 
 // The screws named in the spine forms' "____ செலுத்தும் போது" blank (left blank if not known).
 function consentScrews(c) {
-  const t = String(`${c.implants || ''} ${c.plan || ''}`).toUpperCase();
-  const m = /(PEDICLE|LATERAL MASS|TRANSARTICULAR|ODONTOID|CERVICAL|LAG)\s+SCREWS?/.exec(t);
-  if (m) return `${m[1]} SCREW`;
-  if (/\bPSF\b|PEDICLE|POSTERIOR STABILI[SZ]ATION|\bTLIF\b|\bPLIF\b/.test(t)) return 'PEDICLE SCREW';
-  if (/\bACDF\b|ANTERIOR CERVICAL/.test(t)) return 'PLATE AND SCREW';
-  return '';
+  const t = String(`${c.consentImplant || ''} ${c.implants || ''} ${c.plan || ''}`).toUpperCase();
+  return /SCREW|திருகாணி|\bPSF\b|PEDICLE|POSTERIOR STABILI[SZ]ATION|\bTLIF\b|\bPLIF\b|\bACDF\b|ANTERIOR CERVICAL|LATERAL MASS|FIXATION/.test(t) ? 'திருகாணி' : '';
 }
+
+// ---- Patient's name in Tamil script: c.nameTa if typed on the OT list, else a phonetic guess.
+const TA_V = { a: ['அ', ''], aa: ['ஆ', 'ா'], i: ['இ', 'ி'], ii: ['ஈ', 'ீ'], ee: ['ஈ', 'ீ'], u: ['உ', 'ு'], uu: ['ஊ', 'ூ'], oo: ['ஊ', 'ூ'],
+  e: ['எ', 'ெ'], E: ['ஏ', 'ே'], ae: ['ஏ', 'ே'], ai: ['ஐ', 'ை'], ay: ['ஐ', 'ை'], o: ['ஒ', 'ொ'], O: ['ஓ', 'ோ'], au: ['ஔ', 'ௌ'], ou: ['ஔ', 'ௌ'] };
+const TA_C = [['ksh', 'க்ஷ'], ['sh', 'ஷ'], ['ch', 'ச'], ['th', 'த'], ['dh', 'த'], ['zh', 'ழ'], ['kh', 'க'], ['gh', 'க'], ['bh', 'ப'], ['ph', 'ப'], ['jh', 'ஜ'],
+  ['k', 'க'], ['g', 'க'], ['c', 'க'], ['j', 'ஜ'], ['t', 'ட'], ['d', 'ட'], ['n', 'ன'], ['m', 'ம'], ['p', 'ப'], ['b', 'ப'], ['y', 'ய'], ['r', 'ர'],
+  ['l', 'ல'], ['v', 'வ'], ['w', 'வ'], ['s', 'ச'], ['h', 'ஹ'], ['f', 'ப'], ['z', 'ஜ'], ['x', 'க்ஸ'], ['q', 'க']];
+const TA_LETTER = { A: 'ஏ', B: 'பி', C: 'சி', D: 'டி', E: 'ஈ', F: 'எஃப்', G: 'ஜி', H: 'ஹெச்', I: 'ஐ', J: 'ஜே', K: 'கே', L: 'எல்', M: 'எம்', N: 'என்', O: 'ஓ',
+  P: 'பி', Q: 'க்யூ', R: 'ஆர்', S: 'எஸ்', T: 'டி', U: 'யு', V: 'வி', W: 'டபிள்யு', X: 'எக்ஸ்', Y: 'ஒய்', Z: 'இசட்' };
+function taWord(w, { initial = true, end = true } = {}) {
+  if (initial && /^[A-Z]$/i.test(w)) return TA_LETTER[w.toUpperCase()] + '.'; // initials
+  if (/^(sri|shri|sree)$/i.test(w)) return 'ஸ்ரீ';
+  const s = w.toLowerCase().replace(/[^a-z]/g, '').replace(/i(?=[aou])/g, 'iy');
+  const isV = (ch) => /[aeiou]/.test(ch || '');
+  let out = '';
+  let i = 0;
+  let cons = null; // pending consonant (Tamil) waiting for its vowel
+  const flush = () => { if (cons) { out += cons + '்'; cons = null; } };
+  while (i < s.length) {
+    // vowel?
+    let v = ['aa', 'ai', 'ay', 'au', 'ou', 'ee', 'ii', 'oo', 'uu', 'ae'].find((x) => s.startsWith(x, i) && !(x === 'ay' && isV(s[i + 2])));
+    if (!v && isV(s[i])) {
+      v = s[i];
+      // e / o: long before a single consonant, short before a cluster
+      if (v === 'e' || v === 'o') {
+        const rest = s.slice(i + 1);
+        const c1 = TA_C.find(([k]) => rest.startsWith(k));
+        const after = c1 ? rest.slice(c1[0].length) : rest;
+        const cluster = c1 && after && !isV(after[0]) && after[0] !== 'y';
+        v = cluster ? v : v.toUpperCase();
+      }
+      if (v === 'a' && i === s.length - 1 && cons && end) v = 'aa'; // final -a is long (GEETHA → கீதா)
+    }
+    if (!v && s[i] === 'y' && cons && !isV(s[i + 1])) v = 'i'; // SAMY → சாமி
+    if (v) {
+      const len = v.length === 2 ? 2 : 1;
+      out += cons ? cons + TA_V[v][1] : TA_V[v][0];
+      cons = null;
+      i += len;
+      continue;
+    }
+    // consonant
+    flush();
+    let [k, ta] = TA_C.find(([x]) => s.startsWith(x, i));
+    const next = s.slice(i + k.length);
+    if (k === 'n') {
+      if (i === 0) ta = 'ந';
+      else if (/^(th|dh)/.test(next)) ta = 'ந';
+      else if (/^d/.test(next)) ta = 'ந';
+      else if (/^t/.test(next)) ta = 'ண';
+      else if (/^[kg]/.test(next)) ta = 'ங';
+      else if (/^[jc]/.test(next)) ta = 'ஞ';
+    }
+    if (k === 'd' && (i === 0 || /n$/.test(s.slice(0, i)))) ta = 'த';
+    if ((k === 'j' || k === 'ch') && /n$/.test(s.slice(0, i))) ta = 'ச';
+    if (k === 's' && i === 0 && !isV(next[0]) && next[0] !== 'h') ta = 'ஸ'; // SRINIVASAN
+    cons = ta;
+    i += k.length;
+  }
+  flush();
+  return out;
+}
+// Common Tamil name parts, spelt as in Tamil (phonetics alone can't know ண / ள / long vowels).
+const TA_NAMES = {
+  AMMAL: 'அம்மாள்', AMMA: 'அம்மா', APPAN: 'அப்பன்', SAMY: 'சாமி', SAMI: 'சாமி', SWAMY: 'சுவாமி', SWAMI: 'சுவாமி', KUMAR: 'குமார்', KUMARI: 'குமாரி',
+  LAKSHMI: 'லட்சுமி', LAKSMI: 'லட்சுமி', LATCHUMI: 'லட்சுமி', MEENAKSHI: 'மீனாட்சி', MEENATCHI: 'மீனாட்சி', VALLI: 'வள்ளி', DEVI: 'தேவி', RANI: 'ராணி', VANI: 'வாணி',
+  SELVAM: 'செல்வம்', SELVI: 'செல்வி', SELVA: 'செல்வ', PONNU: 'பொன்னு', PON: 'பொன்', CHINNA: 'சின்ன', PERIYA: 'பெரிய', MUNI: 'முனி', KALI: 'காளி', MARI: 'மாரி',
+  MURUGAN: 'முருகன்', MURUGESAN: 'முருகேசன்', ARUMUGAM: 'ஆறுமுகம்', SARAVANAN: 'சரவணன்', SARAVANA: 'சரவண', PERUMAL: 'பெருமாள்', KANNAN: 'கண்ணன்', KANNA: 'கண்ண',
+  KARTHIK: 'கார்த்திக்', KARTHIKEYAN: 'கார்த்திகேயன்', KARTHIKA: 'கார்த்திகா', MUTHU: 'முத்து', PANDI: 'பாண்டி', PANDIAN: 'பாண்டியன்', PANDIYAN: 'பாண்டியன்',
+  GANESH: 'கணேஷ்', GANESAN: 'கணேசன்', RAJA: 'ராஜா', RAJ: 'ராஜ்', RAJAN: 'ராஜன்', RAJU: 'ராஜு', RAMAN: 'ராமன்', RAMU: 'ராமு', RAMESH: 'ரமேஷ்', RAMASAMY: 'ராமசாமி',
+  BALU: 'பாலு', BALA: 'பாலா', GOPAL: 'கோபால்', ANAND: 'ஆனந்த்', ANANDH: 'ஆனந்த்', ANANDAN: 'ஆனந்தன்', SUNDAR: 'சுந்தர்', SUNDARAM: 'சுந்தரம்', SUNDARI: 'சுந்தரி',
+  SUBRAMANI: 'சுப்பிரமணி', SUBRAMANIAN: 'சுப்பிரமணியன்', SUBRAMANIYAN: 'சுப்பிரமணியன்', MANI: 'மணி', MANIKANDAN: 'மணிகண்டன்', SRINIVASAN: 'சீனிவாசன்', SEENIVASAN: 'சீனிவாசன்',
+  KRISHNAN: 'கிருஷ்ணன்', KRISHNA: 'கிருஷ்ணா', KRISHNAVENI: 'கிருஷ்ணவேணி', CHANDRAN: 'சந்திரன்', CHANDRA: 'சந்திரா', SANTHI: 'சாந்தி', SHANTHI: 'சாந்தி', LATHA: 'லதா',
+  GEETHA: 'கீதா', SUDHA: 'சுதா', VIJAYA: 'விஜயா', VIJAY: 'விஜய்', PRIYA: 'பிரியா', DHANA: 'தன', DHANAM: 'தனம்', KAMALA: 'கமலா', KANNAMMA: 'கண்ணம்மா', PANDIAMMAL: 'பாண்டியம்மாள்',
+  VELU: 'வேலு', VEL: 'வேல்', SEKAR: 'சேகர்', SEKARAN: 'சேகரன்', MOORTHY: 'மூர்த்தி', MURTHY: 'மூர்த்தி', NATHAN: 'நாதன்', VEERA: 'வீர', VEERAN: 'வீரன்', KARUPPU: 'கருப்பு',
+  KARUPPASAMY: 'கருப்பசாமி', KARUPPAIAH: 'கருப்பையா', AIAH: 'ையா', IAH: 'ையா', AYYA: 'ையா', IYA: 'ையா', SIVA: 'சிவ', SIVAN: 'சிவன்', SAKTHI: 'சக்தி', SHAKTHI: 'சக்தி',
+  JOTHI: 'ஜோதி', JYOTHI: 'ஜோதி', MAHESWARI: 'மகேஸ்வரி', ESWARI: 'ஈஸ்வரி', ESWARAN: 'ஈஸ்வரன்', PARVATHI: 'பார்வதி', SAROJA: 'சரோஜா', VASANTHA: 'வசந்தா', VASANTHI: 'வசந்தி',
+  ALAGU: 'அழகு', AZHAGU: 'அழகு', ALAGAR: 'அழகர்', PANCHAVARNAM: 'பஞ்சவர்ணம்', POOJA: 'பூஜா', MOHAN: 'மோகன்', MADHAVAN: 'மாதவன்', NAGARAJ: 'நாகராஜ்', NAGARAJAN: 'நாகராஜன்',
+  GOVINDAN: 'கோவிந்தன்', GOVINDARAJ: 'கோவிந்தராஜ்', ARUN: 'அருண்', ARUNA: 'அருணா', KAVITHA: 'கவிதா', DEEPA: 'தீபா', ANBU: 'அன்பு', ANBALAGAN: 'அன்பழகன்', THANGAM: 'தங்கம்',
+  THANGA: 'தங்க', JOHN: 'ஜான்', MARY: 'மேரி', JOSEPH: 'ஜோசப்', ABDUL: 'அப்துல்', RAHMAN: 'ரஹ்மான்', MOHAMMED: 'முகமது', MOHAMED: 'முகமது', MUHAMMAD: 'முகமது', OF: 'ஆஃப்', MUTHAIAH: 'முத்தையா', MUTHUKUMAR: 'முத்துக்குமார்', SUGUNA: 'சுகுணா', JAYA: 'ஜெயா', JAYAKUMAR: 'ஜெயக்குமார்', RAMAIAH: 'ராமையா', BABY: 'பேபி', BABU: 'பாபு',
+};
+// Split a word into known parts (fewest letters left to guess), guess the rest phonetically.
+function taNameWord(w) {
+  if (/^[A-Z]$/i.test(w)) return taWord(w);
+  const s = w.toUpperCase().replace(/[^A-Z]/g, '');
+  if (!s) return '';
+  const n = s.length;
+  const best = Array(n + 1).fill(null);
+  best[0] = { cost: 0, parts: [] };
+  for (let i = 0; i < n; i++) {
+    if (!best[i]) continue;
+    for (let j = n; j > i; j--) {
+      const piece = s.slice(i, j);
+      const known = TA_NAMES[piece];
+      const cost = best[i].cost + (known ? 0 : j - i);
+      if (known === undefined && j - i > 1) continue; // unknown text goes one letter at a time
+      if (!best[j] || cost < best[j].cost) best[j] = { cost, parts: [...best[i].parts, known ? { ta: known } : { en: piece }] };
+    }
+  }
+  // merge the guessed letters into runs and convert each run
+  const runs = [];
+  for (const p of best[n].parts) {
+    if (p.en && runs.length && runs.at(-1).en !== undefined) runs.at(-1).en += p.en;
+    else runs.push({ ...p });
+  }
+  let out = '';
+  runs.forEach((r, k) => {
+    let ta = r.ta ?? taWord(r.en, { initial: false, end: k === runs.length - 1 });
+    // joining: a part starting with a vowel after one ending in a vowel sign (காளி + அம்மாள் → காளியம்மாள்)
+    const V = { 'அ': '', 'ஆ': 'ா', 'இ': 'ி', 'ஈ': 'ீ', 'உ': 'ு', 'ஊ': 'ூ', 'எ': 'ெ', 'ஏ': 'ே', 'ஐ': 'ை', 'ஒ': 'ொ', 'ஓ': 'ோ' };
+    if (out && V[ta[0]] !== undefined && /்$/.test(out)) { out = out.slice(0, -1); ta = V[ta[0]] + ta.slice(1); } // வீர் + அம்மாள் → வீரம்மாள்
+    else if (out && V[ta[0]] !== undefined) ta = 'ய' + V[ta[0]] + ta.slice(1);
+    else if (out && /^[ாிீுூெேைொோ]/.test(ta) && /்$/.test(out)) out = out.slice(0, -1); // "ையா" after a consonant
+    else if (out && /^[ாிீுூெேைொோ]/.test(ta)) ta = 'ய' + ta;
+    out += ta;
+  });
+  return out;
+}
+const taName = (name) => String(name || '').trim().split(/[\s.]+/).filter(Boolean).map(taNameWord).join(' ');
+const consentNameTa = (c) => String(c.nameTa || '').trim() || taName(c.name);
 
 const ConsentForm = (() => {
   const DPI = 200;
@@ -237,7 +363,7 @@ const ConsentForm = (() => {
       });
       y += rh;
     };
-    box([['பெயர் / Name', c.name, CW]]);
+    box([['பெயர் / Name', `${consentNameTa(c)}${c.name ? ` / ${c.name}` : ''}`, CW]]);
     const sexW = (CW) * 0.36;
     const ipW = CW * 0.3;
     box([['வயது / Age', c.age, CW - sexW - ipW], ['பாலினம் / Sex', c.sex === 'M' ? 'MALE' : c.sex === 'F' ? 'FEMALE' : c.sex, sexW], ['IP No.', c.ipNo, ipW]]);
@@ -248,7 +374,7 @@ const ConsentForm = (() => {
     // Body: justified, first-line indent; blanks filled in bold + underline.
     const lh = pt * PT * 1.5;
     const indent = 10 * MM;
-    const fills = { NAME: c.name, PROC: c.plan, SCREW: consentScrews(c), FRACTURE: consentExitFracture(c), IMPLANT: consentExitImplant(c) };
+    const fills = { NAME: consentNameTa(c), PROC: consentProcImplant(c), SCREW: consentScrews(c), FRACTURE: consentExitFracture(c), IMPLANT: consentExitImplant(c) };
     const width = (tk) => {
       font(pt, tk.fill ? 700 : 400);
       return (tk.blank ? tk.blank * MM + (tk.t ? g.measureText(tk.t).width : 0) : g.measureText(tk.t).width);
@@ -358,5 +484,5 @@ const ConsentForm = (() => {
     return cv;
   }
 
-  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, exitBone: consentExitBone, fracture: consentExitFracture, exitImplant: consentExitImplant, label: (c) => CONSENT_TPLS[consentKind(c)].label };
+  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, exitBone: consentExitBone, fracture: consentExitFracture, exitImplant: consentExitImplant, procImplant: consentProcImplant, nameTa: consentNameTa, label: (c) => CONSENT_TPLS[consentKind(c)].label };
 })();
