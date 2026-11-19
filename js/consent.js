@@ -472,10 +472,10 @@ const ConsentForm = (() => {
     y += 1.5 * MM;
     const right = (text, yy) => g.fillText(text, M + CW - g.measureText(text).width, yy);
     const rows = minor
-      ? [['சாட்சி கையொப்பம் / Witness Signature', 'பெற்றோர் / பாதுகாவலர் கையொப்பம்', 700], ['பெயர் / Name:', 'Parent / Guardian Signature', 400], ['உறவுமுறை / Relation:', 'பெயர் & உறவுமுறை / Name & Relation:', 400]]
+      ? [['சாட்சி கையொப்பம் / Witness Signature', 'பெற்றோர் / பாதுகாவலர் கையொப்பம்', 700], ['', 'Parent / Guardian Signature', 400]]
       : tpl.spine
-      ? [['சாட்சி / Witness', 'நோயாளி / Patient', 700], ['பெயர் / Name:', 'பெயர் / Name:', 400], ['கையொப்பம் / பெருவிரல் ரேகை', 'கையொப்பம் / பெருவிரல் ரேகை', 400]]
-      : [['சாட்சி கையொப்பம் / Witness Signature', 'நோயாளியின் கையொப்பம் / Patient Signature', 700], ['பெயர் / Name:', '(கையொப்பம் / கைரேகை)', 400], ['உறவுமுறை / Relation:', '', 400]];
+      ? [['சாட்சி / Witness', 'நோயாளி / Patient', 700], ['கையொப்பம் / பெருவிரல் ரேகை', 'கையொப்பம் / பெருவிரல் ரேகை', 400]]
+      : [['சாட்சி கையொப்பம் / Witness Signature', 'நோயாளியின் கையொப்பம் / Patient Signature', 700], ['', '(கையொப்பம் / கைரேகை)', 400]];
     for (const [l, r, wgt] of rows) {
       font(spt, wgt);
       g.fillText(l, M, y + spt * PT);
