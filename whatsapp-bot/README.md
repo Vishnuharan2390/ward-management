@@ -91,13 +91,55 @@ isn't verified).
 
 ---
 
+## Sending the OT list to fixed contacts
+
+The ward app's OT list page gets a **Send to OT contacts (N)** button. One tap → the bot sends the
+OT list PDF from its WhatsApp number to every contact in the app's **Settings → WhatsApp the OT list to**.
+Only signed-in team members can make it send (the bot checks with their own ward-app sign-in), and
+the contact list can only be changed in Settings.
+
+Needs B and C above done (the webhook in D and the bot's login in A are only for case intake).
+
+### F. The OT list template (10 min, then wait for Meta's approval — usually minutes, sometimes hours)
+A business number can only message someone first with a template Meta has approved.
+1. **business.facebook.com → WhatsApp Manager → Message templates → Create template.**
+2. Category **Utility**. Name **`ot_list`**. Language **English**.
+3. **Header: Document.**
+4. **Body:** `Please find the {{1}} attached.` For the sample value type `OT LIST UNIT I 20-11-2026`.
+5. Submit. When it shows **Active**, carry on.
+
+WhatsApp charges a small fee per template message (Utility rate for India — see Meta's pricing
+page), so the WhatsApp Business account needs a payment method (**WhatsApp Manager → Payment settings**).
+
+### G. Tell the bot about it (5 min)
+1. Cloudflare worker → **Edit code** → paste the new **`worker-paste.js`** → **Deploy**.
+2. **Settings → Variables and Secrets → Add:**
+   | Name | Type | Value |
+   |---|---|---|
+   | `OT_TEMPLATE` | Text | `ot_list` |
+   | `OT_TEMPLATE_LANG` | Text | `en` (the language code the template shows, e.g. `en` or `en_US`) |
+
+   Make sure `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `FIREBASE_PROJECT_ID` and `FIREBASE_UNIT_ID`
+   from C are there too.
+
+### H. In the ward app
+**Settings → Unit & letterhead:**
+- **WhatsApp the OT list to:** the numbers, separated by commas (10-digit numbers get 91 added).
+- **WhatsApp bot address:** the worker's address, e.g. `https://ward-whatsapp-bot.<you>.workers.dev`.
+
+The button appears on the OT list page. If a number fails, the app says which and why (e.g. not on
+WhatsApp, or the template isn't approved yet).
+
+---
+
 ## Patient data
-Posts go WhatsApp (Meta) → this Cloudflare worker → your own Firebase. Nothing else, and no AI
+Posts go WhatsApp (Meta) → this Cloudflare worker → your own Firebase. The OT list goes the other
+way: ward app → this worker → WhatsApp (Meta) → the contacts. Nothing else, and no AI
 service, unless you add the optional Anthropic key for the chat part.
 
 ## For developers
 - `src/index.js` webhook + case intake (+ optional Claude chat) · `src/caseparse.js` the post reader
-  (keep in step with the app's `js/wa-import.js`) · `src/firestore.js` writes cases/images like the app.
+  (keep in step with the app's `js/wa-import.js`) · `src/firestore.js` writes cases/images like the app · `src/otsend.js` the OT list sender (`/send-ot`).
 - `npm test` runs the tests with fake WhatsApp / Firebase / Claude servers.
 - `worker-paste.js` is the bundled worker for the dashboard: rebuild it after any change with
   `npx wrangler deploy --dry-run --outdir dist --minify && cp dist/index.js worker-paste.js`.

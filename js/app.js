@@ -2067,6 +2067,14 @@ const App = (() => {
     show(cur);
   }
 
+  // OT list contacts for the WhatsApp bot (Settings): 10-digit numbers get 91 in front.
+  const otWaNumbers = () => [...new Set(String(Store.meta.otWaNumbers || '').split(/[,;\n]+/).map((p) => {
+    let d = p.replace(/\D/g, '');
+    if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+    return d.length === 10 ? '91' + d : d;
+  }).filter((d) => d.length >= 11 && d.length <= 15))];
+  const otWaReady = () => Store.mode === 'firebase' && /^https:\/\//.test(String(Store.meta.waBotUrl || '')) && otWaNumbers().length > 0;
+
   // ---------------------------------------------------------------- OT builder
   const OT_KEY = 'wm.v1.otDraft';
   function otDraft() {
@@ -2218,6 +2226,7 @@ const App = (() => {
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
             <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>WhatsApp OT list PDF</button>
+            ${otWaReady() ? `<button class="btn wa" id="ot-wa-bot" ${sel.length ? '' : 'disabled'} title="${esc(otWaNumbers().join(', '))}">Send to OT contacts (${otWaNumbers().length})</button>` : ''}
             <button class="btn" id="ot-mail" ${sel.length ? '' : 'disabled'} title="${esc(Store.meta.otEmail ? 'To ' + Store.meta.otEmail : 'Set the address in Settings')}">Email OT list PDF</button>
             <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op imaging PDF (X-ray, CT, MRI)</button>
             <button class="btn" id="ot-consent" ${sel.length ? '' : 'disabled'}>Consent forms (Tamil)</button>
@@ -2428,6 +2437,33 @@ const App = (() => {
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
       $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); SharePdf.ot(cases, dd); };
+      // The unit's WhatsApp bot sends the PDF to the OT contacts in Settings.
+      const waBot = $('#ot-wa-bot', el);
+      if (waBot) waBot.onclick = async () => {
+        const nums = otWaNumbers();
+        if (!confirm(`Send the OT list PDF on WhatsApp to ${nums.length} contact${nums.length === 1 ? '' : 's'}?\n\n${nums.join('\n')}`)) return;
+        const [cases, dd] = build();
+        waBot.disabled = true;
+        toast('Sending the OT list on WhatsApp…', 15000);
+        try {
+          const file = SharePdf.otPdf(cases, dd);
+          const pdf = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
+          const token = await Store.idToken();
+          if (!token) throw new Error('Sign in first');
+          const r = await fetch(Store.meta.waBotUrl.replace(/\/+$/, '') + '/send-ot', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pdf, filename: file.name, title: file.name.replace(/\.pdf$/i, '') }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(j.error || `the bot answered ${r.status}`);
+          const bad = (j.results || []).filter((x) => !x.ok);
+          toast(bad.length ? `Sent to ${j.sent} of ${j.total}. Not sent: ${bad.map((x) => `${x.to} (${x.error})`).join('; ')}` : `✓ OT list sent on WhatsApp to ${j.sent} contact${j.sent === 1 ? '' : 's'}`, bad.length ? 9000 : 4000);
+        } catch (e) {
+          toast(`Couldn't send on WhatsApp: ${e.message}${navigator.onLine ? '' : ' (no network)'}`, 7000);
+        }
+        waBot.disabled = false;
+      };
       $('#ot-mail', el).onclick = () => {
         const to = String(Store.meta.otEmail || '').trim();
         if (!to) return toast('Add the OT list email address in Settings first', 4000);
@@ -3514,6 +3550,8 @@ const App = (() => {
             <label>Unit<select name="unitId">${opts(UNITS.map((u) => [u.id, 'UNIT ' + u.id]), m.unitId)}</select></label>
             <label>Ortho OPD no.<input name="opd" value="${esc(m.opd)}"></label>
             <label class="span2" data-nocaps>Email the OT list to<input type="email" name="otEmail" value="${esc(m.otEmail)}" placeholder="name@example.com" autocomplete="off"></label>
+            <label class="span2" data-nocaps>WhatsApp the OT list to (sent from the unit's WhatsApp bot)<textarea name="otWaNumbers" rows="2" placeholder="98765 43210, 98123 45678" autocomplete="off">${esc(m.otWaNumbers || '')}</textarea></label>
+            <label class="span2" data-nocaps>WhatsApp bot address<input type="url" name="waBotUrl" value="${esc(m.waBotUrl || '')}" placeholder="https://ward-whatsapp-bot.….workers.dev" autocomplete="off"></label>
             <div class="span2 muted small">Chief: ${esc(unitOf(m.unitId).chief)} · Asst. Profs: ${esc(unitOf(m.unitId).aps.join(', '))}</div>
             <label class="span2">Institution<input name="institution" value="${esc(m.institution)}"></label>
             <label class="span2">Department<input name="department" value="${esc(m.department)}"></label>

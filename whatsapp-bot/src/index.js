@@ -8,6 +8,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { parseCaseText, defaultPlanFor, caseKey, admissionDay, parseDoaCommand, STANDARD_TREATMENT } from './caseparse.js';
 import { createDoc, patchDoc, uid } from './firestore.js';
+import { sendOt } from './otsend.js';
 
 const HISTORY_TURNS = 20; // messages kept per chat (user + assistant)
 const HISTORY_TTL = 12 * 3600; // forget a chat after 12 h of silence
@@ -25,6 +26,7 @@ How to reply:
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/send-ot') return sendOt(request, env);
     if (url.pathname !== '/webhook') return new Response('ward-whatsapp-bot', { status: 200 });
 
     // Meta's one-time webhook check.

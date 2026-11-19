@@ -480,6 +480,8 @@ const Store = (() => {
     localCaseCount: () => Object.keys(localLeftovers().cases).length,
     uploadLocal,
     signOut: () => fb && fb.authM.signOut(fb.auth),
+    // The signed-in person's Firebase ID token (for the WhatsApp bot to check they are on the team).
+    idToken: () => (fb?.auth.currentUser ? fb.auth.currentUser.getIdToken() : Promise.resolve(null)),
     create, patch, remove,
     addImage, getImage, deleteImage,
     saveOffline, pruneOffline,
