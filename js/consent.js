@@ -489,9 +489,6 @@ const ConsentForm = (() => {
     font(spt, 700);
     center("மருத்துவரின் கையொப்பம் / Doctor's Signature", y + spt * PT);
     y += slh;
-    font(spt);
-    center('பெயர் & பதவி / Name & Designation:', y + spt * PT);
-    y += slh;
     return y;
   }
 
