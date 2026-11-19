@@ -312,7 +312,17 @@ const ConsentForm = (() => {
   const PT = DPI / 72;
   const SERIF = '"Noto Serif Tamil", "Tamil Sangam MN", "Latha", "Nirmala UI", "Noto Sans Tamil", serif';
 
+  // The discharge summary's letterhead (Settings → Unit & letterhead), loaded before drawing.
+  let lhImg = null;
+  let lhSrc = '';
+  async function letterhead() {
+    const src = (typeof Store !== 'undefined' && Store.meta?.letterhead) || 'assets/letterhead.jpg';
+    if (lhImg && lhSrc === src) return;
+    lhSrc = src;
+    lhImg = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
+  }
   async function fontsReady() {
+    await letterhead().catch(() => {});
     try {
       await Promise.race([
         Promise.all(['400', '700'].map((w) => document.fonts.load(`${w} 20px "Noto Serif Tamil"`, 'அ'))),
@@ -351,9 +361,17 @@ const ConsentForm = (() => {
     g.strokeStyle = '#000';
     let y = 10 * MM;
 
-    // Header
-    font(14, 700); y += 14 * PT; center('அரசு இராசாசி மருத்துவமனை, மதுரை', y);
-    font(10); y += 16 * PT; center('எலும்பு முறிவு சிகிச்சைத் துறை — Department of Orthopaedics and Traumatology', y);
+    // Header: the same letterhead as the discharge summary (24 mm tall, centred, at most 80% wide)
+    if (lhImg) {
+      let hh = 24 * MM;
+      let w = lhImg.width * (hh / lhImg.height);
+      if (w > CW * 0.8) { w = CW * 0.8; hh = lhImg.height * (w / lhImg.width); }
+      g.drawImage(lhImg, (W - w) / 2, y, w, hh);
+      y += hh;
+    } else {
+      font(14, 700); y += 14 * PT; center('அரசு இராசாசி மருத்துவமனை, மதுரை', y);
+      font(10); y += 16 * PT; center('எலும்பு முறிவு சிகிச்சைத் துறை — Department of Orthopaedics and Traumatology', y);
+    }
     font(12, 700); y += 19 * PT;
     {
       const t = `${tpl.title} — ${tpl.spine ? 'High Risk ' : ''}Informed Consent${c.standby ? '  (STANDBY)' : ''}`;
