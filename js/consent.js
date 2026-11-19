@@ -24,15 +24,15 @@ const CONSENT_LIMB_OPEN = (limb) => `{NAME} ஆகிய எனக்கு அ�
 
 const CONSENT_TPLS = {
   upper: {
-    label: 'Upper limb', bone: 'கை', spine: false, title: 'அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்',
+    label: 'Upper limb', bone: 'கை', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [CONSENT_LIMB_OPEN('கை'), ...CONSENT_LIMB_RISKS('கை', 'கைக்கு', 'கையைத்')],
   },
   lower: {
-    label: 'Lower limb', bone: 'கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்',
+    label: 'Lower limb', bone: 'கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [CONSENT_LIMB_OPEN('கால்'), ...CONSENT_LIMB_RISKS('கால்', 'காலுக்கு', 'காலைத்')],
   },
   cervical: {
-    label: 'Cervical spine', bone: 'கழுத்து', spine: true, title: 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    label: 'Cervical spine', bone: 'கழுத்து', spine: true, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [
       '{NAME} ஆகிய எனக்கு அடிபட்டு அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதித்த மருத்துவர்கள், கழுத்து தண்டுவடத்தில் அடிபட்டு அதனால் கைகள், கால்கள் செயல் இழந்து போனது என்றும், இதற்கு {PROC} கொண்டு அறுவை சிகிச்சை செய்ய வேண்டும் என்றும் கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
       CONSENT_ANAES_SPINE + ' மேலும் செயற்கை சுவாசத்தில் இருந்து வெளியே வரமுடியாத நிலை வரலாம் என்றும், கழுத்தில் துளையிட்டு சுவாசக் குழாய் பொருத்தும் நிலை வரலாம் என்றும் அறிவேன்.',
@@ -43,7 +43,7 @@ const CONSENT_TPLS = {
     ],
   },
   dorsolumbar: {
-    label: 'Dorsolumbar spine', bone: 'முதுகு', spine: true, title: 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    label: 'Dorsolumbar spine', bone: 'முதுகு', spine: true, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [
       '{NAME} ஆகிய எனக்கு அடிபட்டு அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதித்த மருத்துவர்கள், முதுகு தண்டுவடத்தில் அடிபட்டு அதனால் கால்கள் செயல் இழந்து போனது என்றும், இதற்கு {PROC} கொண்டு அறுவை சிகிச்சை செய்ய வேண்டும் என்றும் கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
       CONSENT_ANAES_SPINE,
@@ -339,7 +339,11 @@ const ConsentForm = (() => {
     font(14, 700); y += 14 * PT; center('அரசு இராசாசி மருத்துவமனை, மதுரை', y);
     font(10); y += 16 * PT; center('எலும்பு முறிவு சிகிச்சைத் துறை — Department of Orthopaedics', y);
     font(12, 700); y += 19 * PT;
-    center(`${tpl.title}${tpl.spine ? ' — High Risk Consent' : ''}${c.standby ? '  (STANDBY)' : ''}`, y);
+    {
+      const t = `${tpl.title} — Informed Consent${c.standby ? '  (STANDBY)' : ''}`;
+      for (let fs = 12; fs > 8 && g.measureText(t).width > CW; fs -= 0.25) font(fs, 700); // fit the page width
+      center(t, y);
+    }
     y += 3 * MM;
 
     // Details box: Name / Age, Sex, IP No / Diagnosis / Plan
