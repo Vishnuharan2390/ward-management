@@ -377,6 +377,47 @@ function opTodoChanges(c, text, who) {
   return ch;
 }
 
+// ---- Rounds review: what earlier rounds asked for that is still open ----
+// Investigation lines are dated when first written (c.invAsked: { 'CBC': time }); lines from before
+// this was kept count as earlier.
+const dayStart = (iso = todayISO()) => new Date(iso + 'T00:00:00').getTime();
+const invLines = (c) => String(c.invTodo || '').split('\n').map((l) => l.trim().toUpperCase()).filter(Boolean);
+function invAskedNext(c, text) {
+  const before = invLines(c);
+  const old = c.invAsked || {};
+  const now = Date.now();
+  const lines = String(text || '').split('\n').map((l) => l.trim().toUpperCase()).filter(Boolean);
+  return Object.fromEntries(lines.map((l) => [l, old[l] || (before.includes(l) && !c.invAsked ? 1 : now)]));
+}
+// Which result boxes an investigation line asks for (null = a written report).
+const invParamOf = (k) => ALL_PARAMS.find((p) => p.k === k);
+const INV_PARAMS = [
+  [/\bCBC\b|COMPLETE BLOOD|\bHB\b|HAEMOGRAM|HEMOGRAM/, ['hb', 'wbc', 'plt']],
+  [/\bRFT\b|RENAL FUNCTION|UREA|CREAT/, ['rbs', 'urea', 'creat', 'na', 'k']],
+  [/ELECTROLYTE|\bNA\b|\bK\b/, ['na', 'k']],
+  [/\b(RBS|GRBS|BLOOD SUGAR|SUGAR)\b/, ['rbs']],
+  [/\bLFT\b|LIVER FUNCTION|BILI/, ['tbili', 'dbili', 'ibili', 'sgot', 'sgpt', 'alp']],
+  [/\bESR\b.*\bCRP\b|\bCRP\b.*\bESR\b/, ['esr', 'crp']],
+  [/\bESR\b/, ['esr']],
+  [/\bQ?CRP\b/, ['crp']],
+  [/\bVM\b|VIRAL MARKER|HBSAG|\bHCV\b/, ['hbsag', 'hcv']],
+  [/\bVCTC\b|\bHIV\b|\bICTC\b/, ['hiv']],
+];
+function invParams(line) {
+  const hit = INV_PARAMS.find(([re]) => re.test(line));
+  return hit ? hit[1].map(invParamOf).filter(Boolean) : null;
+}
+// Everything asked before today and not yet answered: investigations, opinions, other to-dos.
+function earlierTodos(c) {
+  const t0 = dayStart();
+  const asked = c.invAsked || {};
+  return [
+    ...invLines(c).filter((l) => !(asked[l] >= t0)).map((l) => ({ kind: 'inv', key: l, line: l, at: asked[l] > 1 ? asked[l] : null, params: invParams(l) })),
+    ...listOf(c.opinions).filter((o) => !hasText(o.note) && (o.at || 0) < t0).map((o) => ({ kind: 'op', key: o.id, line: opLine(o), at: o.at || null })),
+    ...listOf(c.tasks).filter((t) => !t.done && (t.at || 0) < t0).map((t) => ({ kind: 'task', key: t.id, line: taskLine(t), at: t.at || null })),
+  ];
+}
+
 // The ward notebook's "To do's": pending opinions, investigations to repeat (the deranged
 // ones, by name only), and the to-do list. Deranged values themselves are not listed.
 function notebookTodo(c) {

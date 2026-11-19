@@ -831,6 +831,7 @@ const App = (() => {
           </div>
         </div>
         <div class="rd-dx">${esc(c.diagnosis)}</div>${bedsoreLine(c)}${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
+        ${reviewHTML(c)}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
           <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
           <div class="rd-chips">${chips('inv', post ? POST_INV_CHIPS : ROUND_INV_CHIPS)}</div></div>
@@ -843,6 +844,74 @@ const App = (() => {
       ${nav('bottom')}
       ${bedsoreHTML(c) || suggestHTML(c)}
     </div>`;
+  }
+
+  // ---- Rounds: "From earlier rounds" — yesterday's investigations, opinions and to-dos, with a place
+  // for the result: values (into today's investigation set), a report, the opinion's orders, or done.
+  const rvOpen = new Set(); // forms left open across redraws: `${caseId}|${key}`
+  function reviewHTML(c) {
+    const items = earlierTodos(c);
+    if (!items.length) return '';
+    const when = (at) => (at ? `<span class="muted small">asked ${esc(fmtDate(new Date(at).toISOString().slice(0, 10)))}</span>` : '<span class="muted small">earlier</span>');
+    const row = (x) => {
+      const id = `${c.id}|${x.key}`;
+      const open = rvOpen.has(id);
+      const btn = x.kind === 'task'
+        ? `<button type="button" class="btn small primary" data-rv-done>Done ✓</button>`
+        : `<button type="button" class="btn small${open ? '' : ' primary'}" data-rv-open>${x.kind === 'op' ? 'Enter orders' : x.params ? 'Enter values' : 'Enter report'}</button>`;
+      const form = x.kind === 'task' ? '' : `<div class="rv-form"${open ? '' : ' hidden'}>
+          ${x.params ? `<div class="lab-grid">${x.params.map((p) => paramInput(p, '')).join('')}</div>`
+            : `<textarea data-rv-text rows="2" placeholder="${x.kind === 'op' ? 'Orders given (drugs, investigations, advice)' : 'Report / result'}"></textarea>`}
+          <div class="form-actions"><button type="button" class="btn small primary" data-rv-save>Save</button>${x.kind === 'op' ? '<button type="button" class="btn small" data-rv-seen>Seen — no fresh orders</button>' : ''}</div>
+        </div>`;
+      return `<div class="rv-item" data-rv-kind="${x.kind}" data-rv-key="${esc(x.key)}">
+          <div class="rv-line"><b>${esc(x.line)}</b> ${when(x.at)} ${btn}</div>${form}</div>`;
+    };
+    return `<details class="rd-review" data-keep="rv-${c.id}" open>
+        <summary>From earlier rounds <span class="pill">${items.length}</span></summary>
+        ${items.map(row).join('')}
+      </details>`;
+  }
+  // Save one item. Values go into today's set (one per day: labs.rv_YYYYMMDD) so the e-case sheet's
+  // investigation table shows them; the line then leaves the Investigation box.
+  function reviewSave(caseId, kind, key, box, seen) {
+    const c = Store.cases[caseId];
+    if (!c) return;
+    const now = Date.now();
+    const who = Store.who();
+    const ch = {};
+    if (kind === 'task') {
+      Object.assign(ch, { [`tasks.${key}.done`]: true, [`tasks.${key}.doneBy`]: who, [`tasks.${key}.doneAt`]: now });
+    } else if (kind === 'op') {
+      const note = seen ? 'SEEN, NO FRESH ORDERS' : $('[data-rv-text]', box).value.trim().toUpperCase();
+      if (!note) return toast('Type the orders given (or tap Seen — no fresh orders)', 3000);
+      Object.assign(ch, { [`opinions.${key}.note`]: note, [`opinions.${key}.noteAt`]: now, [`opinions.${key}.noteBy`]: who });
+    } else {
+      const set = 'rv_' + todayISO().replace(/-/g, '');
+      const v = {};
+      const params = invParams(key);
+      if (params) {
+        $$('[name^="p_"]', box).forEach((el) => { if (el.value.trim()) v[el.name.slice(2)] = el.value.trim(); });
+        if (!Object.keys(v).length) return toast('Type at least one value', 2500);
+      } else {
+        const text = $('[data-rv-text]', box).value.trim().toUpperCase();
+        if (!text) return toast('Type the report', 2500);
+        if (/\bECHO\b/.test(key)) ch['work.echo'] = text;
+        if (/\bECG\b/.test(key)) ch['work.ecg'] = 'Taken';
+        // a written result becomes a row of the investigation table, named after the line
+        let cp = listOf(c.custom).find((x) => String(x.label).toUpperCase() === key);
+        if (!cp) { cp = { id: uid() }; ch[`custom.${cp.id}`] = { label: key, range: '', unit: '', at: now }; }
+        v['x_' + cp.id] = text;
+      }
+      if (!c.labs?.[set]) ch[`labs.${set}`] = { date: todayISO(), at: now, by: who, v };
+      else for (const [k, val] of Object.entries(v)) ch[`labs.${set}.v.${k}`] = val;
+      const rest = invLines(c).filter((l) => l !== key);
+      ch.invTodo = rest.join('\n');
+      ch.invAsked = Object.fromEntries(Object.entries(c.invAsked || {}).filter(([l]) => l !== key));
+    }
+    rvOpen.delete(`${caseId}|${key}`);
+    Store.patch('cases', caseId, ch);
+    toast(kind === 'task' ? 'Done ✓' : kind === 'op' ? 'Orders saved to the opinion' : 'Saved to the investigations', 2500);
   }
 
   function makeWard(kind) {
@@ -1082,6 +1151,20 @@ const App = (() => {
           }
           return;
         }
+        // From earlier rounds: open a result form / save it / mark done
+        const rv = e.target.closest('[data-rv-open],[data-rv-save],[data-rv-done],[data-rv-seen]');
+        if (rv) {
+          const item = rv.closest('[data-rv-key]');
+          const cid = rv.closest('[data-nbcase]').dataset.nbcase;
+          const { rvKind, rvKey } = item.dataset;
+          if (rv.dataset.rvOpen !== undefined) {
+            const form = $('.rv-form', item);
+            form.hidden = !form.hidden;
+            if (form.hidden) rvOpen.delete(`${cid}|${rvKey}`); else { rvOpen.add(`${cid}|${rvKey}`); $('input,select,textarea', form)?.focus(); }
+            return;
+          }
+          return reviewSave(cid, rvKind, rvKey, item, rv.dataset.rvSeen !== undefined);
+        }
         // Quick-tap chip: add the line to the box and save it.
         const add = e.target.closest('[data-add]');
         if (add) {
@@ -1186,7 +1269,7 @@ const App = (() => {
         const f = t.dataset.nb;
         if (!id || !f || !Store.cases[id]) return;
         const c = { id, ...Store.cases[id] };
-        if (f === 'inv') Store.patch('cases', id, { invTodo: t.value.trim().toUpperCase() });
+        if (f === 'inv') Store.patch('cases', id, { invTodo: t.value.trim().toUpperCase(), invAsked: invAskedNext(c, t.value) });
         else if (f === 'bed') Store.patch('cases', id, { bed: t.value.trim().toUpperCase() });
         else if (f === 'procedureDone') Store.patch('cases', id, { procedureDone: t.value.trim().toUpperCase() });
         else if (f === 'op') {

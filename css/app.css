@@ -1686,3 +1686,14 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 /* App name: Callus · Ortho Unit I */
 .brand-sub { font-weight: 400; opacity: .65; }
 @media (max-width: 380px) { .brand-sub { display: none; } }
+
+/* Rounds: from earlier rounds */
+.rd-review { margin: .6rem 0; padding: .5rem .7rem; border: 1px solid var(--line, #444); border-radius: .6rem; background: rgba(255, 200, 0, .06); }
+.rd-review summary { font-weight: 700; cursor: pointer; }
+.rv-item { padding: .45rem 0; border-top: 1px dashed var(--line, #444); }
+.rv-item:first-of-type { border-top: 0; }
+.rv-line { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
+.rv-line .btn { margin-left: auto; }
+.rv-form { margin-top: .4rem; }
+.rv-form textarea { width: 100%; }
+.rv-form .lab-grid { margin-bottom: .3rem; }
