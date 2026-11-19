@@ -60,64 +60,70 @@ const consentIsExit = (c) => CONSENT_EXIT_RE.test(String(c?.plan || '').toUpperC
 const CONSENT_EXIT_PARA = (bone) => `மேலும், எலும்பில் பொருத்திய உலோகத்தை நீக்கும் போது, அதனை முழுமையாக நீக்க இயலாத நிலை வரலாம் என அறிவேன். உலோகம் அல்லது திருகாணி உடைந்து அதன் ஒரு பகுதி எலும்பிலேயே தங்கிவிட வாய்ப்புள்ளது என அறிவேன். மேலும் உலோகத்தை நீக்கும் போதோ அல்லது நீக்கிய பின்னரோ எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். அவ்வாறு உடைந்தால் அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`;
 
 // Implant exit, first paragraph: which bone was broken, what was put in, and that it now has to come out.
-const CONSENT_EXIT_OPEN = '{NAME} ஆகிய நான் அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். எனக்கு ஏற்கனவே {BONE} எலும்பு முறிவு ஏற்பட்டு, அதற்கு {IMPLANT} பொருத்தி அறுவை சிகிச்சை செய்யப்பட்டது. என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எலும்பில் பொருத்திய உலோகத்தை நீக்க வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.';
+// {FRACTURE} and {IMPLANT} are written in Tamil; a box typed on the OT list is used as typed.
+const CONSENT_EXIT_OPEN = (fracture) => `{NAME} ஆகிய நான் அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். எனக்கு ஏற்கனவே {FRACTURE}${fracture ? '' : ' எலும்பு முறிவு'} ஏற்பட்டு, அதற்கு {IMPLANT} பொருத்தி அறுவை சிகிச்சை செய்யப்பட்டது. என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எலும்பில் பொருத்திய உலோகத்தை நீக்க வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.`;
+// [pattern, Tamil, English in brackets]
 const CONSENT_BONES = [
-  [/NECK (OF )?(THE )?FEMUR|FEMORAL NECK|\bNOF\b/, 'NECK OF FEMUR'],
-  [/INTER\s*TROCHANTER|\bIT (FRACTURE|FEMUR)\b/, 'INTERTROCHANTERIC FEMUR'],
-  [/SUB\s*TROCHANTER/, 'SUBTROCHANTERIC FEMUR'],
-  [/DISTAL FEMUR|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR/, 'DISTAL FEMUR'],
-  [/FEMUR|FEMORAL/, 'FEMUR'],
-  [/TIBIAL PLATEAU|PROXIMAL TIBIA/, 'PROXIMAL TIBIA'],
-  [/PILON|PLAFOND|DISTAL TIBIA/, 'DISTAL TIBIA'],
-  [/BOTH BONES?( OF)?( THE)? LEG|\bBBFL\b/, 'BOTH BONES LEG'],
-  [/TIBIA/, 'TIBIA'],
-  [/MALLEOL|ANKLE/, 'ANKLE'],
-  [/FIBULA/, 'FIBULA'],
-  [/PATELLA/, 'PATELLA'],
-  [/CALCAN/, 'CALCANEUM'],
-  [/METATARSAL/, 'METATARSAL'],
-  [/ACETABUL/, 'ACETABULUM'],
-  [/PELVI/, 'PELVIS'],
-  [/CLAVICLE/, 'CLAVICLE'],
-  [/PROXIMAL HUMER|SURGICAL NECK/, 'PROXIMAL HUMERUS'],
-  [/DISTAL HUMER|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?HUMER|INTERCONDYLAR/, 'DISTAL HUMERUS'],
-  [/HUMER/, 'HUMERUS'],
-  [/OLECRANON/, 'OLECRANON'],
-  [/BOTH BONES?( OF)?( THE)? FOREARM|\bBBFA\b/, 'BOTH BONES FOREARM'],
-  [/DISTAL RADIUS|DISTAL END (OF )?RADIUS|COLLES|SMITH|BARTON/, 'DISTAL RADIUS'],
-  [/RADIUS|RADIAL/, 'RADIUS'],
-  [/ULNA/, 'ULNA'],
-  [/METACARPAL/, 'METACARPAL'],
-  [/SCAPHOID/, 'SCAPHOID'],
+  [/NECK (OF )?(THE )?FEMUR|FEMORAL NECK|\bNOF\b/, 'இடுப்புப் பகுதியில் தொடை எலும்பு', 'NECK OF FEMUR'],
+  [/INTER\s*TROCHANTER|\bIT (FRACTURE|FEMUR)\b/, 'இடுப்புப் பகுதியில் தொடை எலும்பு', 'INTERTROCHANTERIC'],
+  [/SUB\s*TROCHANTER/, 'இடுப்புக்குக் கீழ் தொடை எலும்பு', 'SUBTROCHANTERIC'],
+  [/DISTAL FEMUR|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR/, 'முழங்காலுக்கு மேல் தொடை எலும்பு', 'DISTAL FEMUR'],
+  [/FEMUR|FEMORAL/, 'தொடை எலும்பு', 'FEMUR'],
+  [/TIBIAL PLATEAU|PROXIMAL TIBIA/, 'முழங்காலுக்குக் கீழ் கால் எலும்பு', 'PROXIMAL TIBIA'],
+  [/PILON|PLAFOND|DISTAL TIBIA/, 'கணுக்காலுக்கு மேல் கால் எலும்பு', 'DISTAL TIBIA'],
+  [/BOTH BONES?( OF)?( THE)? LEG|\bBBFL\b/, 'காலின் இரண்டு எலும்புகளிலும்', 'BOTH BONES LEG'],
+  [/TIBIA/, 'கால் முன்னெலும்பு', 'TIBIA'],
+  [/MALLEOL|ANKLE/, 'கணுக்கால் எலும்பு', 'ANKLE'],
+  [/FIBULA/, 'கால் வெளி எலும்பு', 'FIBULA'],
+  [/PATELLA/, 'முழங்கால் சில்லு எலும்பு', 'PATELLA'],
+  [/CALCAN/, 'குதிகால் எலும்பு', 'CALCANEUM'],
+  [/METATARSAL/, 'பாத எலும்பு', 'METATARSAL'],
+  [/ACETABUL/, 'இடுப்புக் கிண்ண எலும்பு', 'ACETABULUM'],
+  [/PELVI/, 'இடுப்பு எலும்பு', 'PELVIS'],
+  [/CLAVICLE/, 'காறை எலும்பு', 'CLAVICLE'],
+  [/PROXIMAL HUMER|SURGICAL NECK/, 'தோள்பட்டை அருகே மேற்கை எலும்பு', 'PROXIMAL HUMERUS'],
+  [/DISTAL HUMER|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?HUMER|INTERCONDYLAR/, 'முழங்கைக்கு மேல் மேற்கை எலும்பு', 'DISTAL HUMERUS'],
+  [/HUMER/, 'மேற்கை எலும்பு', 'HUMERUS'],
+  [/OLECRANON/, 'முழங்கை எலும்பு', 'OLECRANON'],
+  [/BOTH BONES?( OF)?( THE)? FOREARM|\bBBFA\b/, 'முன்கையின் இரண்டு எலும்புகளிலும்', 'BOTH BONES FOREARM'],
+  [/DISTAL RADIUS|DISTAL END (OF )?RADIUS|COLLES|SMITH|BARTON/, 'மணிக்கட்டு அருகே முன்கை எலும்பு', 'DISTAL RADIUS'],
+  [/RADIUS|RADIAL/, 'முன்கை எலும்பு', 'RADIUS'],
+  [/ULNA/, 'முன்கை எலும்பு', 'ULNA'],
+  [/METACARPAL/, 'உள்ளங்கை எலும்பு', 'METACARPAL'],
+  [/SCAPHOID/, 'மணிக்கட்டு எலும்பு', 'SCAPHOID'],
+  [/\bHIP\b/, 'இடுப்புப் பகுதியில் தொடை எலும்பு', 'HIP'],
 ];
-const CONSENT_IMPLANTS = [
-  [/\bPFNA?\b|PROXIMAL FEMORAL NAIL/, 'PFN'],
-  [/\bDHS\b|DYNAMIC HIP/, 'DHS'],
-  [/\bDCS\b/, 'DCS'],
-  [/\bTENS\b|ELASTIC NAIL/, 'TENS NAILS'],
-  [/ILIM|IMIL|\bIMN\b|INTRAMEDULLARY|INTERLOCK|\bNAIL/, 'INTRAMEDULLARY INTERLOCKING NAIL'],
-  [/\bTBW\b|TENSION BAND/, 'TENSION BAND WIRING'],
-  [/\bCC\s*SCREW|CANNULATED/, 'CANNULATED SCREWS'],
-  [/PEDICLE|\bPSF\b/, 'PEDICLE SCREWS AND RODS'],
-  [/EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|ILIZAROV|\bLRS\b/, 'EXTERNAL FIXATOR'],
-  [/PLATE|PLATING|\bLCP\b|\bDCP\b/, 'PLATE AND SCREWS'],
-  [/K[\s-]?WIRE/, 'K-WIRES'],
-  [/SCREW/, 'SCREWS'],
-];
-const consentSide = (t) => (/\b(BILATERAL|B\/L)\b/.test(t) ? 'BILATERAL ' : /\b(LEFT|LT)\b/.test(t) ? 'LEFT ' : /\b(RIGHT|RT)\b/.test(t) ? 'RIGHT ' : '');
+const consentSideTa = (t) => (/\b(BILATERAL|B\/L)\b/.test(t) ? 'இரண்டு பக்க ' : /\b(LEFT|LT)\b/.test(t) ? 'இடது ' : /\b(RIGHT|RT)\b/.test(t) ? 'வலது ' : '');
+// e.g. "வலது தொடை எலும்பு (FEMUR) முறிவு"
 function consentExitBone(c) {
   if (String(c.exitBone || '').trim()) return c.exitBone;
   const dx = String(c.diagnosis || '').toUpperCase();
-  const vert = /\b([CDTL]\d{1,2})\b/.exec(dx);
-  if (vert) return `${vert[1]} VERTEBRA`;
+  const vert = /\b([CDTL])(\d{1,2})\b/.exec(dx);
+  if (vert) return `${vert[1] === 'C' ? 'கழுத்து' : 'முதுகுத்தண்டு'} எலும்பு (${vert[0]}) முறிவு`;
   const hit = CONSENT_BONES.find(([re]) => re.test(dx));
-  return hit ? consentSide(dx) + hit[1] : '';
+  if (!hit) return '';
+  const [, ta, en] = hit;
+  return `${consentSideTa(dx)}${ta} (${en}) முறிவு`;
+}
+// The unit's words: உள்புறக் கம்பி (nail, rod, K-wire), வெளிப்புறக் கம்பி (ex-fix), திருகாணி (screw),
+// உலோகத்தினால் ஆன செயற்கை மூட்டு (arthroplasty), தகடு (plate).
+const CONSENT_IMPLANT_PARTS = [
+  ['joint', /ARTHROPLASTY|BIPOLAR|AUSTIN MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTKR\b|TOTAL HIP|TOTAL KNEE|PROSTHES/, 'உலோகத்தினால் ஆன செயற்கை மூட்டு'],
+  ['exfix', /EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|ILIZAROV|\bLRS\b|FIXATOR/, 'வெளிப்புறக் கம்பி'],
+  ['plate', /PLATE|PLATING|\bLCP\b|\bDCP\b|\bDHS\b|\bDCS\b|DYNAMIC HIP/, 'தகடு'],
+  ['rod', /NAIL|ILIM|IMIL|\bIMN\b|\bPFNA?\b|\bTENS\b|INTRAMEDULLARY|\bRODS?\b|K[\s-]?WIRE|\bTBW\b|TENSION BAND|\bWIRES?\b|PEDICLE|\bPSF\b/, 'உள்புறக் கம்பி'],
+  ['screw', /SCREW|\bCC\b|CANNULATED|PLATE|PLATING|\bLCP\b|\bDCP\b|\bDHS\b|\bDCS\b|\bPFNA?\b|ILIM|IMIL|INTERLOCK|PEDICLE|\bPSF\b|BOLT/, 'திருகாணி'],
+];
+function consentExitFracture(c) {
+  if (String(c.exitBone || '').trim()) return `${c.exitBone.trim()}${/முறிவு\s*$/.test(c.exitBone) ? '' : ' எலும்பு முறிவு'}`;
+  return consentExitBone(c);
 }
 function consentExitImplant(c) {
   if (String(c.exitImplant || '').trim()) return c.exitImplant;
   for (const t of [c.plan, c.diagnosis, c.implants]) {
-    const hit = CONSENT_IMPLANTS.find(([re]) => re.test(String(t || '').toUpperCase()));
-    if (hit) return hit[1];
+    const u = String(t || '').toUpperCase();
+    const parts = CONSENT_IMPLANT_PARTS.filter(([, re]) => re.test(u)).map(([, , ta]) => ta);
+    if (parts.length) return parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} மற்றும் ${parts.at(-1)}`;
   }
   return '';
 }
@@ -242,13 +248,13 @@ const ConsentForm = (() => {
     // Body: justified, first-line indent; blanks filled in bold + underline.
     const lh = pt * PT * 1.5;
     const indent = 10 * MM;
-    const fills = { NAME: c.name, PROC: c.plan, SCREW: consentScrews(c), BONE: consentExitBone(c), IMPLANT: consentExitImplant(c) };
+    const fills = { NAME: c.name, PROC: c.plan, SCREW: consentScrews(c), FRACTURE: consentExitFracture(c), IMPLANT: consentExitImplant(c) };
     const width = (tk) => {
       font(pt, tk.fill ? 700 : 400);
       return (tk.blank ? tk.blank * MM + (tk.t ? g.measureText(tk.t).width : 0) : g.measureText(tk.t).width);
     };
     const exit = consentIsExit(c);
-    const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
+    const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN(consentExitFracture(c)) : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
     for (const p of paras) {
       const tks = tokens(p, fills);
       const lines = [];
@@ -352,5 +358,5 @@ const ConsentForm = (() => {
     return cv;
   }
 
-  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, exitBone: consentExitBone, exitImplant: consentExitImplant, label: (c) => CONSENT_TPLS[consentKind(c)].label };
+  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, exitBone: consentExitBone, fracture: consentExitFracture, exitImplant: consentExitImplant, label: (c) => CONSENT_TPLS[consentKind(c)].label };
 })();
