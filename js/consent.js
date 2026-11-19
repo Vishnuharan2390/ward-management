@@ -224,6 +224,15 @@ const ConsentForm = (() => {
       y += 1.6 * MM;
     }
 
+    // Three ruled lines for anything added by hand (above the signatures, so it is signed for).
+    g.fillStyle = '#555';
+    for (let i = 0; i < 3; i++) {
+      y += 8 * MM;
+      g.fillRect(M, y, CW, Math.max(1.5, PT * 0.45));
+    }
+    g.fillStyle = '#000';
+    y += 1 * MM;
+
     // Date, "இப்படிக்கு," and the two signature blocks
     const spt = 10;
     const slh = spt * PT * 1.45;
