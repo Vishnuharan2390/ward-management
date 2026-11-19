@@ -215,14 +215,13 @@ const SharePdf = (() => {
   }
 
   // Phone: share sheet (pick WhatsApp). Computer / browsers without file sharing: download it.
+  // Resolves when the share sheet closes (sent or cancelled), or at once after a download.
   function send(file) {
     let ok = false;
     try { ok = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch { ok = false; }
-    if (ok) {
-      navigator.share({ files: [file], title: file.name }).catch((e) => { if (e.name !== 'AbortError') download(file); });
-      return;
-    }
+    if (ok) return navigator.share({ files: [file], title: file.name }).catch((e) => { if (e.name !== 'AbortError') download(file); });
     download(file);
+    return Promise.resolve();
   }
   function download(file, msg) {
     const a = document.createElement('a');
@@ -252,5 +251,6 @@ const SharePdf = (() => {
     ot: (cases, draft, twice = false) => send(otPdf(cases, draft, twice)),
     otEmail: (cases, draft, to) => email(otPdf(cases, draft), to, draft),
     wardPdf, pendingPdf, otPdf,
+    share: send,
   };
 })();

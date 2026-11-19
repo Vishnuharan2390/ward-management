@@ -2226,7 +2226,7 @@ const App = (() => {
             <button class="btn primary" id="ot-go" ${sel.length ? '' : 'disabled'}>Generate OT list PDF</button>
             <button class="btn primary" id="ot-go2" ${sel.length ? '' : 'disabled'}>Generate OT list print PDF</button>
             <button class="btn wa" id="ot-wa" ${sel.length ? '' : 'disabled'}>WhatsApp OT list PDF</button>
-            ${otWaReady() ? `<button class="btn wa" id="ot-wa-bot" ${sel.length ? '' : 'disabled'} title="${esc(otWaNumbers().join(', '))}">Send to OT contacts (${otWaNumbers().length})</button>` : ''}
+            ${otWaReady() ? `<button class="btn wa" id="ot-wa-bot" ${sel.length ? '' : 'disabled'} title="${esc(otWaNumbers().join(', '))}">WhatsApp group + OT contacts (${otWaNumbers().length})</button>` : ''}
             <button class="btn" id="ot-mail" ${sel.length ? '' : 'disabled'} title="${esc(Store.meta.otEmail ? 'To ' + Store.meta.otEmail : 'Set the address in Settings')}">Email OT list PDF</button>
             <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op imaging PDF (X-ray, CT, MRI)</button>
             <button class="btn" id="ot-consent" ${sel.length ? '' : 'disabled'}>Consent forms (Tamil)</button>
@@ -2439,14 +2439,17 @@ const App = (() => {
       $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); SharePdf.ot(cases, dd); };
       // The unit's WhatsApp bot sends the PDF to the OT contacts in Settings.
       const waBot = $('#ot-wa-bot', el);
+      // One tap: the share sheet first (iPhone only opens it straight from a tap) to pick the group,
+      // then the bot sends the same PDF to the OT contacts.
       if (waBot) waBot.onclick = async () => {
         const nums = otWaNumbers();
-        if (!confirm(`Send the OT list PDF on WhatsApp to ${nums.length} contact${nums.length === 1 ? '' : 's'}?\n\n${nums.join('\n')}`)) return;
         const [cases, dd] = build();
+        const file = SharePdf.otPdf(cases, dd);
+        await SharePdf.share(file);
+        if (!confirm(`Also send it from the unit's WhatsApp bot to the ${nums.length} OT contact${nums.length === 1 ? '' : 's'}?\n\n${nums.join('\n')}`)) return;
         waBot.disabled = true;
-        toast('Sending the OT list on WhatsApp…', 15000);
+        toast('Sending to the OT contacts…', 15000);
         try {
-          const file = SharePdf.otPdf(cases, dd);
           const pdf = await new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(file); });
           const token = await Store.idToken();
           if (!token) throw new Error('Sign in first');
