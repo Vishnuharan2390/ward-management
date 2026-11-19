@@ -57,7 +57,70 @@ const CONSENT_TPLS = {
 // Implant exit: the implant paragraph is about removing it, not fixing the bone.
 const CONSENT_EXIT_RE = /IMPLANT\s*(EXIT|REMOVAL)|HARDWARE\s*REMOVAL|REMOVAL\s+OF\s+(THE\s+)?(IMPLANTS?|HARDWARE|PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|EXTERNAL\s+FIXATOR|JESS)|\b(PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|FIXATOR|JESS|IMPLANTS?)\s+(EXIT|REMOVAL)\b|\bROI\b/;
 const consentIsExit = (c) => CONSENT_EXIT_RE.test(String(c?.plan || '').toUpperCase());
-const CONSENT_EXIT_PARA = (bone) => `மேலும், எலும்பில் பொருத்தப்பட்டுள்ள உலோகத்தை அகற்றும் போது, அதனை முழுமையாக அகற்ற இயலாத நிலை வரலாம் என அறிவேன். உலோகம் அல்லது திருகாணி உடைந்து அதன் ஒரு பகுதி எலும்பிலேயே தங்கிவிட வாய்ப்புள்ளது என அறிவேன். மேலும் உலோகத்தை அகற்றும் போதோ அல்லது அகற்றிய பின்னரோ எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். அவ்வாறு உடைந்தால் அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`;
+const CONSENT_EXIT_PARA = (bone) => `மேலும், எலும்பில் பொருத்திய உலோகத்தை நீக்கும் போது, அதனை முழுமையாக நீக்க இயலாத நிலை வரலாம் என அறிவேன். உலோகம் அல்லது திருகாணி உடைந்து அதன் ஒரு பகுதி எலும்பிலேயே தங்கிவிட வாய்ப்புள்ளது என அறிவேன். மேலும் உலோகத்தை நீக்கும் போதோ அல்லது நீக்கிய பின்னரோ எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். அவ்வாறு உடைந்தால் அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`;
+
+// Implant exit, first paragraph: which bone was broken, what was put in, and that it now has to come out.
+const CONSENT_EXIT_OPEN = '{NAME} ஆகிய நான் அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். எனக்கு ஏற்கனவே {BONE} எலும்பு முறிவு ஏற்பட்டு, அதற்கு {IMPLANT} பொருத்தி அறுவை சிகிச்சை செய்யப்பட்டது. என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எலும்பில் பொருத்திய உலோகத்தை நீக்க வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.';
+const CONSENT_BONES = [
+  [/NECK (OF )?(THE )?FEMUR|FEMORAL NECK|\bNOF\b/, 'NECK OF FEMUR'],
+  [/INTER\s*TROCHANTER|\bIT (FRACTURE|FEMUR)\b/, 'INTERTROCHANTERIC FEMUR'],
+  [/SUB\s*TROCHANTER/, 'SUBTROCHANTERIC FEMUR'],
+  [/DISTAL FEMUR|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR/, 'DISTAL FEMUR'],
+  [/FEMUR|FEMORAL/, 'FEMUR'],
+  [/TIBIAL PLATEAU|PROXIMAL TIBIA/, 'PROXIMAL TIBIA'],
+  [/PILON|PLAFOND|DISTAL TIBIA/, 'DISTAL TIBIA'],
+  [/BOTH BONES?( OF)?( THE)? LEG|\bBBFL\b/, 'BOTH BONES LEG'],
+  [/TIBIA/, 'TIBIA'],
+  [/MALLEOL|ANKLE/, 'ANKLE'],
+  [/FIBULA/, 'FIBULA'],
+  [/PATELLA/, 'PATELLA'],
+  [/CALCAN/, 'CALCANEUM'],
+  [/METATARSAL/, 'METATARSAL'],
+  [/ACETABUL/, 'ACETABULUM'],
+  [/PELVI/, 'PELVIS'],
+  [/CLAVICLE/, 'CLAVICLE'],
+  [/PROXIMAL HUMER|SURGICAL NECK/, 'PROXIMAL HUMERUS'],
+  [/DISTAL HUMER|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?HUMER|INTERCONDYLAR/, 'DISTAL HUMERUS'],
+  [/HUMER/, 'HUMERUS'],
+  [/OLECRANON/, 'OLECRANON'],
+  [/BOTH BONES?( OF)?( THE)? FOREARM|\bBBFA\b/, 'BOTH BONES FOREARM'],
+  [/DISTAL RADIUS|DISTAL END (OF )?RADIUS|COLLES|SMITH|BARTON/, 'DISTAL RADIUS'],
+  [/RADIUS|RADIAL/, 'RADIUS'],
+  [/ULNA/, 'ULNA'],
+  [/METACARPAL/, 'METACARPAL'],
+  [/SCAPHOID/, 'SCAPHOID'],
+];
+const CONSENT_IMPLANTS = [
+  [/\bPFNA?\b|PROXIMAL FEMORAL NAIL/, 'PFN'],
+  [/\bDHS\b|DYNAMIC HIP/, 'DHS'],
+  [/\bDCS\b/, 'DCS'],
+  [/\bTENS\b|ELASTIC NAIL/, 'TENS NAILS'],
+  [/ILIM|IMIL|\bIMN\b|INTRAMEDULLARY|INTERLOCK|\bNAIL/, 'INTRAMEDULLARY INTERLOCKING NAIL'],
+  [/\bTBW\b|TENSION BAND/, 'TENSION BAND WIRING'],
+  [/\bCC\s*SCREW|CANNULATED/, 'CANNULATED SCREWS'],
+  [/PEDICLE|\bPSF\b/, 'PEDICLE SCREWS AND RODS'],
+  [/EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|ILIZAROV|\bLRS\b/, 'EXTERNAL FIXATOR'],
+  [/PLATE|PLATING|\bLCP\b|\bDCP\b/, 'PLATE AND SCREWS'],
+  [/K[\s-]?WIRE/, 'K-WIRES'],
+  [/SCREW/, 'SCREWS'],
+];
+const consentSide = (t) => (/\b(BILATERAL|B\/L)\b/.test(t) ? 'BILATERAL ' : /\b(LEFT|LT)\b/.test(t) ? 'LEFT ' : /\b(RIGHT|RT)\b/.test(t) ? 'RIGHT ' : '');
+function consentExitBone(c) {
+  if (String(c.exitBone || '').trim()) return c.exitBone;
+  const dx = String(c.diagnosis || '').toUpperCase();
+  const vert = /\b([CDTL]\d{1,2})\b/.exec(dx);
+  if (vert) return `${vert[1]} VERTEBRA`;
+  const hit = CONSENT_BONES.find(([re]) => re.test(dx));
+  return hit ? consentSide(dx) + hit[1] : '';
+}
+function consentExitImplant(c) {
+  if (String(c.exitImplant || '').trim()) return c.exitImplant;
+  for (const t of [c.plan, c.diagnosis, c.implants]) {
+    const hit = CONSENT_IMPLANTS.find(([re]) => re.test(String(t || '').toUpperCase()));
+    if (hit) return hit[1];
+  }
+  return '';
+}
 
 // Which form: chosen on the OT list (c.consentTpl), else from the diagnosis, then the plan.
 const CONSENT_RE = {
@@ -179,13 +242,13 @@ const ConsentForm = (() => {
     // Body: justified, first-line indent; blanks filled in bold + underline.
     const lh = pt * PT * 1.5;
     const indent = 10 * MM;
-    const fills = { NAME: c.name, PROC: c.plan, SCREW: consentScrews(c) };
+    const fills = { NAME: c.name, PROC: c.plan, SCREW: consentScrews(c), BONE: consentExitBone(c), IMPLANT: consentExitImplant(c) };
     const width = (tk) => {
       font(pt, tk.fill ? 700 : 400);
       return (tk.blank ? tk.blank * MM + (tk.t ? g.measureText(tk.t).width : 0) : g.measureText(tk.t).width);
     };
     const exit = consentIsExit(c);
-    const paras = tpl.paras.map((t) => (exit && /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
+    const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
     for (const p of paras) {
       const tks = tokens(p, fills);
       const lines = [];
@@ -289,5 +352,5 @@ const ConsentForm = (() => {
     return cv;
   }
 
-  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, label: (c) => CONSENT_TPLS[consentKind(c)].label };
+  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, exitBone: consentExitBone, exitImplant: consentExitImplant, label: (c) => CONSENT_TPLS[consentKind(c)].label };
 })();

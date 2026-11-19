@@ -2204,6 +2204,8 @@ const App = (() => {
                   <label>Level<select data-f="level">${levelOpts(c.level)}</select></label>
                   <label>Scheme status<select data-f="scheme">${schemeOpts(c.scheme)}</select></label>
                   <label>Anaesthesia assessment<select data-f="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
+                  ${ConsentForm.isExit(c) ? `<label>Bone that was broken (consent)<input data-f="exitBone" value="${esc(c.exitBone || '')}" placeholder="${esc(ConsentForm.exitBone({ ...c, exitBone: '' }) || 'e.g. RIGHT FEMUR')}"></label>
+                  <label>Implant in place (consent)<input data-f="exitImplant" value="${esc(c.exitImplant || '')}" placeholder="${esc(ConsentForm.exitImplant({ ...c, exitImplant: '' }) || 'e.g. PLATE AND SCREWS')}"></label>` : ''}
                   <label>Consent form<select data-f="consentTpl"><option value="">Auto (${esc(ConsentForm.label({ ...c, consentTpl: '' }))})</option>${opts(Object.entries(CONSENT_TPLS).map(([k, t]) => [k, t.label]), c.consentTpl || '')}</select></label>
                   <label class="span3">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
                   <label class="span3">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
