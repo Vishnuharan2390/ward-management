@@ -1676,3 +1676,9 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .offline-line .ok { color: var(--ok); }
 .offline-line .warn { color: var(--amber, #a86b00); }
 .viewer-msg { position: absolute; inset: auto 1rem 45%; color: #fff; background: rgba(0,0,0,.6); padding: .8rem 1rem; border-radius: .6rem; text-align: center; }
+
+/* Consent forms: check before printing */
+.cf-pop .sug-box { max-height: 85vh; overflow: auto; }
+.cf-row { display: grid; gap: .35rem; padding: .6rem 0; border-top: 1px solid var(--line, #ddd); }
+.cf-row label { display: grid; gap: .15rem; font-size: .85rem; }
+.cf-row input, .cf-row select { width: 100%; font-family: "Noto Sans Tamil", inherit; }

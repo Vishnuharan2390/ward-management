@@ -55,7 +55,7 @@ const CONSENT_TPLS = {
 };
 
 // Implant exit: the implant paragraph is about removing it, not fixing the bone.
-const CONSENT_EXIT_RE = /IMPLANT\s*(EXIT|REMOVAL)|HARDWARE\s*REMOVAL|REMOVAL\s+OF\s+(THE\s+)?(IMPLANTS?|HARDWARE|PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|EXTERNAL\s+FIXATOR|JESS)|\b(PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|FIXATOR|JESS|IMPLANTS?)\s+(EXIT|REMOVAL)\b|\bROI\b/;
+const CONSENT_EXIT_RE = /IMPLANT\s*(EXIT|REMOVAL)|HARDWARE\s*REMOVAL|REMOVAL\s+OF\s+(THE\s+)?(IMPLANTS?|HARDWARE|PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|EXTERNAL\s+FIXATOR|JESS)|\b(PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|FIXATOR|JESS|LRS|ILIZAROV|IMPLANTS?)\s+(EXIT|REMOVAL)\b|\bROI\b/;
 const consentIsExit = (c) => CONSENT_EXIT_RE.test(String(c?.plan || '').toUpperCase());
 const CONSENT_EXIT_PARA = (bone) => `மேலும், எலும்பில் பொருத்திய உலோகத்தை நீக்கும் போது, அதனை முழுமையாக நீக்க இயலாத நிலை வரலாம் என அறிவேன். உலோகம் அல்லது திருகாணி உடைந்து அதன் ஒரு பகுதி எலும்பிலேயே தங்கிவிட வாய்ப்புள்ளது என அறிவேன். மேலும் உலோகத்தை நீக்கும் போதோ அல்லது நீக்கிய பின்னரோ எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். அவ்வாறு உடைந்தால் அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`;
 
@@ -109,7 +109,7 @@ function consentExitBone(c) {
 // உலோகத்தினால் ஆன செயற்கை மூட்டு (arthroplasty), தகடு (plate).
 const CONSENT_IMPLANT_PARTS = [
   ['joint', /ARTHROPLASTY|BIPOLAR|AUSTIN MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTKR\b|TOTAL HIP|TOTAL KNEE|PROSTHES/, 'உலோகத்தினால் ஆன செயற்கை மூட்டு'],
-  ['exfix', /EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|ILIZAROV|\bLRS\b|FIXATOR/, 'வெளிப்புறக் கம்பி'],
+  ['exfix', /EX\s?FIX|EXTERNAL FIXATOR|ORTHOFIX|\bJESS\b|ILIZAROV|\bLRS\b|LIMB RECONSTRUCTION|RAIL FIXATOR|FIXATOR/, 'வெளிப்புறக் கம்பி'],
   ['plate', /PLATE|PLATING|\bLCP\b|\bDCP\b|\bDHS\b|\bDCS\b|DYNAMIC HIP/, 'தகடு'],
   ['rod', /NAIL|ILIM|IMIL|\bIMN\b|\bPFNA?\b|\bTENS\b|INTRAMEDULLARY|\bRODS?\b|K[\s-]?WIRE|\bTBW\b|TENSION BAND|\bWIRES?\b|PEDICLE|\bPSF\b/, 'உள்புறக் கம்பி'],
   ['screw', /SCREW|\bCC\b|CANNULATED|PLATE|PLATING|\bLCP\b|\bDCP\b|\bDHS\b|\bDCS\b|\bPFNA?\b|ILIM|IMIL|INTERLOCK|PEDICLE|\bPSF\b|BOLT/, 'திருகாணி'],

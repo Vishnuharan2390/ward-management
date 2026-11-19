@@ -2204,11 +2204,6 @@ const App = (() => {
                   <label>Level<select data-f="level">${levelOpts(c.level)}</select></label>
                   <label>Scheme status<select data-f="scheme">${schemeOpts(c.scheme)}</select></label>
                   <label>Anaesthesia assessment<select data-f="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
-                  ${ConsentForm.isExit(c) ? `<label>Bone that was broken (consent)<input data-f="exitBone" value="${esc(c.exitBone || '')}" placeholder="${esc(ConsentForm.exitBone({ ...c, exitBone: '' }) || 'e.g. RIGHT FEMUR')}"></label>
-` : ''}
-                  <label>Name in Tamil (consent)<input data-f="nameTa" value="${esc(c.nameTa || '')}" placeholder="${esc(ConsentForm.nameTa({ ...c, nameTa: '' }))}"></label>
-                  <label>${ConsentForm.isExit(c) ? 'Implant in place' : 'Implant'} in Tamil (consent)<input data-f="consentImplant" value="${esc(c.consentImplant || c.exitImplant || '')}" placeholder="${esc((ConsentForm.isExit(c) ? ConsentForm.exitImplant : ConsentForm.procImplant)({ ...c, consentImplant: '', exitImplant: '' }) || 'தகடு மற்றும் திருகாணி')}"></label>
-                  <label>Consent form<select data-f="consentTpl"><option value="">Auto (${esc(ConsentForm.label({ ...c, consentTpl: '' }))})</option>${opts(Object.entries(CONSENT_TPLS).map(([k, t]) => [k, t.label]), c.consentTpl || '')}</select></label>
                   <label class="span3">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
                   <label class="span3">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
                   <label class="span3">Implants <button type="button" class="link small" data-refill>↻ implants & level from database</button><textarea data-f="implants" rows="2">${esc(c.implants)}</textarea></label>
@@ -2440,7 +2435,52 @@ const App = (() => {
         SharePdf.otEmail(cases, dd, to);
       };
       // Phones get a real PDF file (window.print is unreliable there); computers keep the print dialog.
-      $('#ot-consent', el).onclick = () => { const [cases, dd] = build(); if (PhonePdf.isPhone()) PhonePdf.consents(cases, dd); else Print.consents(cases, dd); };
+      // Consent forms: a quick check first (form, Tamil name, implant words), then the pages.
+      $('#ot-consent', el).onclick = () => {
+        const [cases] = build();
+        $('.cf-pop')?.remove();
+        const pop = document.createElement('div');
+        pop.className = 'sug-back cf-pop';
+        const g = (c) => ({
+          name: ConsentForm.nameTa({ ...c, nameTa: '' }),
+          imp: (ConsentForm.isExit(c) ? ConsentForm.exitImplant : ConsentForm.procImplant)({ ...c, consentImplant: '', exitImplant: '' }),
+          bone: ConsentForm.fracture({ ...c, exitBone: '' }),
+        });
+        pop.innerHTML = `<div class="sug-box card" role="dialog" aria-label="Check consent forms">
+            <h3>Check before printing</h3>
+            <p class="muted small">Tamil spelling is a guess from the English name — correct anything wrong. Changes are kept for this patient.</p>
+            ${cases.map((c) => { const x = g(c); return `<div class="cf-row" data-cf="${c.id}">
+              <div><b>${esc(c.name)}</b> <span class="muted small">${esc(c.diagnosis || '')}</span></div>
+              <label>Form<select data-cfk="consentTpl"><option value="">Auto (${esc(ConsentForm.label({ ...c, consentTpl: '' }))})</option>${opts(Object.entries(CONSENT_TPLS).map(([k, t]) => [k, t.label]), c.consentTpl || '')}</select></label>
+              <label>பெயர்<input data-cfk="nameTa" data-guess="${esc(x.name)}" value="${esc(c.nameTa || x.name)}"></label>
+              <label>${ConsentForm.isExit(c) ? 'பொருத்திய உலோகம்' : 'உலோகம்'}<input data-cfk="consentImplant" data-guess="${esc(x.imp)}" value="${esc(c.consentImplant || c.exitImplant || x.imp)}"></label>
+              ${ConsentForm.isExit(c) ? `<label>எலும்பு முறிவு<input data-cfk="exitBone" data-guess="${esc(x.bone)}" value="${esc(c.exitBone || x.bone)}"></label>` : ''}
+            </div>`; }).join('')}
+            <div class="form-actions"><button type="button" class="btn primary" data-cf-go>Make consent forms</button><button type="button" class="btn" data-cf-cancel>Cancel</button></div>
+          </div>`;
+        pop.addEventListener('click', (ev) => {
+          if (ev.target.closest('[data-cf-cancel]') || ev.target === pop) { pop.remove(); return; }
+          if (!ev.target.closest('[data-cf-go]')) return;
+          // keep only what differs from the guess, so a better guess later still applies
+          $$('[data-cf]', pop).forEach((row) => {
+            const id = row.dataset.cf;
+            const cur = Store.cases[id] || {};
+            const ch = {};
+            $$('[data-cfk]', row).forEach((f) => {
+              const k = f.dataset.cfk;
+              const v = f.value.trim();
+              const keep = f.dataset.guess !== undefined && v === f.dataset.guess ? '' : v;
+              if ((cur[k] || '') !== keep) ch[k] = keep;
+            });
+            if (cur.exitImplant && ch.consentImplant !== undefined) ch.exitImplant = '';
+            if (Object.keys(ch).length) Store.patch('cases', id, ch);
+          });
+          pop.remove();
+          const [fresh, dd] = build();
+          if (PhonePdf.isPhone()) PhonePdf.consents(fresh, dd); else Print.consents(fresh, dd);
+        });
+        document.body.appendChild(pop);
+      };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
         toast('Collecting X-rays, CT and MRI…', 8000);
