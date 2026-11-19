@@ -289,6 +289,21 @@ function taNameWord(w) {
 const taName = (name) => String(name || '').trim().split(/[\s.]+/).filter(Boolean).map(taNameWord).join(' ');
 const consentNameTa = (c) => String(c.nameTa || '').trim() || taName(c.name);
 
+// Under 18: the parent signs for "எனது மகனுக்கு / மகளுக்கு", and the patient's parts become அவன் / அவள்.
+const consentMinor = (c) => ageYears(c) < 18;
+function consentForChild(text, sex) {
+  const P = sex === 'M' ? { son: 'மகன்', dat: 'மகனுக்கு', poss: 'அவனது', him: 'அவனை', to: 'அவனுக்கு', was: 'அனுமதிக்கப்பட்டான்' }
+    : sex === 'F' ? { son: 'மகள்', dat: 'மகளுக்கு', poss: 'அவளது', him: 'அவளை', to: 'அவளுக்கு', was: 'அனுமதிக்கப்பட்டாள்' }
+    : { son: 'மகன் / மகள்', dat: 'மகன் / மகளுக்கு', poss: 'அவரது', him: 'அவரை', to: 'அவருக்கு', was: 'அனுமதிக்கப்பட்டார்' };
+  return text
+    .replace('ஆகிய எனக்கு', `ஆகிய எனது ${P.dat}`)
+    .replace('ஆகிய நான்', `ஆகிய எனது ${P.son}`)
+    .replace(/அனுமதிக்கப்பட்டேன்/g, P.was)
+    .replace(/என்னைப் /g, `${P.him}ப் `)
+    .replace(/எனது (?!மக)/g, `${P.poss} `)
+    .replace(/எனக்கு/g, P.to);
+}
+
 const ConsentForm = (() => {
   const DPI = 200;
   const W = Math.round(210 / 25.4 * DPI);
@@ -388,7 +403,9 @@ const ConsentForm = (() => {
     };
     const exit = consentIsExit(c);
     const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN(consentExitFracture(c)) : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
-    for (const p of paras) {
+    const minor = consentMinor(c);
+    for (const p0 of paras) {
+      const p = minor ? consentForChild(p0, c.sex) : p0;
       const tks = tokens(p, fills);
       const lines = [];
       let line = [];
@@ -453,7 +470,9 @@ const ConsentForm = (() => {
     rule(M + CW - bw, y, bw);
     y += 1.5 * MM;
     const right = (text, yy) => g.fillText(text, M + CW - g.measureText(text).width, yy);
-    const rows = tpl.spine
+    const rows = minor
+      ? [['சாட்சி கையொப்பம் / Witness Signature', 'பெற்றோர் / பாதுகாவலர் கையொப்பம்', 700], ['பெயர் / Name:', 'Parent / Guardian Signature', 400], ['உறவுமுறை / Relation:', 'பெயர் & உறவுமுறை / Name & Relation:', 400]]
+      : tpl.spine
       ? [['சாட்சி / Witness', 'நோயாளி / Patient', 700], ['பெயர் / Name:', 'பெயர் / Name:', 400], ['கையொப்பம் / பெருவிரல் ரேகை', 'கையொப்பம் / பெருவிரல் ரேகை', 400]]
       : [['சாட்சி கையொப்பம் / Witness Signature', 'நோயாளியின் கையொப்பம் / Patient Signature', 700], ['பெயர் / Name:', '(கையொப்பம் / கைரேகை)', 400], ['உறவுமுறை / Relation:', '', 400]];
     for (const [l, r, wgt] of rows) {
@@ -491,5 +510,5 @@ const ConsentForm = (() => {
     return cv;
   }
 
-  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, exitBone: consentExitBone, fracture: consentExitFracture, exitImplant: consentExitImplant, procImplant: consentProcImplant, nameTa: consentNameTa, label: (c) => CONSENT_TPLS[consentKind(c)].label };
+  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, minor: consentMinor, forChild: consentForChild, exitBone: consentExitBone, fracture: consentExitFracture, exitImplant: consentExitImplant, procImplant: consentProcImplant, nameTa: consentNameTa, label: (c) => CONSENT_TPLS[consentKind(c)].label };
 })();
