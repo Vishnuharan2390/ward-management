@@ -821,7 +821,7 @@ const App = (() => {
       </div>`;
     return `<div class="rounds" data-nbcase="${c.id}">
       ${nav('top')}
-      <div class="card rd-card">
+      <div class="card rd-card${W.flip ? ` flip-${W.flip > 0 ? 'next' : 'prev'}` : ''}">
         <div class="rd-head">
           <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''}</div>
             <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
@@ -858,7 +858,7 @@ const App = (() => {
       const open = rvOpen.has(id);
       const btn = x.kind === 'task'
         ? `<button type="button" class="btn small primary" data-rv-done>Done ✓</button>`
-        : `${x.img ? `<label class="btn small primary">📷 Add ${esc(imageKind(x.img).label)}<input type="file" accept="image/*" multiple data-rv-img="${x.img}" hidden></label>` : ''}<button type="button" class="btn small${open || x.img ? '' : ' primary'}" data-rv-open>${x.kind === 'op' ? 'Enter orders' : x.params ? 'Enter values' : 'Enter report'}</button>`;
+        : `${x.img ? `<label class="btn small primary icon-btn" title="Take a photo (${esc(imageKind(x.img).label)})" aria-label="Take a photo">📷<input type="file" accept="image/*" capture="environment" data-rv-img="${x.img}" hidden></label><label class="btn small icon-btn" title="From the gallery (${esc(imageKind(x.img).label)})" aria-label="Pick from the gallery">🖼<input type="file" accept="image/*" multiple data-rv-img="${x.img}" hidden></label>` : ''}<button type="button" class="btn small${open || x.img ? '' : ' primary'}" data-rv-open>${x.kind === 'op' ? 'Enter orders' : x.params ? 'Enter values' : 'Enter report'}</button>`;
       const form = x.kind === 'task' ? '' : `<div class="rv-form"${open ? '' : ' hidden'}>
           ${x.params ? `<div class="lab-grid">${x.params.map((p) => paramInput(p, '')).join('')}</div>`
             : `<textarea data-rv-text rows="2" placeholder="${x.kind === 'op' ? 'Orders given (drugs, investigations, advice)' : 'Report / result'}"></textarea>`}
@@ -917,6 +917,7 @@ const App = (() => {
   // Pictures for an imaging line (X-ray / CT / MRI / wound pic): saved to the case like the e-case
   // sheet's uploads (OT list viewer, PPTs); a report typed in the open form goes too. The line is then done.
   async function reviewImages(caseId, key, kind, files, item) {
+    files = await cropAll(files);
     if (!files.length) return;
     toast(`Saving ${files.length} picture${files.length === 1 ? '' : 's'}…`, 15000);
     let n = 0;
@@ -1083,8 +1084,11 @@ const App = (() => {
       // Rounds: go to the previous / next patient (saving the box being typed in first).
       const goRound = (id) => {
         document.activeElement?.blur?.();
+        const ids = wardCases(W).map((c) => c.id);
+        W.flip = Math.sign(ids.indexOf(id) - ids.indexOf(W.roundId)); // the card flips forward / back
         W.roundId = id;
         render();
+        W.flip = 0; // a teammate's edit redrawing the card doesn't flip it again
         window.scrollTo(0, 0);
       };
       const step = (dir) => {
@@ -1480,7 +1484,7 @@ const App = (() => {
           if (!kind) return;
           const files = [...e.target.files];
           e.target.value = '';
-          for (const file of files) {
+          for (const file of await cropAll(files)) {
             try {
               pending.push({ kind, data: await compressImage(file), name: file.name.replace(/\.[^.]+$/, '') });
             } catch {
@@ -1997,7 +2001,7 @@ const App = (() => {
           } else if (t.dataset.upload) {
             const files = [...t.files];
             t.value = '';
-            for (const file of files) {
+            for (const file of await cropAll(files)) {
               try {
                 toast(`Uploading ${file.name}…`, 6000);
                 await Store.addImage(id, t.dataset.upload, await compressImage(file), file.name.replace(/\.[^.]+$/, ''));
@@ -2372,7 +2376,7 @@ const App = (() => {
           t.value = '';
           (async () => {
             let n = 0;
-            for (const file of files) {
+            for (const file of await cropAll(files)) {
               try { await Store.addImage(cid, 'xray', await compressImage(file), file.name.replace(/\.[^.]+$/, '')); n++; } catch { toast(`"${file.name}" couldn't be opened as an image. Use JPG or PNG.`, 4000); }
             }
             if (n) toast(`${n} X-ray(s) added to ${Store.cases[cid]?.name || 'the case'}`);
@@ -2405,7 +2409,7 @@ const App = (() => {
           if (!kind) return;
           const files = [...e.target.files];
           e.target.value = '';
-          for (const file of files) {
+          for (const file of await cropAll(files)) {
             try { qImgs.push({ kind, data: await compressImage(file), name: file.name.replace(/\.[^.]+$/, '') }); } catch { toast(`"${file.name}" couldn't be opened as an image. Use JPG or PNG.`, 4000); }
           }
           drawQ();
@@ -2883,7 +2887,7 @@ const App = (() => {
           Store.patch('cases', cid, m ? { age: m[1], ...(m[2] ? { sex: m[2].toUpperCase() } : {}) } : { age: t.value.trim() });
           render();
         } else if (t.dataset.dupload && cid) {
-          const files = [...t.files];
+          let files = [...t.files];
           let kind = t.dataset.dupload;
           t.value = '';
           // Custom: a new slide group per upload, with its own editable title.
@@ -2892,6 +2896,7 @@ const App = (() => {
             kind = 'custom-' + (n + 1);
           }
           (async () => {
+            files = await cropAll(files);
             const busy = $('.busy', t.closest('[data-dcase]'));
             for (let i = 0; i < files.length; i++) {
               if (busy) busy.textContent = `Adding image ${i + 1} of ${files.length}…`;
@@ -3450,7 +3455,7 @@ const App = (() => {
           if (!k) return;
           const files = [...e.target.files];
           e.target.value = '';
-          for (const file of files) {
+          for (const file of await cropAll(files)) {
             try {
               toast(`Uploading ${file.name}…`, 6000);
               await Store.addImage(id, k, await compressImage(file), file.name.replace(/\.[^.]+$/, ''));

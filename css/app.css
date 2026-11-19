@@ -1698,3 +1698,31 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .rv-form { margin-top: .4rem; }
 .rv-form textarea { width: 100%; }
 .rv-form .lab-grid { margin-bottom: .3rem; }
+
+/* Rounds: the card flips over to the next / previous patient */
+.rounds { perspective: 1400px; }
+.rd-card.flip-next { animation: rd-flip-next .45s cubic-bezier(.2, .7, .2, 1) both; transform-origin: center; backface-visibility: hidden; }
+.rd-card.flip-prev { animation: rd-flip-prev .45s cubic-bezier(.2, .7, .2, 1) both; transform-origin: center; backface-visibility: hidden; }
+@keyframes rd-flip-next { from { transform: rotateY(-95deg); opacity: .2; } 60% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
+@keyframes rd-flip-prev { from { transform: rotateY(95deg); opacity: .2; } 60% { opacity: 1; } to { transform: rotateY(0); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .rd-card.flip-next, .rd-card.flip-prev { animation: none; } }
+.icon-btn { min-width: 2.6rem; justify-content: center; font-size: 1.15rem; }
+
+/* Crop screen */
+.crop-wrap { position: fixed; inset: 0; z-index: 1000; background: #0b0b0c; color: #fff; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.crop-top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; padding: .7rem 1rem; font-size: .9rem; }
+.crop-top span { opacity: .6; font-size: .8rem; }
+.crop-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; }
+.crop-area { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.crop-area canvas { display: block; }
+.crop-box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58); outline: 2px solid #fff; cursor: move; }
+.crop-box::before, .crop-box::after { content: ''; position: absolute; inset: 33.3% 0; border-top: 1px solid rgba(255,255,255,.35); border-bottom: 1px solid rgba(255,255,255,.35); pointer-events: none; }
+.crop-box::after { inset: 0 33.3%; border: 0; border-left: 1px solid rgba(255,255,255,.35); border-right: 1px solid rgba(255,255,255,.35); }
+.crop-box i { position: absolute; width: 34px; height: 34px; z-index: 1; }
+.crop-box i::after { content: ''; position: absolute; width: 18px; height: 18px; border: 4px solid #fff; }
+.crop-box i[data-h="tl"] { left: -12px; top: -12px; cursor: nwse-resize; } .crop-box i[data-h="tl"]::after { left: 8px; top: 8px; border-right: 0; border-bottom: 0; }
+.crop-box i[data-h="tr"] { right: -12px; top: -12px; cursor: nesw-resize; } .crop-box i[data-h="tr"]::after { right: 8px; top: 8px; border-left: 0; border-bottom: 0; }
+.crop-box i[data-h="bl"] { left: -12px; bottom: -12px; cursor: nesw-resize; } .crop-box i[data-h="bl"]::after { left: 8px; bottom: 8px; border-right: 0; border-top: 0; }
+.crop-box i[data-h="br"] { right: -12px; bottom: -12px; cursor: nwse-resize; } .crop-box i[data-h="br"]::after { right: 8px; bottom: 8px; border-left: 0; border-top: 0; }
+.crop-bar { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; padding: .7rem 1rem 1rem; }
+.crop-bar .btn { min-width: 3.2rem; }
