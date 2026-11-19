@@ -1259,8 +1259,7 @@ const App = (() => {
           <nav class="chips jump" aria-label="Sections">
             <a class="chip" href="#sec-patient" data-jump>Patient</a>
             <a class="chip" href="#sec-plan" data-jump>Diagnosis & plan</a>
-            <a class="chip on" href="#sec-inv" data-jump>Investigations</a>
-            ${id ? '' : '<a class="chip" href="#sec-img" data-jump>Images</a>'}
+            ${id ? '' : '<a class="chip on" href="#sec-inv" data-jump>Investigations</a><a class="chip" href="#sec-img" data-jump>Images</a>'}
           </nav>
           <form id="case-form" class="form" autocomplete="off">
             <fieldset class="card" id="sec-patient"><legend>Patient</legend>
@@ -1278,9 +1277,7 @@ const App = (() => {
               <label class="span2">Diagnosis<textarea name="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
               <label class="span2">Plan (proposed surgery)<textarea name="plan" rows="2">${esc(c.plan)}</textarea></label>
               <label>Level<select name="level">${levelOpts(c.level)}</select><span class="hint" id="level-hint"></span></label>
-              ${id && comorbOn(c).length
-                ? `<label class="span2">Comorbidities <span class="hint">edit them on the Comorbidities card of the e-case sheet</span><input name="comorbid" value="${esc(c.comorbid)}" readonly></label>`
-                : `<label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>`}
+              ${id ? '' : `<label class="span2">Comorbidities<input name="comorbid" value="${esc(c.comorbid)}"></label>`}
               <label>Mode<input name="mode" list="dl-mode" value="${esc(c.mode)}"></label>
               <label class="span2">Implants
                 <textarea name="implants" rows="2">${esc(c.implants)}</textarea>
@@ -1288,11 +1285,7 @@ const App = (() => {
               </label>
               <div class="span2"><button type="button" class="btn small" id="impl-fill">↻ Fill implants & level from database</button></div>
             </fieldset>
-            ${id ? `
-            <fieldset class="card" id="sec-inv"><legend>Investigations</legend>
-              <p class="span2 muted">Blood investigations are entered as dated sets on the case page.</p>
-              <div class="span2"><button type="button" class="btn primary" id="edit-labs">+ Enter / repeat investigations</button></div>
-            </fieldset>` : `
+            ${id ? '' : `
             <fieldset class="card block-fs" id="sec-inv"><legend>Investigations</legend>
               <div class="span2">${labFormHTML(c)}</div>
               <label>Pus C/S — organism<input name="pusOrganism" class="italic"></label>
@@ -1388,10 +1381,11 @@ const App = (() => {
         });
         f.onsubmit = async (e) => {
           e.preventDefault();
-          const data = Object.fromEntries(BASIC.map((k) => [k, f.elements[k].value.trim()]));
+          // only what's on the form (editing a case has no comorbidities box: they live on the e-case sheet)
+          const data = Object.fromEntries(BASIC.filter((k) => f.elements[k]).map((k) => [k, f.elements[k].value.trim()]));
           if (id) {
             const before = Store.cases[id];
-            const changed = BASIC.filter((k) => (before[k] || '') !== data[k]);
+            const changed = Object.keys(data).filter((k) => (before[k] || '') !== data[k]);
             if (changed.length) Store.patch('cases', id, Object.fromEntries(changed.map((k) => [k, data[k]])));
             location.hash = '#/case/' + id;
             return;
