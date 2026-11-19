@@ -1682,3 +1682,7 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .cf-row { display: grid; gap: .35rem; padding: .6rem 0; border-top: 1px solid var(--line, #ddd); }
 .cf-row label { display: grid; gap: .15rem; font-size: .85rem; }
 .cf-row input, .cf-row select { width: 100%; font-family: "Noto Sans Tamil", inherit; }
+
+/* App name: Callus · Ortho Unit I */
+.brand-sub { font-weight: 400; opacity: .65; }
+@media (max-width: 380px) { .brand-sub { display: none; } }

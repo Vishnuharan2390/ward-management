@@ -1,7 +1,7 @@
 {
-  "name": "Orthopaedics Ward Management",
-  "short_name": "Ortho Ward",
-  "description": "Orthopaedics ward management — Govt. Rajaji Hospital & Madurai Medical College.",
+  "name": "Callus · Ortho Unit I",
+  "short_name": "Callus",
+  "description": "Callus — ward management for Ortho Unit I, Govt. Rajaji Hospital & Madurai Medical College.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
