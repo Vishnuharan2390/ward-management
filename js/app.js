@@ -858,14 +858,14 @@ const App = (() => {
       const open = rvOpen.has(id);
       const btn = x.kind === 'task'
         ? `<button type="button" class="btn small primary" data-rv-done>Done ✓</button>`
-        : `<button type="button" class="btn small${open ? '' : ' primary'}" data-rv-open>${x.kind === 'op' ? 'Enter orders' : x.params ? 'Enter values' : 'Enter report'}</button>`;
+        : `${x.img ? `<label class="btn small primary">📷 Add ${esc(imageKind(x.img).label)}<input type="file" accept="image/*" multiple data-rv-img="${x.img}" hidden></label>` : ''}<button type="button" class="btn small${open || x.img ? '' : ' primary'}" data-rv-open>${x.kind === 'op' ? 'Enter orders' : x.params ? 'Enter values' : 'Enter report'}</button>`;
       const form = x.kind === 'task' ? '' : `<div class="rv-form"${open ? '' : ' hidden'}>
           ${x.params ? `<div class="lab-grid">${x.params.map((p) => paramInput(p, '')).join('')}</div>`
             : `<textarea data-rv-text rows="2" placeholder="${x.kind === 'op' ? 'Orders given (drugs, investigations, advice)' : 'Report / result'}"></textarea>`}
           <div class="form-actions"><button type="button" class="btn small primary" data-rv-save>Save</button>${x.kind === 'op' ? '<button type="button" class="btn small" data-rv-seen>Seen — no fresh orders</button>' : ''}</div>
         </div>`;
       return `<div class="rv-item" data-rv-kind="${x.kind}" data-rv-key="${esc(x.key)}">
-          <div class="rv-line"><b>${esc(x.line)}</b> ${when(x.at)} ${btn}</div>${form}</div>`;
+          <div class="rv-line"><span class="rv-what"><b>${esc(x.line)}</b> ${when(x.at)}</span><span class="rv-acts">${btn}</span></div>${form}</div>`;
     };
     return `<details class="rd-review" data-keep="rv-${c.id}" open>
         <summary>From earlier rounds <span class="pill">${items.length}</span></summary>
@@ -912,6 +912,34 @@ const App = (() => {
     rvOpen.delete(`${caseId}|${key}`);
     Store.patch('cases', caseId, ch);
     toast(kind === 'task' ? 'Done ✓' : kind === 'op' ? 'Orders saved to the opinion' : 'Saved to the investigations', 2500);
+  }
+
+  // Pictures for an imaging line (X-ray / CT / MRI / wound pic): saved to the case like the e-case
+  // sheet's uploads (OT list viewer, PPTs); a report typed in the open form goes too. The line is then done.
+  async function reviewImages(caseId, key, kind, files, item) {
+    if (!files.length) return;
+    toast(`Saving ${files.length} picture${files.length === 1 ? '' : 's'}…`, 15000);
+    let n = 0;
+    for (const file of files) {
+      try { await Store.addImage(caseId, kind, await compressImage(file), key); n++; } catch { toast(`"${file.name}" couldn't be opened as a picture`, 4000); }
+    }
+    if (!n) return;
+    const c = Store.cases[caseId];
+    const ch = {
+      invTodo: invLines(c).filter((l) => l !== key).join('\n'),
+      invAsked: Object.fromEntries(Object.entries(c.invAsked || {}).filter(([l]) => l !== key)),
+    };
+    const text = $('[data-rv-text]', item)?.value.trim().toUpperCase();
+    if (text) {
+      let cp = listOf(c.custom).find((x) => String(x.label).toUpperCase() === key);
+      if (!cp) { cp = { id: uid() }; ch[`custom.${cp.id}`] = { label: key, range: '', unit: '', at: Date.now() }; }
+      const set = 'rv_' + todayISO().replace(/-/g, '');
+      if (!c.labs?.[set]) ch[`labs.${set}`] = { date: todayISO(), at: Date.now(), by: Store.who(), v: { ['x_' + cp.id]: text } };
+      else ch[`labs.${set}.v.x_${cp.id}`] = text;
+    }
+    rvOpen.delete(`${caseId}|${key}`);
+    Store.patch('cases', caseId, ch);
+    toast(`✓ ${n} ${imageKind(kind).label}${n === 1 ? '' : 's'} added to ${c.name}`, 3000);
   }
 
   function makeWard(kind) {
@@ -1265,6 +1293,11 @@ const App = (() => {
       filter();
       el.addEventListener('change', (e) => {
         const t = e.target;
+        if (t.dataset.rvImg) {
+          const item = t.closest('[data-rv-key]');
+          reviewImages(t.closest('[data-nbcase]').dataset.nbcase, item.dataset.rvKey, t.dataset.rvImg, [...t.files], item);
+          return;
+        }
         const id = t.closest('[data-nbcase]')?.dataset.nbcase;
         const f = t.dataset.nb;
         if (!id || !f || !Store.cases[id]) return;

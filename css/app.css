@@ -1693,7 +1693,8 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .rv-item { padding: .45rem 0; border-top: 1px dashed var(--line, #444); }
 .rv-item:first-of-type { border-top: 0; }
 .rv-line { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; }
-.rv-line .btn { margin-left: auto; }
+.rv-acts { margin-left: auto; display: flex; flex-wrap: wrap; gap: .4rem; justify-content: flex-end; }
+.rv-what { flex: 1 1 10rem; }
 .rv-form { margin-top: .4rem; }
 .rv-form textarea { width: 100%; }
 .rv-form .lab-grid { margin-bottom: .3rem; }

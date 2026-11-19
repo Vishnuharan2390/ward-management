@@ -283,7 +283,7 @@ function pendingList(c) {
 
 // Ward notebook "To do's", two editable boxes shared with the e-case sheet.
 // Rounds view quick-tap chips (each adds one line to the box).
-const ROUND_INV_CHIPS = ['CBC', 'RFT', 'LFT', 'SERUM ELECTROLYTES', 'RBS', 'VCTC', 'VM', 'ECG', 'ECHO', 'COAGULATION PROFILE', 'CXR', 'X-RAY', 'CT', 'MRI'];
+const ROUND_INV_CHIPS = ['CBC', 'RFT', 'LFT', 'SERUM ELECTROLYTES', 'RBS', 'VCTC', 'VM', 'ECG', 'ECHO', 'COAGULATION PROFILE', 'CXR', 'X-RAY', 'CT', 'MRI', 'WOUND PIC'];
 const ROUND_OP_CHIPS = ['CARDIOLOGY OPINION', 'GENERAL MEDICINE OPINION', 'PULMONOLOGY OPINION', 'NEPHROLOGY OPINION', 'DIABETOLOGY OPINION', 'NEUROSURGERY OPINION', 'PLASTIC SURGERY OPINION', 'VASCULAR SURGERY OPINION', 'PAC', 'BLOOD TRANSFUSION', 'DRESSING', 'WOUND WASH'];
 
 // ---- Comorbidities (e-case sheet card): each one ticked carries years + current treatment.
@@ -338,7 +338,7 @@ function roundSuggestions(c) {
   return [...out].filter(([line]) => !have.has(line)).map(([line, why]) => ({ line, why }));
 }
 
-const POST_INV_CHIPS = ['CBC', 'RFT', 'ESR', 'CRP', 'SERUM ELECTROLYTES', 'RBS', 'CHECK X-RAY', 'WOUND C/S'];
+const POST_INV_CHIPS = ['CBC', 'RFT', 'ESR', 'CRP', 'SERUM ELECTROLYTES', 'RBS', 'CHECK X-RAY', 'WOUND PIC', 'WOUND C/S'];
 const POST_OP_CHIPS = ['DRESSING', 'SUTURE REMOVAL', 'DRAIN REMOVAL', 'PHYSIOTHERAPY', 'IV ANTIBIOTICS', 'BLOOD TRANSFUSION', 'DISCHARGE PLAN', 'GENERAL MEDICINE OPINION', 'PLASTIC SURGERY OPINION', 'VASCULAR SURGERY OPINION'];
 
 // 1. Investigation: only what someone typed (no automatic suggestions).
@@ -407,12 +407,24 @@ function invParams(line) {
   const hit = INV_PARAMS.find(([re]) => re.test(line));
   return hit ? hit[1].map(invParamOf).filter(Boolean) : null;
 }
+// Imaging asked in rounds → the kind its pictures are filed under (null: no picture, e.g. chest X-ray,
+// which is a PAC test, or wound C/S). On the post-op ward X-rays and wound pics are the post-op kinds.
+function invImageKind(line, c) {
+  const post = c?.status === 'postop';
+  if (/\bCXR\b|CHEST|\bC\/S\b|CULTURE/.test(line)) return null;
+  if (/\bWOUND\b.*\b(PIC|PICS|PICTURE|PHOTO|IMAGE)S?\b|\b(PIC|PHOTO)S? OF (THE )?WOUND/.test(line)) return post ? 'powound' : 'wound';
+  if (/\bMRI\b/.test(line)) return 'mri';
+  if (/\bCT\b|\bNCCT\b|\bCECT\b/.test(line)) return 'ct';
+  if (/X[\s-]?RAY|\bXR\b|RADIOGRAPH/.test(line)) return post ? 'poxray' : 'xray';
+  return null;
+}
+
 // Everything asked before today and not yet answered: investigations, opinions, other to-dos.
 function earlierTodos(c) {
   const t0 = dayStart();
   const asked = c.invAsked || {};
   return [
-    ...invLines(c).filter((l) => !(asked[l] >= t0)).map((l) => ({ kind: 'inv', key: l, line: l, at: asked[l] > 1 ? asked[l] : null, params: invParams(l) })),
+    ...invLines(c).filter((l) => !(asked[l] >= t0)).map((l) => ({ kind: 'inv', key: l, line: l, at: asked[l] > 1 ? asked[l] : null, params: invParams(l), img: invImageKind(l, c) })),
     ...listOf(c.opinions).filter((o) => !hasText(o.note) && (o.at || 0) < t0).map((o) => ({ kind: 'op', key: o.id, line: opLine(o), at: o.at || null })),
     ...listOf(c.tasks).filter((t) => !t.done && (t.at || 0) < t0).map((t) => ({ kind: 'task', key: t.id, line: taskLine(t), at: t.at || null })),
   ];
