@@ -24,15 +24,15 @@ const CONSENT_LIMB_OPEN = (limb) => `{NAME} ஆகிய எனக்கு அ�
 
 const CONSENT_TPLS = {
   upper: {
-    label: 'Upper limb', spine: false, title: 'அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்',
+    label: 'Upper limb', bone: 'கை', spine: false, title: 'அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்',
     paras: [CONSENT_LIMB_OPEN('கை'), ...CONSENT_LIMB_RISKS('கை', 'கைக்கு', 'கையைத்')],
   },
   lower: {
-    label: 'Lower limb', spine: false, title: 'அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்',
+    label: 'Lower limb', bone: 'கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான ஒப்புதல் படிவம்',
     paras: [CONSENT_LIMB_OPEN('கால்'), ...CONSENT_LIMB_RISKS('கால்', 'காலுக்கு', 'காலைத்')],
   },
   cervical: {
-    label: 'Cervical spine', spine: true, title: 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    label: 'Cervical spine', bone: 'கழுத்து', spine: true, title: 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [
       '{NAME} ஆகிய எனக்கு அடிபட்டு அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதித்த மருத்துவர்கள், கழுத்து தண்டுவடத்தில் அடிபட்டு அதனால் கைகள், கால்கள் செயல் இழந்து போனது என்றும், இதற்கு {PROC} கொண்டு அறுவை சிகிச்சை செய்ய வேண்டும் என்றும் கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
       CONSENT_ANAES_SPINE + ' மேலும் செயற்கை சுவாசத்தில் இருந்து வெளியே வரமுடியாத நிலை வரலாம் என்றும், கழுத்தில் துளையிட்டு சுவாசக் குழாய் பொருத்தும் நிலை வரலாம் என்றும் அறிவேன்.',
@@ -43,7 +43,7 @@ const CONSENT_TPLS = {
     ],
   },
   dorsolumbar: {
-    label: 'Dorsolumbar spine', spine: true, title: 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    label: 'Dorsolumbar spine', bone: 'முதுகு', spine: true, title: 'எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [
       '{NAME} ஆகிய எனக்கு அடிபட்டு அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதித்த மருத்துவர்கள், முதுகு தண்டுவடத்தில் அடிபட்டு அதனால் கால்கள் செயல் இழந்து போனது என்றும், இதற்கு {PROC} கொண்டு அறுவை சிகிச்சை செய்ய வேண்டும் என்றும் கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
       CONSENT_ANAES_SPINE,
@@ -53,6 +53,11 @@ const CONSENT_TPLS = {
     ],
   },
 };
+
+// Implant exit: the implant paragraph is about removing it, not fixing the bone.
+const CONSENT_EXIT_RE = /IMPLANT\s*(EXIT|REMOVAL)|HARDWARE\s*REMOVAL|REMOVAL\s+OF\s+(THE\s+)?(IMPLANTS?|HARDWARE|PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|EXTERNAL\s+FIXATOR|JESS)|\b(PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|FIXATOR|JESS|IMPLANTS?)\s+(EXIT|REMOVAL)\b|\bROI\b/;
+const consentIsExit = (c) => CONSENT_EXIT_RE.test(String(c?.plan || '').toUpperCase());
+const CONSENT_EXIT_PARA = (bone) => `மேலும், எலும்பில் பொருத்தப்பட்டுள்ள உலோகத்தை அகற்றும் போது, அதனை முழுமையாக அகற்ற இயலாத நிலை வரலாம் என அறிவேன். உலோகம் அல்லது திருகாணி உடைந்து அதன் ஒரு பகுதி எலும்பிலேயே தங்கிவிட வாய்ப்புள்ளது என அறிவேன். மேலும் உலோகத்தை அகற்றும் போதோ அல்லது அகற்றிய பின்னரோ எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். அவ்வாறு உடைந்தால் அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`;
 
 // Which form: chosen on the OT list (c.consentTpl), else from the diagnosis, then the plan.
 const CONSENT_RE = {
@@ -179,7 +184,9 @@ const ConsentForm = (() => {
       font(pt, tk.fill ? 700 : 400);
       return (tk.blank ? tk.blank * MM + (tk.t ? g.measureText(tk.t).width : 0) : g.measureText(tk.t).width);
     };
-    for (const p of tpl.paras) {
+    const exit = consentIsExit(c);
+    const paras = tpl.paras.map((t) => (exit && /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
+    for (const p of paras) {
       const tks = tokens(p, fills);
       const lines = [];
       let line = [];
@@ -273,5 +280,5 @@ const ConsentForm = (() => {
     return cv;
   }
 
-  return { page, fontsReady, kind: consentKind, label: (c) => CONSENT_TPLS[consentKind(c)].label };
+  return { page, fontsReady, kind: consentKind, isExit: consentIsExit, label: (c) => CONSENT_TPLS[consentKind(c)].label };
 })();
