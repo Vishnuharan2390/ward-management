@@ -117,3 +117,15 @@ js/vendor/        pptxgenjs 4.0.1 (MIT) for building .pptx in the browser
 tools/release.py  bump the version (title bar, ?v= on every file, offline cache)
 js/app.js         screens
 ```
+
+## Six units
+
+Every unit of the department has its own patients, wards, OT lists and settings; nobody sees another
+unit's data (enforced by `firestore.rules`). Unit I is the original data.
+
+- **People** are on exactly one unit's team. They sign in and land in their own unit.
+- **Owners** (`ownerEmails` in config.js and `owners()` in firestore.rules) can open any unit from
+  **Settings → Unit** and press **Make admin** on someone in that unit's team.
+- **Unit admins** add and remove people for their own unit under **Settings → Team**. Adding someone who
+  is already on another unit's team is refused until that unit removes them.
+- After changing `firestore.rules`, publish it: Firebase console → Firestore Database → Rules → paste → Publish.

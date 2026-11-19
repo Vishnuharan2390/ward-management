@@ -81,6 +81,25 @@ test('not on the team / not signed in: nothing is sent', async () => {
   assert.equal(uploads.length + sent.length, 0);
 });
 
+test('each unit uses its own contacts (one bot for all units)', async () => {
+  const U3 = META.replace('unit-1', 'ortho-unit-3');
+  const seen = [];
+  const prev = globalThis.fetch;
+  globalThis.fetch = async (input, init = {}) => {
+    const url = String(input.url || input);
+    if (url === U3) { seen.push(url); return Response.json({ fields: { otWaNumbers: { stringValue: '9000000003' } } }); }
+    return prev(input, init);
+  };
+  const j = await (await post('member-token', { pdf: PDF, filename: 'a.pdf', unit: 'ortho-unit-3' })).json();
+  assert.equal(seen.length, 1);
+  assert.deepEqual(sent.map((s) => s.to), ['919000000003']);
+  assert.equal(j.sent, 1);
+  // something that isn't a unit id falls back to the bot's own unit
+  sent = [];
+  await post('member-token', { pdf: PDF, filename: 'a.pdf', unit: '../../people' });
+  assert.deepEqual(sent.map((s) => s.to), ['919876543210', '919812345678']);
+});
+
 test('one failed contact is reported, the rest still go', async () => {
   failFor = '919812345678';
   const j = await (await post('member-token', { pdf: PDF, filename: 'a.pdf' })).json();

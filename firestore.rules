@@ -1,9 +1,13 @@
 rules_version = '2';
 
-// Only signed-in Google accounts on the team list can read or write.
-// 1. Put your own Gmail in OWNERS below (and in config.js → ownerEmails).
-// 2. Paste this file into Firebase console → Firestore → Rules → Publish.
-// 3. Add your HS / PGs from the app: Settings → Team.
+// Callus — one department, six units. Each unit's data lives under units/ortho-unit-N and only
+// that unit's team can read or write it.
+//  - OWNERS (below, and config.js → ownerEmails) can open every unit and manage every team.
+//  - A unit's ADMIN (Settings → Team → "Make admin", set by an owner) manages only that unit's team.
+//  - people/{email} is the department directory: one entry per person, saying which unit they are
+//    on. A person can only be on one unit's team: adding someone who is already on another unit's
+//    team is refused until that unit removes them.
+// To publish: Firebase console → Firestore Database → Rules → paste this whole file → Publish.
 service cloud.firestore {
   match /databases/{database}/documents {
     function owners() {
@@ -20,14 +24,37 @@ service cloud.firestore {
     function isOwner() {
       return signedIn() && me() in owners();
     }
+    function memberDoc(unit) {
+      return /databases/$(database)/documents/units/$(unit)/members/$(me());
+    }
     function isMember(unit) {
-      return signedIn() && (isOwner() || exists(/databases/$(database)/documents/units/$(unit)/members/$(me())));
+      return signedIn() && (isOwner() || exists(memberDoc(unit)));
+    }
+    function isAdmin(unit) {
+      return isOwner() || (signedIn() && exists(memberDoc(unit)) && get(memberDoc(unit)).data.get('admin', false) == true);
     }
 
+    // A unit's team list: its members read it; its admin (or an owner) changes it. Only owners make
+    // someone an admin, and admins can't change their own entry.
+    function adminFlag(d) {
+      return d.get('admin', false);
+    }
     match /units/{unit}/members/{email} {
       allow read: if isMember(unit);
-      allow write: if isOwner();
+      allow create: if isOwner() || (isAdmin(unit) && email != me() && adminFlag(request.resource.data) == false);
+      allow update: if isOwner() || (isAdmin(unit) && email != me() && adminFlag(request.resource.data) == adminFlag(resource.data));
+      allow delete: if isOwner() || (isAdmin(unit) && email != me());
     }
+
+    // The department directory (one unit per person).
+    match /people/{email} {
+      allow read: if signedIn() && (email == me() || isOwner() || (resource != null && isAdmin(resource.data.unit)));
+      allow create: if isAdmin(request.resource.data.unit);
+      allow update: if isAdmin(resource.data.unit) && isAdmin(request.resource.data.unit);
+      allow delete: if isAdmin(resource.data.unit);
+    }
+
+    // Everything else of a unit: cases, images, implants, levels, settings.
     match /units/{unit}/{coll}/{doc} {
       allow read, write: if coll != 'members' && isMember(unit);
     }

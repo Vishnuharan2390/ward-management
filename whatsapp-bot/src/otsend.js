@@ -15,7 +15,7 @@ const MAX_PDF = 10 * 1024 * 1024;
 const MAX_CONTACTS = 25;
 
 const graph = (env, path) => `https://graph.facebook.com/${env.GRAPH_VERSION || 'v21.0'}/${path}`;
-const firestore = (env) => `${env.FIRESTORE_URL || 'https://firestore.googleapis.com'}/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/units/${env.FIREBASE_UNIT_ID}`;
+const firestore = (env, unit) => `${env.FIRESTORE_URL || 'https://firestore.googleapis.com'}/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/units/${unit}`;
 
 // "98765 43210, +91 98123-45678" → ['919876543210', '919812345678'] (10 digits get 91 in front).
 export function parseNumbers(text) {
@@ -46,14 +46,18 @@ export async function sendOt(request, env) {
   const json = (obj, status = 200) => Response.json(obj, { status, headers });
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers });
   if (request.method !== 'POST') return json({ error: 'POST only' }, 405);
-  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID || !env.FIREBASE_PROJECT_ID || !env.FIREBASE_UNIT_ID) {
+  if (!env.WHATSAPP_TOKEN || !env.WHATSAPP_PHONE_ID || !env.FIREBASE_PROJECT_ID) {
     return json({ error: 'The bot is missing its WhatsApp or Firebase settings.' }, 500);
   }
 
-  // 1. A team member? (their own token reads the unit settings, or Firestore refuses)
+  // 1. A team member of the unit sending? (their own token reads that unit's settings, or Firestore
+  //    refuses). One bot serves every unit: each unit's own contact list is used.
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
   if (!token) return json({ error: 'Sign in to the ward app first.' }, 401);
-  const metaRes = await fetch(`${firestore(env)}/meta/main`, { headers: { Authorization: `Bearer ${token}` } });
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'Bad request.' }, 400); }
+  const unit = /^ortho-unit-\d{1,2}$/.test(String(body.unit || '')) ? body.unit : env.FIREBASE_UNIT_ID;
+  const metaRes = await fetch(`${firestore(env, unit)}/meta/main`, { headers: { Authorization: `Bearer ${token}` } });
   if (metaRes.status === 401 || metaRes.status === 403) return json({ error: 'Only the unit team can send the OT list.' }, 403);
   if (!metaRes.ok) return json({ error: `Couldn't read the unit settings (${metaRes.status}).` }, 502);
   const meta = (await metaRes.json()).fields || {};
@@ -61,8 +65,6 @@ export async function sendOt(request, env) {
   if (!to.length) return json({ error: 'No OT list WhatsApp numbers in Settings.' }, 400);
 
   // 2. The PDF
-  let body;
-  try { body = await request.json(); } catch { return json({ error: 'Bad request.' }, 400); }
   const filename = String(body.filename || 'OT LIST.pdf').replace(/[^\w .()-]/g, '').slice(0, 120) || 'OT LIST.pdf';
   const title = String(body.title || filename.replace(/\.pdf$/i, '')).slice(0, 200);
   let bytes;

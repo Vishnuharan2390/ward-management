@@ -21,3 +21,12 @@
 - `config.js` has Firebase on (Google sign-in). For headless tests, serve the repo
   (`python3 -m http.server`) and route `config.js` to `firebase: null` (local mode).
 - Test phone behaviour with Playwright's `devices['iPhone 13']`.
+
+## Units (6 in the department)
+- Each unit's data lives at `units/ortho-unit-N` (N = position in `UNITS`, js/data.js; Unit I = ortho-unit-1,
+  the original data). Everyone is on exactly one unit's team; the app finds it at sign-in (js/store.js chooseUnit).
+- Owners (`ownerEmails` in config.js + `owners()` in firestore.rules) open every unit (Settings → Unit) and make
+  unit admins. A unit admin manages only that unit's team. `people/{email}` = department directory, one unit each.
+- `Store.meta.unitId` is forced to the signed-in unit, so every print/PDF names the right unit.
+- firestore.rules changes must be published by the owner (Firebase console → Firestore → Rules). Test them
+  against the emulator (firebase-tools + @firebase/rules-unit-testing) before telling the owner to publish.

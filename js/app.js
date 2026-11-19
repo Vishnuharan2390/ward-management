@@ -2456,7 +2456,7 @@ const App = (() => {
           const r = await fetch(Store.meta.waBotUrl.replace(/\/+$/, '') + '/send-ot', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pdf, filename: file.name, title: file.name.replace(/\.pdf$/i, '') }),
+            body: JSON.stringify({ pdf, filename: file.name, title: file.name.replace(/\.pdf$/i, ''), unit: Store.unitKey }),
           });
           const j = await r.json().catch(() => ({}));
           if (!r.ok) throw new Error(j.error || `the bot answered ${r.status}`);
@@ -3550,7 +3550,11 @@ const App = (() => {
 
         <form class="card form" id="meta">
           <fieldset><legend>Unit & letterhead (shared)</legend>
-            <label>Unit<select name="unitId">${opts(UNITS.map((u) => [u.id, 'UNIT ' + u.id]), m.unitId)}</select></label>
+            ${Store.mode !== 'firebase'
+              ? `<label>Unit<select name="unitId">${opts(UNITS.map((u) => [u.id, 'UNIT ' + u.id]), m.unitId)}</select></label>`
+              : Store.isOwner()
+                ? `<label>Unit (you can open every unit)<select id="unit-switch">${opts(Store.unitKeys.map((k, i) => [k, 'UNIT ' + UNITS[i].id]), Store.unitKey)}</select></label>`
+                : `<label>Unit<input value="UNIT ${esc(m.unitId)}" disabled></label>`}
             <label>Ortho OPD no.<input name="opd" value="${esc(m.opd)}"></label>
             <label class="span2" data-nocaps>Email the OT list to<input type="email" name="otEmail" value="${esc(m.otEmail)}" placeholder="name@example.com" autocomplete="off"></label>
             <label class="span2" data-nocaps>WhatsApp the OT list to (sent from the unit's WhatsApp bot)<textarea name="otWaNumbers" rows="2" placeholder="98765 43210, 98123 45678" autocomplete="off">${esc(m.otWaNumbers || '')}</textarea></label>
@@ -3580,13 +3584,14 @@ const App = (() => {
               : '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and senior PGs, connect Firebase — see <b>README.md</b>.</p>')
             : `<p>Signed in as <b>${esc(Store.user?.email)}</b> · sync: ${esc(Store.status)} <button class="btn small" id="signout">Sign out</button></p>
                ${Store.localCaseCount() ? `<p class="notice">This device has <b>${Store.localCaseCount()}</b> case(s) saved before sharing was switched on. <button class="btn small primary" id="upload-local">Copy them to the shared database</button></p>` : ''}
-               <h4>Team</h4>
-               <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> <span class="muted">${esc(x.role)} · ${esc(x.email)}</span>${Store.isOwner() ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">Only owners so far.</li>'}</ul>
-               ${Store.isOwner() ? `<form class="inline-add" id="add-member">
+               <h4>Unit ${esc(m.unitId)} team</h4>
+               <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> <span class="muted">${esc(x.role)} · ${esc(x.email)}</span>${x.admin ? ' <span class="tag">unit admin</span>' : ''}${Store.isOwner() ? ` <button class="btn small" data-admin="${esc(x.email)}" data-on="${x.admin ? '' : '1'}">${x.admin ? 'Remove admin' : 'Make admin'}</button>` : ''}${Store.canManageTeam() && (Store.isOwner() || x.email !== Store.user?.email?.toLowerCase()) ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">No one yet.</li>'}</ul>
+               ${Store.canManageTeam() ? `<form class="inline-add" id="add-member">
                  <label class="mini-lab">Gmail of HS / PG<input name="email" type="email" required></label>
                  <label class="mini-lab">Name<input name="name"></label>
                  <select name="role">${opts(ROLES, 'PG')}</select>
-                 <button class="btn small primary">Add</button></form>` : '<p class="muted small">Ask the unit owner to add people.</p>'}`}
+                 <button class="btn small primary">Add</button></form>
+                 <p class="muted small">Each person can be on one unit's team only. Someone on another unit's team has to be removed there first.</p>` : '<p class="muted small">Ask your unit\'s admin to add people.</p>'}`}
         </div>
 
         <div class="card">
@@ -3616,7 +3621,10 @@ const App = (() => {
         try { localStorage.setItem('wm.ui', k); } catch { /* private mode */ }
         render();
       });
+      const us = $('#unit-switch', el);
+      if (us) us.onchange = (e) => { e.stopPropagation(); Store.switchUnit(e.target.value); toast(`Opened UNIT ${UNITS[Store.unitKeys.indexOf(e.target.value)].id}`); };
       $('#meta', el).onchange = async (e) => {
+        if (e.target.id === 'unit-switch') return;
         if (e.target.id === 'lh-file') {
           const file = e.target.files[0];
           if (file) Store.setMeta({ letterhead: await compressImage(file, 1800, 0.85) });
@@ -3727,13 +3735,14 @@ const App = (() => {
         am.onsubmit = (e) => {
           e.preventDefault();
           const f = e.target.elements;
-          Store.addMember(f.email.value, f.name.value.trim(), f.role.value);
-          e.target.reset();
+          Store.addMember(f.email.value, f.name.value.trim(), f.role.value).then((ok) => { if (ok) e.target.reset(); });
         };
       }
       el.addEventListener('click', (e) => {
         const b = e.target.closest('[data-rm]');
         if (b && confirm('Remove ' + b.dataset.rm + '?')) Store.removeMember(b.dataset.rm);
+        const ad = e.target.closest('[data-admin]');
+        if (ad) Store.setAdmin(ad.dataset.admin, !!ad.dataset.on);
       });
       $('#export', el).onclick = async () => {
         const blob = new Blob([JSON.stringify(await Store.exportAll())], { type: 'application/json' });
@@ -3771,7 +3780,7 @@ const App = (() => {
     render() {
       const s = Store.status;
       if (s === 'denied') {
-        return `<div class="card gate"><h2>No access yet</h2><p>You're signed in as <b>${esc(Store.user?.email)}</b>, but this email isn't on the team list. Ask the unit owner to add it under Settings → Team, then tap Try again.</p>
+        return `<div class="card gate"><h2>No access yet</h2><p>You're signed in as <b>${esc(Store.user?.email)}</b>, but this email isn't on the team list. Ask your unit's admin to add it under Settings → Team, then tap Try again.</p>
           <div class="actions center"><button class="btn primary" id="retry">Try again</button><button class="btn" id="signout">Sign out</button></div></div>`;
       }
       if (s === 'unverified') {
@@ -3902,6 +3911,8 @@ const App = (() => {
     const same = current && current.hash === location.hash;
     if (!same) current = { hash: location.hash, view: resolve() };
     const v = current.view;
+    const bs = $('.brand-sub');
+    if (bs) bs.textContent = `· Ortho Unit ${Store.meta.unitId}`;
     // Swap in a fresh element so delegated listeners from the last render don't pile up.
     // Drawers (details[data-keep]) stay open when the same page redraws — e.g. a teammate's edit syncing in.
     const keepOpen = same ? $$('details[data-keep][open]', App.el).map((d) => d.dataset.keep) : [];

@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION with each release so phones
 // pick up the new files; data never goes through here (it lives in the
 // browser's storage or Firestore).
-const VERSION = 'v162';
+const VERSION = 'v163';
 const CACHE = 'preop-ward-' + VERSION;
 const SHELL = [
   './',

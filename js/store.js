@@ -178,10 +178,67 @@ const Store = (() => {
       // Password accounts must confirm their email first (the database rules
       // only admit verified addresses, so nobody can borrow a colleague's).
       else if (!u.emailVerified) status = 'unverified';
-      else listen();
+      else {
+        status = 'connecting';
+        chooseUnit().then((ok) => {
+          if (user !== u) return; // signed out meanwhile
+          if (ok) listen();
+          else status = 'denied';
+          emit();
+        });
+      }
       emit();
     });
   }
+
+  // ---- units: each of the department's units has its own data (units/ortho-unit-N) ----
+  // Everyone belongs to exactly one unit (its Settings → Team list); the app finds it at sign-in.
+  // Owners (config.js ownerEmails) look after all units and can switch.
+  const UNIT_KEYS = UNITS.map((u, i) => `ortho-unit-${i + 1}`);
+  const unitSaveKey = () => `wm.unit.${email()}`;
+  const memberRef = (unit, mail) => fb.fsM.doc(fb.db, 'units', unit, 'members', mail);
+  const peopleRef = (mail) => fb.fsM.doc(fb.db, 'people', mail);
+  async function isIn(unit) {
+    try { return (await fb.fsM.getDoc(memberRef(unit, email()))).exists(); } catch { return false; }
+  }
+  async function chooseUnit() {
+    let saved = '';
+    try { saved = localStorage.getItem(unitSaveKey()) || ''; } catch { /* private mode */ }
+    if (isOwner()) {
+      fb.unit = UNIT_KEYS.includes(saved) ? saved : (CFG.unitId || UNIT_KEYS[0]);
+      return true;
+    }
+    if (UNIT_KEYS.includes(saved)) {
+      // open at once (works offline); if they have since moved to another unit, follow them
+      fb.unit = saved;
+      isIn(saved).then(async (ok) => {
+        if (ok || !navigator.onLine) return;
+        try { localStorage.removeItem(unitSaveKey()); } catch { /* ignore */ }
+        const next = await findUnit();
+        if (next && next !== fb.unit) switchUnit(next);
+      });
+      return true;
+    }
+    const found = await findUnit();
+    if (!found) return false;
+    fb.unit = found;
+    try { localStorage.setItem(unitSaveKey(), found); } catch { /* ignore */ }
+    return true;
+  }
+  async function findUnit() {
+    const hits = await Promise.all(UNIT_KEYS.map(isIn));
+    return UNIT_KEYS[hits.findIndex(Boolean)] || null;
+  }
+  function switchUnit(unit) {
+    if (!fb || !UNIT_KEYS.includes(unit) || unit === fb.unit) return;
+    stopListening();
+    for (const k of Object.keys(syncFresh)) delete syncFresh[k];
+    fb.unit = unit;
+    try { localStorage.setItem(unitSaveKey(), unit); localStorage.removeItem(LS + 'otDraft'); } catch { /* ignore */ }
+    listen();
+    emit();
+  }
+  const unitIndex = () => Math.max(0, UNIT_KEYS.indexOf(fb?.unit));
 
   const ref = (coll, id) => fb.fsM.doc(fb.db, 'units', fb.unit, coll, id);
   const collRef = (coll) => fb.fsM.collection(fb.db, 'units', fb.unit, coll);
@@ -216,7 +273,7 @@ const Store = (() => {
         state[coll] = m;
         seen[coll] = true;
         status = 'ok';
-        if (!snap.metadata.fromCache) { fresh[coll] = true; maybeSeedImplants(); }
+        if (!snap.metadata.fromCache) { fresh[coll] = true; maybeSeedImplants(); backfillPeople(); }
         // First connection for the unit: load the WOPL level list once.
         if (coll === 'levels' && snap.empty && !snap.metadata.fromCache && !seededLevels) {
           seededLevels = true;
@@ -270,7 +327,9 @@ const Store = (() => {
     user = fb.auth.currentUser;
     if (user.emailVerified) {
       stopListening();
-      listen();
+      status = 'connecting';
+      emit();
+      status = (await chooseUnit()) ? (listen(), 'connecting') : 'denied';
     }
     emit();
   }
@@ -413,13 +472,47 @@ const Store = (() => {
   }
 
   // ---- team (shared mode) ----
-  function addMember(mail, name, role) {
+  // The member's doc in this unit and their entry in the department directory are written together;
+  // the database rules refuse it if they are already on another unit's team.
+  async function addMember(mail, name, role, admin = false) {
     mail = mail.trim().toLowerCase();
-    if (!fb || !mail) return;
-    return fb.fsM.setDoc(ref('members', mail), { email: mail, name, role, addedBy: who(), at: Date.now() }).catch(remoteFail);
+    if (!fb || !mail) return false;
+    const at = Date.now();
+    const b = fb.fsM.writeBatch(fb.db);
+    b.set(ref('members', mail), { email: mail, name, role, admin: !!admin, addedBy: who(), at });
+    b.set(peopleRef(mail), { email: mail, unit: fb.unit, name, role, admin: !!admin, addedBy: who(), at });
+    try {
+      await b.commit();
+      return true;
+    } catch (e) {
+      console.error(e);
+      toast(e.code === 'permission-denied'
+        ? `Couldn't add ${mail}: they are already on another unit's team (or you aren't this unit's admin). They must be removed there first.`
+        : 'Could not add: ' + (e.code || e.message), 7000);
+      return false;
+    }
   }
-  function removeMember(mail) {
-    if (fb) return fb.fsM.deleteDoc(ref('members', mail)).catch(remoteFail);
+  async function removeMember(mail) {
+    if (!fb) return;
+    const b = fb.fsM.writeBatch(fb.db);
+    b.delete(ref('members', mail));
+    b.delete(peopleRef(mail));
+    return b.commit().catch(remoteFail);
+  }
+  function setAdmin(mail, admin) {
+    if (!fb) return;
+    const b = fb.fsM.writeBatch(fb.db);
+    b.update(ref('members', mail), { admin: !!admin });
+    b.set(peopleRef(mail), { email: mail, unit: fb.unit, admin: !!admin }, { merge: true });
+    return b.commit().catch(remoteFail);
+  }
+  // Team lists made before units: put them in the department directory once (owner's phone).
+  function backfillPeople() {
+    if (!isOwner() || !syncFresh.members || !syncFresh.meta || state.meta.main?.peopleV1) return;
+    for (const m of Object.values(state.members)) {
+      if (m.email) fb.fsM.setDoc(peopleRef(m.email), { email: m.email, unit: fb.unit, name: m.name || '', role: m.role || '', admin: !!m.admin }, { merge: true }).catch(() => {});
+    }
+    patch('meta', 'main', { peopleV1: true });
   }
 
   // ---- backup ----
@@ -469,7 +562,12 @@ const Store = (() => {
     get cases() { return state.cases; },
     get implants() { return state.implants; },
     get levels() { return state.levels; },
-    get meta() { return { ...DEFAULT_META, ...(state.meta.main || {}) }; },
+    // In shared mode the unit is the one signed in to, whatever an old setting says.
+    get meta() { return { ...DEFAULT_META, ...(state.meta.main || {}), ...(fb ? { unitId: UNITS[unitIndex()].id } : {}) }; },
+    get unitKey() { return fb?.unit || ''; },
+    unitKeys: UNIT_KEYS,
+    switchUnit,
+    canManageTeam: () => mode === 'local' || isOwner() || state.members[email()]?.admin === true,
     get members() { return state.members; },
     setMeta: (changes) => {
       if (!state.meta.main) create('meta', 'main', {});
@@ -487,7 +585,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember,
+    addMember, removeMember, setAdmin,
     exportAll, importAll,
   };
 })();
