@@ -30,3 +30,10 @@
 - `Store.meta.unitId` is forced to the signed-in unit, so every print/PDF names the right unit.
 - firestore.rules changes must be published by the owner (Firebase console → Firestore → Rules). Test them
   against the emulator (firebase-tools + @firebase/rules-unit-testing) before telling the owner to publish.
+
+## Views by role (team list role → viewOfRole in js/data.js)
+- House Surgeon → `Todo` (all open items, same rows/handlers as rounds' "From earlier rounds") + e-case sheets (#/cases).
+- Assistant Professor / Professor → `Folders` + read-only `ConsultCase` (#/c/<id>); every other route resolves to Folders.
+- Everyone else (and owners) → the whole app + "HS updates" (#/updates), fed by the unit's `updates` collection
+  (logUpdate in js/app.js; kept 7 days). Owners / unit admins can preview a view: Settings → Views (sessionStorage).
+- This is a view, not a security boundary: firestore.rules still let any unit member read/write the unit.

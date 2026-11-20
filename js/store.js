@@ -6,8 +6,8 @@
 const Store = (() => {
   const CFG = window.WARD_CONFIG || {};
   const LS = 'wm.v1.';
-  const COLLS = ['cases', 'implants', 'levels', 'meta'];
-  const state = { cases: {}, implants: {}, levels: {}, meta: {}, members: {} };
+  const COLLS = ['cases', 'implants', 'levels', 'meta', 'updates'];
+  const state = { cases: {}, implants: {}, levels: {}, meta: {}, members: {}, updates: {} };
   const subs = new Set();
   const imgCache = new Map();
   let fb = null;
@@ -499,6 +499,13 @@ const Store = (() => {
     b.delete(peopleRef(mail));
     return b.commit().catch(remoteFail);
   }
+  function setRole(mail, role) {
+    if (!fb) return;
+    const b = fb.fsM.writeBatch(fb.db);
+    b.update(ref('members', mail), { role });
+    b.set(peopleRef(mail), { email: mail, unit: fb.unit, role }, { merge: true });
+    return b.commit().catch(remoteFail);
+  }
   function setAdmin(mail, admin) {
     if (!fb) return;
     const b = fb.fsM.writeBatch(fb.db);
@@ -569,6 +576,11 @@ const Store = (() => {
     switchUnit,
     canManageTeam: () => mode === 'local' || isOwner() || state.members[email()]?.admin === true,
     get members() { return state.members; },
+    // What house surgeons (and others) saved: { caseId, name, text, by, email, role, at }
+    get updates() { return state.updates; },
+    // This person's role on the unit's team list (or what they set on this phone).
+    get myRole() { return state.members[email()]?.role || profile().role || ''; },
+    get myEmail() { return email(); },
     setMeta: (changes) => {
       if (!state.meta.main) create('meta', 'main', {});
       return patch('meta', 'main', changes);
@@ -585,7 +597,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember, setAdmin,
+    addMember, removeMember, setAdmin, setRole,
     exportAll, importAll,
   };
 })();

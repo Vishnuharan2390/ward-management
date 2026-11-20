@@ -13,12 +13,23 @@ const CASE_STATUS = {
 
 // Departments a case can be transferred out to (and back in from, into the pre-op ward).
 // The key is the case status and the tab's address (#/plastic). Add a line here for another one.
+// Where a case can go from the wards. Order = the order of the buttons and of the AP / chief folders.
+// backToWard: coming back, the case returns to the ward it left (else always the pre-op ward).
+const stayWords = (where, inWhere) => ({
+  outBtn: `Shift to ${where}`, outQ: (n) => `Shift ${n} to ${where}?`, outToast: (n) => `${n} shifted to ${where}`, withTag: `In ${where} since`,
+  backBtn: 'Back to the ward', backBtnLong: 'Back to the ward', backQ: (n) => `Move ${n} from ${where} back to the ward?`,
+  backToast: (n) => `${n} is back in the ward`, outWord: 'shifted', intro: `Cases shifted to ${where} from the pre-op or post-op ward.`,
+  howTo: `To shift a case, open its e-case sheet and tap <b>Shift to ${where}</b>.`, empty: `No cases in ${where} right now.`,
+  spent: inWhere, movedTo: `moved to ${where}`, backH: 'Back in the ward (last 14 days)',
+});
 const TRANSFER_DEPTS = {
-  plastic: { short: 'Plastic', long: 'Plastic surgery', tab: 'Plastic transfer outs', status: 'Plastic T/O', btn: 'Plastic T/O' },
-  neuro: { short: 'Neurosurgery', long: 'Neurosurgery', tab: 'Neurosurgery transfer outs', status: 'Neurosurgery T/O', btn: 'Neurosurgery T/O' },
+  neuro: { short: 'Neurosurgery', long: 'Neurosurgery', tab: 'Neurosurgery transfer outs', status: 'Neurosurgery T/O', btn: 'NS T/O', folder: 'NS T/O' },
+  plastic: { short: 'Plastic', long: 'Plastic surgery', tab: 'Plastic transfer outs', status: 'Plastic T/O', btn: 'Plastic T/O', folder: 'Plastic T/O' },
+  vascular: { short: 'Vascular', long: 'Vascular surgery', tab: 'Vascular transfer outs', status: 'Vascular T/O', btn: 'Vascular T/O', folder: 'Vascular T/O' },
+  surgery: { short: 'Surgery', long: 'General surgery', tab: 'Surgery transfer outs', status: 'Surgery T/O', btn: 'Surgery T/O', folder: 'Surgery T/O' },
   // Not a department: the case is kept back (out of the wards and the OT list) under "Retained cases".
   retained: {
-    short: 'Retained', long: 'Retained cases', tab: 'Retained cases', status: 'Retained', btn: 'Retained',
+    short: 'Retained', long: 'Retained cases', tab: 'Retained cases', status: 'Retained', btn: 'Retained', folder: 'Retained',
     say: {
       outBtn: 'Retain case', outQ: (n) => `Retain ${n}?`, outToast: (n) => `${n} retained`, withTag: 'Retained since',
       backBtn: 'Back to pre-op ward', backBtnLong: 'Back to pre-op ward', backQ: (n) => `Move ${n} from Retained cases back to the pre-op ward?`,
@@ -27,6 +38,8 @@ const TRANSFER_DEPTS = {
       spent: 'retained', movedTo: 'moved to Retained cases', backH: 'Back in the pre-op ward (last 14 days)',
     },
   },
+  payward: { short: 'Pay ward', long: 'Pay ward', tab: 'Pay ward cases', status: 'Pay ward', btn: 'Pay ward', folder: 'Pay ward', backToWard: true, say: stayWords('the pay ward', 'in the pay ward') },
+  sicu: { short: 'SICU', long: 'Surgical ICU', tab: 'SICU cases', status: 'SICU', btn: 'SICU', folder: 'SICU', backToWard: true, say: stayWords('SICU', 'in SICU') },
 };
 // Wording for one entry: its own `say`, or the transfer-out wording built from its names.
 function deptSay(k) {
@@ -420,14 +433,27 @@ function invImageKind(line, c) {
 }
 
 // Everything asked before today and not yet answered: investigations, opinions, other to-dos.
-function earlierTodos(c) {
-  const t0 = dayStart();
+function earlierTodos(c, t0 = dayStart()) {
   const asked = c.invAsked || {};
   return [
     ...invLines(c).filter((l) => !(asked[l] >= t0)).map((l) => ({ kind: 'inv', key: l, line: l, at: asked[l] > 1 ? asked[l] : null, params: invParams(l), img: invImageKind(l, c) })),
     ...listOf(c.opinions).filter((o) => !hasText(o.note) && (o.at || 0) < t0).map((o) => ({ kind: 'op', key: o.id, line: opLine(o), at: o.at || null })),
     ...listOf(c.tasks).filter((t) => !t.done && (t.at || 0) < t0).map((t) => ({ kind: 'task', key: t.id, line: taskLine(t), at: t.at || null })),
   ];
+}
+
+function allTodos(c) {
+  return [
+    ...earlierTodos(c, Infinity),
+    ...(c.work?.anaes && c.work.anaes !== 'Assessed' ? pacOpen(c).map((l) => ({ kind: 'pac', key: pacKey(l), line: `PAC: ${l.toUpperCase()}`, at: null })) : []),
+  ];
+}
+// What each person sees: the team list role decides (Settings → Team).
+function viewOfRole(role) {
+  const r = String(role || '').toLowerCase();
+  if (/house/.test(r)) return 'hs';
+  if (/professor|chief|\bap\b/.test(r)) return 'consultant';
+  return 'full';
 }
 
 // The ward notebook's "To do's": pending opinions, investigations to repeat (the deranged

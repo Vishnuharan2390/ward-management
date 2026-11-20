@@ -168,7 +168,14 @@ const App = (() => {
     f.onsubmit = (e) => {
       e.preventDefault();
       const ch = readLabForm(f, setId);
-      if (ch) Store.patch('cases', caseId, ch);
+      if (ch) {
+        Store.patch('cases', caseId, ch);
+        const set = Object.entries(ch).find(([k]) => k.startsWith('labs.'))?.[1];
+        if (set?.v) {
+          const params = [...ALL_PARAMS, ...customParams(Store.cases[caseId])];
+          logUpdate(caseId, `Investigations ${fmtDate(set.date)}: ${Object.entries(set.v).map(([k, v]) => `${params.find((p) => p.k === k)?.label || k} ${v}`).join(', ')}`);
+        }
+      }
       close();
     };
   }
@@ -272,9 +279,11 @@ const App = (() => {
   }
   // `to`: where the case went when the stay ended — 'preop' (transferred back in) or another department.
   const closeStay = (c, dept, to = 'preop') => ({ [dept]: DELETE, [`${dept}Log.${uid()}`]: { ...(c[dept] || {}), in: todayISO(), inAt: Date.now(), inBy: Store.who(), to } });
+  const backTo = (c) => (TRANSFER_DEPTS[c.status]?.backToWard && c[c.status]?.from === 'postop' ? 'postop' : 'preop');
   function backIn(id) {
     const c = Store.cases[id];
-    Store.patch('cases', id, { status: 'preop', ...closeStay(c, c.status) });
+    const to = backTo(c);
+    Store.patch('cases', id, { status: to, ...closeStay(c, c.status, to) });
   }
   function askOut(id, dept) {
     const c = Store.cases[id];
@@ -291,9 +300,10 @@ const App = (() => {
     const D = TRANSFER_DEPTS[c.status];
     if (!D) return false;
     const T = deptSay(c.status);
-    if (!confirm(`${T.backQ(c.name || 'this case')}\n\nIt goes into the pre-op ward.`)) return false;
+    const dest = backTo(c) === 'postop' ? 'post-op ward' : 'pre-op ward';
+    if (!confirm(`${T.backQ(c.name || 'this case')}\n\nIt goes into the ${dest}.`)) return false;
     backIn(id);
-    toast(`${c.name || 'Case'} is back in the pre-op ward`);
+    toast(`${c.name || 'Case'} is back in the ${dest}`);
     return true;
   }
 
@@ -852,14 +862,24 @@ const App = (() => {
   function reviewHTML(c) {
     const items = earlierTodos(c);
     if (!items.length) return '';
-    const when = (at) => (at ? `<span class="muted small">asked ${esc(fmtDate(new Date(at).toISOString().slice(0, 10)))}</span>` : '<span class="muted small">earlier</span>');
+    return `<details class="rd-review" data-keep="rv-${c.id}" open>
+        <summary>From earlier rounds <span class="pill">${items.length}</span></summary>
+        ${reviewRows(c, items)}
+      </details>`;
+  }
+  function reviewRows(c, items) {
+    const when = (at) => {
+      if (!at) return '<span class="muted small">earlier</span>';
+      const d = new Date(at).toISOString().slice(0, 10);
+      return `<span class="muted small">asked ${d === todayISO() ? 'today' : esc(fmtDate(d))}</span>`;
+    };
     const row = (x) => {
       const id = `${c.id}|${x.key}`;
       const open = rvOpen.has(id);
-      const btn = x.kind === 'task'
+      const btn = x.kind === 'task' || x.kind === 'pac'
         ? `<button type="button" class="btn small primary" data-rv-done>Done ✓</button>`
         : `${x.img ? `<label class="btn small primary icon-btn" title="Take a photo (${esc(imageKind(x.img).label)})" aria-label="Take a photo">📷<input type="file" accept="image/*" capture="environment" data-rv-img="${x.img}" hidden></label><label class="btn small icon-btn" title="From the gallery (${esc(imageKind(x.img).label)})" aria-label="Pick from the gallery">🖼<input type="file" accept="image/*" multiple data-rv-img="${x.img}" hidden></label>` : ''}<button type="button" class="btn small${open || x.img ? '' : ' primary'}" data-rv-open>${x.kind === 'op' ? 'Enter orders' : x.params ? 'Enter values' : 'Enter report'}</button>`;
-      const form = x.kind === 'task' ? '' : `<div class="rv-form"${open ? '' : ' hidden'}>
+      const form = x.kind === 'task' || x.kind === 'pac' ? '' : `<div class="rv-form"${open ? '' : ' hidden'}>
           ${x.params ? `<div class="lab-grid">${x.params.map((p) => paramInput(p, '')).join('')}</div>`
             : `<textarea data-rv-text rows="2" placeholder="${x.kind === 'op' ? 'Orders given (drugs, investigations, advice)' : 'Report / result'}"></textarea>`}
           <div class="form-actions"><button type="button" class="btn small primary" data-rv-save>Save</button>${x.kind === 'op' ? '<button type="button" class="btn small" data-rv-seen>Seen — no fresh orders</button>' : ''}</div>
@@ -867,10 +887,46 @@ const App = (() => {
       return `<div class="rv-item" data-rv-kind="${x.kind}" data-rv-key="${esc(x.key)}">
           <div class="rv-line"><span class="rv-what"><b>${esc(x.line)}</b> ${when(x.at)}</span><span class="rv-acts">${btn}</span></div>${form}</div>`;
     };
-    return `<details class="rd-review" data-keep="rv-${c.id}" open>
-        <summary>From earlier rounds <span class="pill">${items.length}</span></summary>
-        ${items.map(row).join('')}
-      </details>`;
+    return items.map(row).join('');
+  }
+  // Rounds and the to-do page share these: open a result form / save it / mark done; pictures.
+  function reviewClick(e) {
+    const rv = e.target.closest('[data-rv-open],[data-rv-save],[data-rv-done],[data-rv-seen]');
+    if (!rv) return false;
+    const item = rv.closest('[data-rv-key]');
+    const cid = rv.closest('[data-nbcase]').dataset.nbcase;
+    const { rvKind, rvKey } = item.dataset;
+    if (rv.dataset.rvOpen !== undefined) {
+      const form = $('.rv-form', item);
+      form.hidden = !form.hidden;
+      if (form.hidden) rvOpen.delete(`${cid}|${rvKey}`); else { rvOpen.add(`${cid}|${rvKey}`); $('input,select,textarea', form)?.focus(); }
+      return true;
+    }
+    reviewSave(cid, rvKind, rvKey, item, rv.dataset.rvSeen !== undefined);
+    return true;
+  }
+  function reviewChange(e) {
+    const t = e.target;
+    if (!t.dataset.rvImg) return false;
+    const item = t.closest('[data-rv-key]');
+    reviewImages(t.closest('[data-nbcase]').dataset.nbcase, item.dataset.rvKey, t.dataset.rvImg, [...t.files], item);
+    return true;
+  }
+
+  // ---- The updates log: what was entered / done, for the PGs' "HS updates" tab.
+  function logUpdate(caseId, text) {
+    const c = Store.cases[caseId];
+    if (!c || !text) return;
+    Store.create('updates', uid(), { caseId, name: c.name || '', text: String(text).slice(0, 400), by: Store.who(), email: Store.myEmail || '', role: viewRole(), at: Date.now() });
+  }
+  // Which view this phone shows: house surgeon, AP / chief, or everything. Owners and unit admins
+  // can look at the others' views on their own phone (Settings → View the app as).
+  const previewAs = () => { try { return sessionStorage.getItem('wm.viewAs') || ''; } catch { return ''; } };
+  function viewRole() {
+    const p = previewAs();
+    if (p && (Store.mode === 'local' || Store.isOwner() || Store.canManageTeam())) return p;
+    if (Store.mode === 'local' || Store.isOwner()) return 'full';
+    return viewOfRole(Store.myRole);
   }
   // Save one item. Values go into today's set (one per day: labs.rv_YYYYMMDD) so the e-case sheet's
   // investigation table shows them; the line then leaves the Investigation box.
@@ -880,12 +936,21 @@ const App = (() => {
     const now = Date.now();
     const who = Store.who();
     const ch = {};
+    let said = '';
     if (kind === 'task') {
       Object.assign(ch, { [`tasks.${key}.done`]: true, [`tasks.${key}.doneBy`]: who, [`tasks.${key}.doneAt`]: now });
+      said = `${taskLine(c.tasks?.[key] || {})} — done`;
+    } else if (kind === 'pac') {
+      const base = `work.pacDone.${key}`;
+      Object.assign(ch, { [`${base}.done`]: true, [`${base}.by`]: who, [`${base}.at`]: now });
+      const line = pacLines(c).find((l) => pacKey(l) === key) || key;
+      said = `PAC: ${line.toUpperCase()} — done`;
+      if (c.work?.anaes === 'Provisionally assessed' && pacOpen(c).every((l) => pacKey(l) === key)) { ch['work.anaes'] = 'Assessed'; said += ' (all PAC works done — Assessed)'; }
     } else if (kind === 'op') {
       const note = seen ? 'SEEN, NO FRESH ORDERS' : $('[data-rv-text]', box).value.trim().toUpperCase();
       if (!note) return toast('Type the orders given (or tap Seen — no fresh orders)', 3000);
       Object.assign(ch, { [`opinions.${key}.note`]: note, [`opinions.${key}.noteAt`]: now, [`opinions.${key}.noteBy`]: who });
+      said = `${opLine(c.opinions?.[key] || {})} — ${note}`;
     } else {
       const set = 'rv_' + todayISO().replace(/-/g, '');
       const v = {};
@@ -893,9 +958,11 @@ const App = (() => {
       if (params) {
         $$('[name^="p_"]', box).forEach((el) => { if (el.value.trim()) v[el.name.slice(2)] = el.value.trim(); });
         if (!Object.keys(v).length) return toast('Type at least one value', 2500);
+        said = `${key}: ${params.filter((p) => v[p.k]).map((p) => `${p.label} ${v[p.k]}`).join(', ')}`;
       } else {
         const text = $('[data-rv-text]', box).value.trim().toUpperCase();
         if (!text) return toast('Type the report', 2500);
+        said = `${key}: ${text}`;
         if (/\bECHO\b/.test(key)) ch['work.echo'] = text;
         if (/\bECG\b/.test(key)) ch['work.ecg'] = 'Taken';
         // a written result becomes a row of the investigation table, named after the line
@@ -911,7 +978,8 @@ const App = (() => {
     }
     rvOpen.delete(`${caseId}|${key}`);
     Store.patch('cases', caseId, ch);
-    toast(kind === 'task' ? 'Done ✓' : kind === 'op' ? 'Orders saved to the opinion' : 'Saved to the investigations', 2500);
+    logUpdate(caseId, said);
+    toast(kind === 'task' || kind === 'pac' ? 'Done ✓' : kind === 'op' ? 'Orders saved to the opinion' : 'Saved to the investigations', 2500);
   }
 
   // Pictures for an imaging line (X-ray / CT / MRI / wound pic): saved to the case like the e-case
@@ -940,6 +1008,7 @@ const App = (() => {
     }
     rvOpen.delete(`${caseId}|${key}`);
     Store.patch('cases', caseId, ch);
+    logUpdate(caseId, `${key} — ${n} ${imageKind(kind).label}${n === 1 ? '' : 's'} added${text ? `: ${text}` : ''}`);
     toast(`✓ ${n} ${imageKind(kind).label}${n === 1 ? '' : 's'} added to ${c.name}`, 3000);
   }
 
@@ -1184,19 +1253,7 @@ const App = (() => {
           return;
         }
         // From earlier rounds: open a result form / save it / mark done
-        const rv = e.target.closest('[data-rv-open],[data-rv-save],[data-rv-done],[data-rv-seen]');
-        if (rv) {
-          const item = rv.closest('[data-rv-key]');
-          const cid = rv.closest('[data-nbcase]').dataset.nbcase;
-          const { rvKind, rvKey } = item.dataset;
-          if (rv.dataset.rvOpen !== undefined) {
-            const form = $('.rv-form', item);
-            form.hidden = !form.hidden;
-            if (form.hidden) rvOpen.delete(`${cid}|${rvKey}`); else { rvOpen.add(`${cid}|${rvKey}`); $('input,select,textarea', form)?.focus(); }
-            return;
-          }
-          return reviewSave(cid, rvKind, rvKey, item, rv.dataset.rvSeen !== undefined);
-        }
+        if (reviewClick(e)) return;
         // Quick-tap chip: add the line to the box and save it.
         const add = e.target.closest('[data-add]');
         if (add) {
@@ -1297,11 +1354,7 @@ const App = (() => {
       filter();
       el.addEventListener('change', (e) => {
         const t = e.target;
-        if (t.dataset.rvImg) {
-          const item = t.closest('[data-rv-key]');
-          reviewImages(t.closest('[data-nbcase]').dataset.nbcase, item.dataset.rvKey, t.dataset.rvImg, [...t.files], item);
-          return;
-        }
+        if (reviewChange(e)) return;
         const id = t.closest('[data-nbcase]')?.dataset.nbcase;
         const f = t.dataset.nb;
         if (!id || !f || !Store.cases[id]) return;
@@ -1963,6 +2016,7 @@ const App = (() => {
               return;
             }
             Store.patch('cases', id, { [`${base}.done`]: t.checked, [`${base}.by`]: Store.who(), [`${base}.at`]: Date.now() });
+            if (t.checked) logUpdate(id, `PAC: ${(pacLines(Store.cases[id]).find((l) => pacKey(l) === k) || '').toUpperCase()} — done`);
             const cur = Store.cases[id];
             if (t.checked && cur.work?.anaes === 'Provisionally assessed' && pacLines(cur).length && !pacOpen(cur).length) {
               Store.patch('cases', id, { 'work.anaes': 'Assessed' });
@@ -1976,6 +2030,10 @@ const App = (() => {
             const val = t.value.trim();
             if (val === String(cur).trim()) return;
             Store.patch('cases', id, { [`${base}.v.${t.dataset.lk}`]: val || DELETE, [`${base}.by`]: Store.who() });
+            if (val) {
+              const p = [...ALL_PARAMS, ...customParams(Store.cases[id])].find((x) => x.k === t.dataset.lk);
+              logUpdate(id, `${p?.label || t.dataset.lk} ${val}`);
+            }
             return;
           }
           if (t.dataset.labDate) {
@@ -1993,11 +2051,14 @@ const App = (() => {
             Store.patch('cases', id, ch);
           } else if (t.dataset.bind) {
             Store.patch('cases', id, { [t.dataset.bind]: t.value.trim() });
+            const op = /^opinions\.(\w+)\.note$/.exec(t.dataset.bind);
+            if (op && t.value.trim()) logUpdate(id, `${opLine(Store.cases[id].opinions?.[op[1]] || {})} — ${t.value.trim().toUpperCase()}`);
           } else if (t.dataset.task) {
             const k = 'tasks.' + t.dataset.task;
             Store.patch('cases', id, t.checked
               ? { [k + '.done']: true, [k + '.doneBy']: Store.who(), [k + '.doneAt']: Date.now() }
               : { [k + '.done']: false });
+            if (t.checked) logUpdate(id, `${taskLine(Store.cases[id].tasks?.[t.dataset.task] || {})} — done`);
           } else if (t.dataset.upload) {
             const files = [...t.files];
             t.value = '';
@@ -2135,7 +2196,7 @@ const App = (() => {
           <div class="viewer-bar">
             <span><b>${esc(c?.name || '')}</b> · ${esc(imageKind(im.kind).deck)} · ${idx + 1} of ${all.length}${im.caption ? ' · ' + esc(im.caption) : ''}</span>
             <span>
-              <button class="btn small danger" data-v="del">Delete</button>
+              ${viewRole() === 'consultant' ? '' : '<button class="btn small danger" data-v="del">Delete</button>'}
               <button class="btn small" data-v="close">Close</button>
             </span>
           </div>
@@ -3691,6 +3752,11 @@ const App = (() => {
 
         ${staffSection()}
 
+        ${Store.mode === 'local' || Store.isOwner() || Store.canManageTeam() ? `<div class="card">
+          <h3>Views</h3>
+          <p class="muted small">Each person sees the view of their role on the team list: <b>House Surgeon</b> — To-do and e-case sheets; <b>Assistant Professor / Professor</b> — case sheets in folders (basics, imaging, opinions); everyone else — the whole app. PGs get an <b>HS updates</b> tab.</p>
+          <label>View the app as (this phone only, to check)<select id="view-as">${opts([['', 'My own view'], ['full', 'PG (whole app)'], ['hs', 'House surgeon'], ['consultant', 'Assistant Professor / Chief']], previewAs())}</select></label>
+        </div>` : ''}
         <div class="card">
           <h3>Sharing</h3>
           ${Store.mode === 'local'
@@ -3700,7 +3766,7 @@ const App = (() => {
             : `<p>Signed in as <b>${esc(Store.user?.email)}</b> · sync: ${esc(Store.status)} <button class="btn small" id="signout">Sign out</button></p>
                ${Store.localCaseCount() ? `<p class="notice">This device has <b>${Store.localCaseCount()}</b> case(s) saved before sharing was switched on. <button class="btn small primary" id="upload-local">Copy them to the shared database</button></p>` : ''}
                <h4>Unit ${esc(m.unitId)} team</h4>
-               <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> <span class="muted">${esc(x.role)} · ${esc(x.email)}</span>${x.admin ? ' <span class="tag">unit admin</span>' : ''}${Store.isOwner() ? ` <button class="btn small" data-admin="${esc(x.email)}" data-on="${x.admin ? '' : '1'}">${x.admin ? 'Remove admin' : 'Make admin'}</button>` : ''}${Store.canManageTeam() && (Store.isOwner() || x.email !== Store.user?.email?.toLowerCase()) ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">No one yet.</li>'}</ul>
+               <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> ${Store.canManageTeam() ? ` <select class="role-pick" data-role-of="${esc(x.email)}" aria-label="Role of ${esc(x.name || x.email)}">${opts(ROLES.includes(x.role) || !x.role ? ROLES : [x.role, ...ROLES], x.role || 'PG')}</select> <span class="muted">${esc(x.email)}</span>` : `<span class="muted">${esc(x.role)} · ${esc(x.email)}</span>`}${x.admin ? ' <span class="tag">unit admin</span>' : ''}${Store.isOwner() ? ` <button class="btn small" data-admin="${esc(x.email)}" data-on="${x.admin ? '' : '1'}">${x.admin ? 'Remove admin' : 'Make admin'}</button>` : ''}${Store.canManageTeam() && (Store.isOwner() || x.email !== Store.user?.email?.toLowerCase()) ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">No one yet.</li>'}</ul>
                ${Store.canManageTeam() ? `<form class="inline-add" id="add-member">
                  <label class="mini-lab">Gmail of HS / PG<input name="email" type="email" required></label>
                  <label class="mini-lab">Name<input name="name"></label>
@@ -3735,6 +3801,18 @@ const App = (() => {
         document.documentElement.classList.toggle('grad', ['crimson', 'aurora', 'blossom', 'mint', 'sorbet'].includes(k));
         try { localStorage.setItem('wm.ui', k); } catch { /* private mode */ }
         render();
+      });
+      const va = $('#view-as', el);
+      if (va) va.onchange = () => {
+        try { if (va.value) sessionStorage.setItem('wm.viewAs', va.value); else sessionStorage.removeItem('wm.viewAs'); } catch { /* ignore */ }
+        location.hash = va.value === 'consultant' || va.value === 'hs' ? '#/' : '#/settings';
+        current = null;
+        render();
+        toast(va.value ? `Showing the ${va.options[va.selectedIndex].text} view — Settings → Views to go back` : 'Back to your own view', 4000);
+      };
+      el.addEventListener('change', (e) => {
+        const r = e.target.closest('[data-role-of]');
+        if (r) { Store.setRole(r.dataset.roleOf, r.value); toast(`${r.dataset.roleOf}: ${r.value}`); }
       });
       const us = $('#unit-switch', el);
       if (us) us.onchange = (e) => { e.stopPropagation(); Store.switchUnit(e.target.value); toast(`Opened UNIT ${UNITS[Store.unitKeys.indexOf(e.target.value)].id}`); };
@@ -3978,6 +4056,143 @@ const App = (() => {
     },
   };
 
+  // ================================================================ Views by role
+  // ---- House surgeons: everything open, patient by patient, with a place to enter the result.
+  const Todo = {
+    live: true,
+    filter: 'all',
+    render() {
+      const cs = allCases().filter((c) => isActive(c) || c.status === 'postop')
+        .filter((c) => Todo.filter === 'all' || (Todo.filter === 'post') === (c.status === 'postop'))
+        .sort((a, b) => (a.status === 'postop') - (b.status === 'postop') || String(a.doa || '').localeCompare(String(b.doa || '')));
+      const rows = cs.map((c) => ({ c, items: allTodos(c) })).filter((x) => x.items.length);
+      const total = rows.reduce((n, x) => n + x.items.length, 0);
+      return `
+        <div class="toolbar"><h2>To-do <span class="pill">${total}</span></h2></div>
+        <div class="chips">${[['all', 'All'], ['pre', 'Pre-op ward'], ['post', 'Post-op ward']].map(([k, l]) => `<button type="button" class="chip${Todo.filter === k ? ' on' : ''}" data-tf="${k}">${l}</button>`).join('')}</div>
+        <p class="muted small">Enter the result, the opinion's orders, add the picture, or mark the work done. The PGs see each one as soon as you save it.</p>
+        ${rows.map(({ c, items }) => `<div class="card todo-case" data-nbcase="${c.id}">
+            <div class="todo-head"><div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}</span>
+              <span class="tag">${c.status === 'postop' ? 'Post-op' : 'Pre-op'}</span>${c.ward ? ` <span class="muted small">Ward ${esc(c.ward)}</span>` : ''}
+              <div class="muted small">${esc(c.diagnosis || '')}</div></div>
+              <a class="btn small" href="#/case/${c.id}">e-Case sheet</a></div>
+            ${reviewRows(c, items)}
+          </div>`).join('') || '<div class="card empty">Nothing pending. 🎉</div>'}`;
+    },
+    mount(el) {
+      el.addEventListener('click', (e) => {
+        const f = e.target.closest('[data-tf]');
+        if (f) { Todo.filter = f.dataset.tf; render(); return; }
+        reviewClick(e);
+      });
+      el.addEventListener('change', reviewChange);
+    },
+  };
+
+  // ---- PGs: what the house surgeons saved, live.
+  const upSeenKey = () => `wm.upSeen.${Store.unitKey || 'local'}`;
+  const hsUpdates = (all = false) => listOf(Store.updates).filter((u) => all || u.role === 'hs').sort((a, b) => (b.at || 0) - (a.at || 0));
+  const unseenUpdates = () => {
+    let seen = 0;
+    try { seen = +localStorage.getItem(upSeenKey()) || 0; } catch { /* ignore */ }
+    return hsUpdates().filter((u) => u.at > seen && u.email !== Store.myEmail).length;
+  };
+  const Updates = {
+    live: true,
+    all: false,
+    render() {
+      const ups = hsUpdates(Updates.all).slice(0, 300);
+      const byDay = {};
+      for (const u of ups) (byDay[new Date(u.at).toISOString().slice(0, 10)] ||= []).push(u);
+      const day = (d) => (d === todayISO() ? 'Today' : d === todayISO(-1) ? 'Yesterday' : fmtDate(d));
+      const hm = (at) => new Date(at).toTimeString().slice(0, 5);
+      return `
+        <div class="toolbar"><h2>${Updates.all ? 'Updates' : 'House surgeon updates'}</h2>
+          <label class="small nowrap"><input type="checkbox" id="up-all" ${Updates.all ? 'checked' : ''}> everyone's</label></div>
+        <p class="muted small">Live: each result, opinion's orders or finished work appears here the moment it's saved.</p>
+        ${Object.entries(byDay).map(([d, list]) => `<div class="card"><h4>${esc(day(d))}</h4><ul class="updates">${list.map((u) => `
+            <li><span class="up-time">${esc(hm(u.at))}</span>
+              <span><a href="#/case/${esc(u.caseId)}"><b>${esc(u.name)}</b></a> — ${esc(u.text)}
+              <span class="muted small">· ${esc(u.by)}</span></span></li>`).join('')}</ul></div>`).join('')
+          || `<div class="card empty">No ${Updates.all ? '' : 'house surgeon '}updates yet.</div>`}`;
+    },
+    mount(el) {
+      try { localStorage.setItem(upSeenKey(), String(Date.now())); } catch { /* ignore */ }
+      const a = $('#up-all', el);
+      if (a) a.onchange = () => { Updates.all = a.checked; render(); };
+    },
+  };
+
+  // ---- APs and chiefs: case sheets in folders — the basics, imaging and opinions, nothing to edit.
+  const FOLDERS = [
+    ['preop', 'Pre-op', (c) => isActive(c)],
+    ['postop', 'Post-op', (c) => c.status === 'postop'],
+    ...Object.entries(TRANSFER_DEPTS).map(([k, D]) => [k, D.folder || D.short, (c) => c.status === k]),
+  ];
+  const Folders = {
+    live: true,
+    f: 'preop',
+    render() {
+      const all = allCases();
+      const [, label, test] = FOLDERS.find((x) => x[0] === Folders.f) || FOLDERS[0];
+      const list = all.filter(test).sort((a, b) => String(a.doa || '').localeCompare(String(b.doa || '')));
+      return `
+        <div class="toolbar"><h2>Case sheets</h2></div>
+        <div class="folders">${FOLDERS.map(([k, l, t]) => { const n = all.filter(t).length; return `<button type="button" class="folder${Folders.f === k ? ' on' : ''}" data-folder="${k}"><span class="folder-ico" aria-hidden="true">📁</span><span>${esc(l)}</span><span class="pill">${n}</span></button>`; }).join('')}</div>
+        <h3>${esc(label)} <span class="muted small">${list.length} case${list.length === 1 ? '' : 's'}</span></h3>
+        <div class="fold-list">${list.map((c) => {
+          const n = caseImages(c.id).length;
+          const ops = listOf(c.opinions).length;
+          return `<a class="card fold-case" href="#/c/${c.id}">
+            <div><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}</span>${c.ipNo ? ` <span class="muted small">IP ${esc(c.ipNo)}</span>` : ''}</div>
+            <div class="small">${esc(c.diagnosis || '')}</div>
+            <div class="muted small">${esc([c.procedureDone ? '✓ ' + c.procedureDone : c.plan ? '▸ ' + c.plan : '', c.doa && 'DOA ' + fmtDate(c.doa), (c.surgeryDate || c.otDate) && c.status === 'postop' && 'DOS ' + fmtDate(c.surgeryDate || c.otDate)].filter(Boolean).join(' · '))}</div>
+            <div class="muted small">${n ? `🖼 ${n} image${n === 1 ? '' : 's'}` : 'No images'}${ops ? ` · ${ops} opinion${ops === 1 ? '' : 's'}` : ''}</div>
+          </a>`;
+        }).join('') || '<div class="card empty">No cases in this folder.</div>'}</div>`;
+    },
+    mount(el) {
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-folder]');
+        if (b) { Folders.f = b.dataset.folder; render(); }
+      });
+    },
+  };
+  function ConsultCase(id) {
+    return {
+      live: true,
+      render() {
+        const c = Store.cases[id];
+        if (!c) return notFound();
+        const folder = FOLDERS.find(([, , t]) => t({ id, ...c }))?.[1] || '';
+        const rows = [
+          ['Name', c.name], ['Age / Sex', ageSex(c)], ['IP no.', c.ipNo], ['Ward', c.ward], ['DOA', c.doa && fmtDate(c.doa)],
+          ['Diagnosis', c.diagnosis], ['Comorbidities', c.comorbid], ['Plan', c.plan], ['Procedure done', c.procedureDone],
+          ['Date of surgery', (c.surgeryDate || c.otDate) && c.status === 'postop' ? fmtDate(c.surgeryDate || c.otDate) : ''], ['Surgeon', c.surgeon],
+        ].filter(([, v]) => hasText(v));
+        const imgs = caseImages(id);
+        const kinds = [...new Set(imgs.map((im) => im.kind))];
+        const ops = listOf(c.opinions);
+        return `
+          <div class="toolbar"><a class="btn" href="#/">← Case sheets</a>${folder ? `<span class="tag">${esc(folder)}</span>` : ''}</div>
+          <div class="card"><h2>${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span></h2>
+            <dl class="kv">${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl></div>
+          <div class="card"><h3>Imaging <span class="pill">${imgs.length}</span></h3>
+            ${kinds.map((k) => `<h4>${esc(imageKind(k).label)}</h4><div class="thumbs">${caseImages(id, k).map((im) => `<button type="button" class="thumb" data-open="${im.id}" data-kind="${esc(k)}"><img data-img="${im.id}" alt=""><span>${esc(im.caption || imageKind(k).label)}</span></button>`).join('')}</div>`).join('') || '<p class="muted">No images yet.</p>'}</div>
+          <div class="card"><h3>Opinions <span class="pill">${ops.length}</span></h3>
+            ${ops.map((o) => `<div class="op-row"><b>${esc(String(o.dept || '').toUpperCase())}</b>${o.at ? ` <span class="muted small">asked ${esc(fmtDate(new Date(o.at).toISOString().slice(0, 10)))}</span>` : ''}
+              <div>${hasText(o.note) ? esc(o.note) : '<span class="muted">Awaited</span>'}</div></div>`).join('') || '<p class="muted">No opinions sought.</p>'}</div>`;
+      },
+      mount(el) {
+        $$('img[data-img]', el).forEach((img) => { Store.getImage(img.dataset.img).then((src) => { if (src) img.src = src; }); });
+        el.addEventListener('click', (e) => {
+          const t = e.target.closest('[data-open]');
+          if (t) openViewer(id, t.dataset.open, t.dataset.kind);
+        });
+      },
+    };
+  }
+
   const ROUTES = [
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
@@ -3999,6 +4214,21 @@ const App = (() => {
   function resolve() {
     if (Store.mode === 'firebase' && Store.status !== 'ok') return Gate;
     const h = location.hash || '#/';
+    const view = viewRole();
+    let m;
+    // APs and chiefs: the folders and the case sheets in them (and Settings) — nothing else.
+    if (view === 'consultant') {
+      if ((m = h.match(/^#\/c\/(\w+)$/))) return ConsultCase(m[1]);
+      if (/^#\/settings$/.test(h)) return Settings;
+      return Folders;
+    }
+    // House surgeons: their to-do and the e-case sheets; not the wards' rounds, OT list or PPTs.
+    if (view === 'hs' && (/^#?\/?$/.test(h) || /^#\/(ward|postward|ot(\/list)?|deck|postop|updates|import(\/.*)?|folders)$/.test(h))) return Todo;
+    if (h === '#/todo') return Todo;
+    if (h === '#/updates') return Updates;
+    if (h === '#/cases') return Dashboard;
+    if (h === '#/folders') return Folders;
+    if ((m = h.match(/^#\/c\/(\w+)$/))) return ConsultCase(m[1]);
     for (const [re, mk] of ROUTES) {
       const m = h.match(re);
       if (m) return mk(m[1]);
@@ -4007,8 +4237,28 @@ const App = (() => {
   }
 
   function section() {
-    const m = (location.hash || '#/').match(/^#\/(ward|postward|ot|deck|postop|settings)\b/);
+    const h = location.hash || '#/';
+    const view = viewRole();
+    if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
+    if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
+    if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases)\b/);
     return m ? '#/' + m[1] : '#/';
+  }
+  // The tabs this view has, which one is open, and the PGs' count of new HS updates.
+  function paintNav() {
+    const view = viewRole();
+    const sec = section();
+    $$('#nav a').forEach((a) => {
+      a.hidden = !(a.dataset.v || 'full').split(' ').includes(view);
+      a.classList.toggle('on', a.getAttribute('href') === sec);
+    });
+    const up = $('#nav a[href="#/updates"]');
+    if (up) {
+      const n = view === 'full' ? unseenUpdates() : 0;
+      up.innerHTML = `HS updates${n ? ` <span class="pill new">${n}</span>` : ''}`;
+    }
+    document.documentElement.dataset.view = view;
   }
 
   // PAC: show "work pending" only for provisionally / not assessed.
@@ -4023,8 +4273,11 @@ const App = (() => {
     document.body.classList.remove('rounds-mode'); // the ward view puts it back while rounds are on
     Voice.stop();
     const y = window.scrollY;
-    const same = current && current.hash === location.hash;
-    if (!same) current = { hash: location.hash, view: resolve() };
+    // the page is chosen again when the address changes, or when the role becomes known / changes
+    // (the team list can arrive a moment after the first draw)
+    const role = viewRole();
+    const same = current && current.hash === location.hash && current.role === role;
+    if (!same) current = { hash: location.hash, view: resolve(), role };
     const v = current.view;
     const bs = $('.brand-sub');
     if (bs) bs.textContent = `· Ortho Unit ${Store.meta.unitId}`;
@@ -4042,8 +4295,7 @@ const App = (() => {
     // Voice.attach(fresh); — dictation buttons switched off for now (js/voice.js)
     current.loading = Store.status === 'connecting' && !!fresh.querySelector('.empty');
     window.scrollTo(0, same ? y : 0);
-    const sec = section();
-    $$('#nav a').forEach((a) => a.classList.toggle('on', a.getAttribute('href') === sec));
+    paintNav();
     updateSync();
   }
 
@@ -4201,8 +4453,28 @@ const App = (() => {
   }
   window.addEventListener('online', () => queueOffline(1000));
 
+  let upToastAt = Date.now();
+  let upPruned = false;
+  function updatesChanged() {
+    if (viewRole() !== 'full') return;
+    paintNav();
+    const fresh = hsUpdates().filter((u) => u.at > upToastAt && u.email !== Store.myEmail);
+    if (fresh.length && !/^#\/updates/.test(location.hash)) {
+      const u = fresh[0];
+      toast(`HS update · ${u.name}: ${u.text}${fresh.length > 1 ? ` (+${fresh.length - 1} more)` : ''}`, 5000);
+    }
+    if (fresh.length) upToastAt = Math.max(...fresh.map((u) => u.at));
+    // keep a week
+    if (!upPruned && Store.synced) {
+      upPruned = true;
+      const old = Date.now() - 7 * 864e5;
+      listOf(Store.updates).filter((u) => (u.at || 0) < old).forEach((u) => Store.remove('updates', u.id));
+    }
+  }
+
   function onStoreChange() {
     if (Store.synced) queueOffline();
+    updatesChanged();
     const gateNeeded = Store.mode === 'firebase' && Store.status !== 'ok';
     if (gateNeeded !== (current?.view === Gate)) {
       current = null;
@@ -4214,6 +4486,7 @@ const App = (() => {
       setTimeout(doaFix, 2500);
     }
     if (!current) return render();
+    if (current.role !== viewRole() && !editing()) return render(); // role arrived / changed: that view's pages
     if (!current.view.live && !current.loading) return updateSync();
     // Wait a tick: a save fired by leaving one box arrives while focus is still moving to the
     // next box. Re-rendering at that instant would destroy the box being tapped.
