@@ -1813,7 +1813,3 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 #guest-bar { background: #ffd34d; color: #1a1a1a; text-align: center; padding: .35rem .8rem; font-size: .85rem; font-weight: 600; }
 #guest-bar .link { color: #1a1a1a; text-decoration: underline; font-weight: 700; }
 .gate-keep { display: flex; gap: .4rem; align-items: center; }
-
-/* Callus logo in the title bar */
-.brand-ico { width: 18px; height: 18px; background: url(../assets/icons/logo.svg) center / contain no-repeat; box-shadow: none; border-radius: 4px; }
-.brand-ico::before, .brand-ico::after { display: none; }

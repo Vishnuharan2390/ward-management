@@ -4382,7 +4382,7 @@ const App = (() => {
       try { SchemeTab.reps = await Store.schemeReports(mon, addDays(mon, 6)); SchemeTab.err = ''; } catch (e) { SchemeTab.reps = []; SchemeTab.err = e.code || e.message; }
       SchemeTab.loading = false;
       SchemeTab.loadedWeek = mon + '|' + Store.unitKey;
-      if (/^#\/spec/.test(location.hash)) { current = null; render(); }
+      if (/^#\/scheme/.test(location.hash)) { current = null; render(); }
     },
     // The unit-wise table of the department's scheme report. Each case once (its latest OT list that
     // week); standby cases left out. `scheme` = on the OT day, `now` = today (sent back by the unit).
@@ -4707,7 +4707,7 @@ const App = (() => {
           <h2>Which unit?</h2>
           <div class="home-units">${Store.unitKeys.map((k, i) => {
             const u = UNITS[i];
-            const sp = SPECIALTIES[specOfUnit(u.id)]?.label || (u.id === SCHEME_UNIT ? 'Scheme report' : '');
+            const sp = SPECIALTIES[specOfUnit(u.id)]?.label || '';
             return `<button type="button" class="home-unit" data-unit="${k}"><b>Unit ${esc(u.id)}</b>${sp ? `<span class="muted small">${esc(sp)}</span>` : ''}</button>`;
           }).join('')}</div>
         </div>`;
@@ -4717,7 +4717,7 @@ const App = (() => {
       const posted = cs.filter((c) => c.status === 'posted').length;
       const post = cs.filter((c) => c.status === 'postop').length;
       const S = SPECIALTIES[specOfUnit(Store.meta.unitId)];
-      const extra = S ? ['#/spec', `${S.label} cases`] : Store.meta.unitId === SCHEME_UNIT ? ['#/spec', 'Scheme report'] : null;
+      const extra = S ? ['#/spec', `${S.label} cases`] : null;
       const who = String(Store.profile().name || Store.user?.displayName || '').trim();
       const h = new Date().getHours();
       return `
@@ -4786,7 +4786,8 @@ const App = (() => {
     if (h === '#/home') return Home;
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
-    if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
+    if (h === '#/spec') return SpecTab;
+    if (h === '#/scheme') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : Home;
     if (h === '#/cases') return Dashboard;
     if (h === '#/folders') return Folders;
     if ((m = h.match(/^#\/c\/(\w+)$/))) return ConsultCase(m[1]);
@@ -4803,7 +4804,7 @@ const App = (() => {
     if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
     if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
     if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
-    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|home)\b/);
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|home)\b/);
     return m ? '#/' + m[1] : '#/';
   }
   // The tabs this view has, which one is open, and the PGs' count of new HS updates.
@@ -4822,8 +4823,11 @@ const App = (() => {
     const sp = $('#nav a[href="#/spec"]');
     if (sp) {
       const S = SPECIALTIES[specOfUnit(Store.meta.unitId)];
-      if (S) sp.textContent = `${S.label} cases`; else if (Store.meta.unitId === SCHEME_UNIT) sp.textContent = 'Scheme report'; else sp.hidden = true;
+      if (S) sp.textContent = `${S.label} cases`;
+      if (!S) sp.hidden = true;
     }
+    const sch = $('#nav a[href="#/scheme"]');
+    if (sch && Store.meta.unitId !== SCHEME_UNIT) sch.hidden = true;
     document.documentElement.dataset.view = view;
   }
 

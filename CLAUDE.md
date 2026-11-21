@@ -40,11 +40,11 @@
 - This is a view, not a security boundary: firestore.rules still let any unit member read/write the unit.
 
 ## Unit specialties (SPECIALTIES in js/data.js)
-- I arthroplasty, II arthroscopy, III tumour, IV spine, V paediatrics (VI none). Each case gets `specs` (specsOf) written
+- I arthroplasty, II arthroscopy, III tumour, IV spine, V paediatrics, VI foot & ankle. Each case gets `specs` (specsOf) written
   by its own unit's app (tagSpecs in js/app.js). firestore.rules let a specialty unit read (not write) cases whose
   `specs` contain its specialty, and their images, from every unit (Store.specCases / getImage(id, unit)).
 - Tab #/spec ("Arthroplasty cases" etc.): cases in the wards now + weekly (Mon–Sun) report PowerPoint (DeckEngine, noCover).
-- Unit VI's tab (#/spec) is the **Scheme report** instead: every OT list generated (sendScheme in js/app.js) writes
+- Unit VI also has the **Scheme report** tab (#/scheme): every OT list generated (sendScheme in js/app.js) writes
   schemeReports/<unit>_<OT date> (scheme + reason per case); Unit VI reads a Mon–Sun week, PDF via jsPDF autotable.
 
 ## Guest demo (temporary — owner will ask to remove it)
@@ -53,4 +53,5 @@
 - Removal steps are at the top of js/demo.js.
 
 ## Logo
-- assets/icons/logo.svg is the source; the PNG icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).
+- The emblem is the Andry tree (assets/andry-tree.svg; title bar + hospital panel via CSS mask). assets/icons/logo.svg = that tree
+  in white on navy; the PNG app icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).
