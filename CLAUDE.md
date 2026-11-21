@@ -55,3 +55,6 @@
 ## Logo
 - The emblem is the Andry tree (assets/andry-tree.svg; title bar + hospital panel via CSS mask). assets/icons/callus-tree.svg = that tree
   in white on navy; the PNG app icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).
+
+## Wards
+- Ward fields are a dropdown of WARDS (js/data.js) via wardOpts in js/app.js; an old free-typed ward stays selectable.

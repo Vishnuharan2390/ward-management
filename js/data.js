@@ -466,6 +466,7 @@ const SPECIALTIES = {
 // Unit VI (foot & ankle — a name only; no specialty tab) compiles the weekly scheme report from every unit's OT lists (#/scheme).
 const UNIT_NAMES = { VI: 'Foot & ankle' };
 const SCHEME_UNIT = 'VI';
+const WARDS = ['90A', '90B', '90C', '90D', '90E', '90F', '500B', '500C', '500D', 'SICU', 'PAYWARD', '99', 'TRIAGE', '101-ICU', '101A'];
 const NO_SCHEME_REASONS = ['NO CMCHIS CARD', 'NOT ELIGIBLE (INCOME / RATION CARD)', 'OUT OF STATE PATIENT', 'DOCUMENTS NOT AVAILABLE', 'PATIENT NOT WILLING',
   'PROCEDURE NOT COVERED', 'IMPLANT NOT COVERED', 'SCHEME LIMIT EXHAUSTED', 'EMERGENCY — NOT REGISTERED IN TIME'];
 const specOfUnit = (romanId) => Object.keys(SPECIALTIES).find((k) => SPECIALTIES[k].unit === romanId) || '';

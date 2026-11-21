@@ -12,6 +12,12 @@ const App = (() => {
   const allCases = () => Object.entries(Store.cases).map(([id, c]) => ({ id, ...c }));
   const caseList = () => allCases().filter((c) => !c.otOnly);
   const statusBadge = (s) => `<span class="badge st-${esc(s || 'preop')}">${esc(CASE_STATUS[s] || 'Pre-op')}</span>`;
+  // Ward: pick from the hospital's wards; an older free-typed ward stays as its own option.
+  const wardOpts = (v) => {
+    const cur = String(v || '').trim().toUpperCase();
+    const list = cur && !WARDS.includes(cur) ? [cur, ...WARDS] : WARDS;
+    return `<option value="">—</option>${list.map((w) => `<option${w === cur ? ' selected' : ''}>${esc(w)}</option>`).join('')}`;
+  };
   const levelOpts = (sel) => opts([['', '—'], ...LEVELS.map((l) => [l, l])], sel || '');
   const schemeOpts = (sel) => opts([['', '—'], ...SCHEMES.map((s) => [s, s])], sel || '');
   const isActive = (c) => ['preop', 'posted', undefined, ''].includes(c.status);
@@ -482,7 +488,7 @@ const App = (() => {
               <label>Age<input data-i="${i}" data-f="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex${sexSel(i, c.sex)}</label>
               <label>IP no.<input data-i="${i}" data-f="ipNo" value="${esc(c.ipNo)}"></label>
-              <label>Ward<input data-i="${i}" data-f="ward" value="${esc(c.ward)}"></label>
+              <label>Ward<select data-i="${i}" data-f="ward">${wardOpts(c.ward)}</select></label>
               <label>Mode<input data-i="${i}" data-f="mode" list="dl-mode" value="${esc(c.mode)}"></label>
               <label>DOA<input type="date" data-i="${i}" data-f="doa" value="${esc(c.doa)}"></label>
               <label class="span2">Diagnosis<textarea data-i="${i}" data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
@@ -1440,7 +1446,7 @@ const App = (() => {
               <label>Age<input name="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
               <label>IP number<input name="ipNo" value="${esc(c.ipNo)}"></label>
-              <label>Ward<input name="ward" value="${esc(c.ward)}"></label>
+              <label>Ward<select name="ward">${wardOpts(c.ward)}</select></label>
               <label>Date of admission<input type="date" name="doa" value="${esc(c.doa)}"></label>
               <label>Attender<input name="attender" value="${esc(c.attender)}"></label>
               <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
@@ -2339,7 +2345,7 @@ const App = (() => {
             <label>Age<input name="age" inputmode="numeric"></label>
             <label>Sex<select name="sex"><option></option><option>M</option><option>F</option></select></label>
             <label>IP no.<input name="ipNo"></label>
-            <label>Ward<input name="ward"></label>
+            <label>Ward<select name="ward">${wardOpts('')}</select></label>
             <label class="span2">Diagnosis<textarea name="diagnosis" rows="2" required></textarea></label>
             <label class="span2">Plan<input name="plan"></label>
             <label>Anaesthesia<select name="anaes"><option value="">—</option>${opts(PAC_OPTIONS, '')}</select></label>
@@ -2384,7 +2390,7 @@ const App = (() => {
                   </span>
                 </div>
                 <div class="ot-fields">
-                  <label>Ward<input data-f="ward" value="${esc(c.ward)}"></label>
+                  <label>Ward<select data-f="ward">${wardOpts(c.ward)}</select></label>
                   <label>Level<select data-f="level">${levelOpts(c.level)}</select></label>
                   <label>Scheme status<select data-f="scheme">${schemeOpts(c.scheme)}</select></label>
                   ${['NO SCHEME', 'DENIED'].includes(c.scheme) ? `<label class="span2">No-scheme reason<input data-f="schemeReason" list="dl-noscheme" value="${esc(c.schemeReason || '')}" placeholder="Why no scheme (for Unit VI's report)"></label>` : ''}
