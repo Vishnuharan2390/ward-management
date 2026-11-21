@@ -75,7 +75,7 @@ const DcImport = (() => {
     ['diagnosis', ['DIAGNOSIS IN DETAIL', 'FINAL DIAGNOSIS', 'PROVISIONAL DIAGNOSIS', 'DIAGNOSIS']],
     ['procedure', ['PROCEDURE IN DETAIL', 'PROCEDURE DONE', 'PROCEDURES DONE', 'SURGERY DONE', 'OPERATION DONE', 'SURGICAL PROCEDURE', 'OPERATIVE PROCEDURE', 'PROCEDURE', 'SURGERY']],
     ['unitLine', ['UNIT / CONSULTANTS', 'UNIT/CONSULTANTS', 'UNIT & CONSULTANTS', 'CONSULTANTS']],
-    ['history', ['H/O INJURY / ILLNESS', 'H/O INJURY/ILLNESS', 'H/O INJURY', 'H/O ILLNESS', 'HISTORY OF PRESENT ILLNESS', 'HISTORY OF PRESENTING ILLNESS', 'PRESENTING COMPLAINTS', 'PRESENTING COMPLAINT', 'CHIEF COMPLAINTS', 'COMPLAINTS', 'HOPI', 'HISTORY']],
+    ['history', ['H/O INJURY / ILLNESS', 'H/O INJURY/ILLNESS', 'H/O PRESENTING ILLNESS', 'H/O PRESENT ILLNESS', 'H/O PRESENTING COMPLAINTS', 'H/O PRESENTING COMPLAINT', 'H/O INJURY', 'H/O ILLNESS', 'HISTORY OF PRESENT ILLNESS', 'HISTORY OF PRESENTING ILLNESS', 'HISTORY OF PRESENTING COMPLAINTS', 'HISTORY OF INJURY', 'PRESENTING COMPLAINTS', 'PRESENTING COMPLAINT', 'CHIEF COMPLAINTS', 'COMPLAINTS', 'HOPI', 'HPI', 'HISTORY']],
     ['past', ['PAST HISTORY / TREATMENT HISTORY', 'PAST HISTORY/TREATMENT HISTORY', 'PAST MEDICAL HISTORY', 'PAST HISTORY', 'TREATMENT HISTORY']],
     ['exam', ['EXAMINATION FINDINGS', 'CLINICAL EXAMINATION', 'GENERAL EXAMINATION', 'LOCAL EXAMINATION', 'ON EXAMINATION', 'EXAMINATION', 'O/E']],
     ['investigations', ['INVESTIGATIONS', 'LAB INVESTIGATIONS', 'INVESTIGATION']],
@@ -126,7 +126,8 @@ const DcImport = (() => {
     hits.sort((a, b) => a.at - b.at || b.end - a.end);
     const keep = hits.filter((h, i) => !hits.some((o, j) => j < i && h.at < o.end)); // no overlaps
     return keep.map((h, i) => ({ k: h.k, v: line.slice(h.end, keep[i + 1]?.at ?? line.length).replace(/^\s*[:：\-–]+\s*/, '').trim() }))
-      .filter((p) => p.v && !/^[:\-]$/.test(p.v));
+      // nothing written: blank, a dash, NA / NIL / not applicable
+      .filter((p) => p.v && !/^([:\-–.]+|N\.?\/?A\.?|NIL|NONE|NOT APPLICABLE)$/i.test(p.v));
   }
   function isoDate(s) {
     const m = /(\d{1,2})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{2,4})/.exec(s || '');

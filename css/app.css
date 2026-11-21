@@ -1763,3 +1763,7 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .imp-rows { display: grid; gap: .1rem; margin: .4rem 0; }
 .imp-row { display: flex; gap: .5rem; align-items: flex-start; padding: .35rem 0; border-top: 1px solid var(--line, #333); }
 .imp-row > span { display: grid; }
+
+/* the buttons stay in view while the list scrolls */
+.dc-imp-pop .sug-box { padding-bottom: 0; }
+.dc-imp-pop .form-actions { position: sticky; bottom: 0; margin: .4rem -1rem 0; padding: .7rem 1rem calc(.7rem + env(safe-area-inset-bottom)); background: var(--card, #1b1b1d); border-top: 1px solid var(--line, #333); z-index: 1; }
