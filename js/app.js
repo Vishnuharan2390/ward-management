@@ -2290,6 +2290,7 @@ const App = (() => {
         return `
         <div class="toolbar">
           <h2>OT list · pick cases</h2>
+          <label class="btn small" title="An OT list made outside the app (Word or PDF): its scheme status goes to Unit VI's scheme report">⬆ Upload OT list<input type="file" id="ot-upload" accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden></label>
           <a class="btn primary" href="#/ot/list" ${sel.length ? '' : 'aria-disabled="true"'} id="ot-next">Next (${sel.length}) →</a>
         </div>
         <div class="card">
@@ -2429,6 +2430,68 @@ const App = (() => {
       if ($('#ot-chief', el)) $('#ot-chief', el).onchange = (e) => upd((x) => { x.chief = e.target.value; }, false);
       if ($('#ot-prof', el)) $('#ot-prof', el).onchange = (e) => upd((x) => { x.prof = e.target.value; }, false);
       if ($('#ot-all', el)) $('#ot-all', el).onchange = (e) => { OT.showAll = e.target.checked; render(); };
+      // An OT list made outside the app: read it, check it, send its scheme status to Unit VI.
+      const otUp = $('#ot-upload', el);
+      if (otUp) otUp.onchange = async () => {
+        const file = otUp.files[0];
+        otUp.value = '';
+        if (!file) return;
+        toast('Reading the OT list…', 8000);
+        let r;
+        try { r = await OtImport.read(file); } catch (err) { console.error(err); return toast(`Couldn't read that file: ${err.message}`, 6000); }
+        if (!r.rows.length) return toast("No patients found — the table needs a NAME column (and SCHEME STATUS). Send me the file if it's in another layout.", 7000);
+        const norm = (s) => String(s || '').replace(/\W/g, '').toUpperCase();
+        const match = (row) => allCases().find((c) => (row.ipNo && norm(c.ipNo) === norm(row.ipNo)) || (!row.ipNo && norm(c.name) === norm(row.name)));
+        const SCH = ['', ...SCHEMES];
+        $('.otup-pop')?.remove();
+        const pop = document.createElement('div');
+        pop.className = 'sug-back otup-pop';
+        pop.innerHTML = `<div class="sug-box card" role="dialog" aria-label="Uploaded OT list">
+            <h3>${esc(file.name)}</h3>
+            ${r.title ? `<p class="muted small">${esc(r.title)}</p>` : ''}
+            <label>OT date<input type="date" id="otup-date" value="${esc(r.date)}"></label>
+            <p class="muted small">${r.rows.length} patient${r.rows.length === 1 ? '' : 's'} found. Check the scheme status; it goes to Unit VI's scheme report for Unit ${esc(Store.meta.unitId)}.</p>
+            <div class="otup-rows">${r.rows.map((x, i) => { const m = match(x); return `<div class="otup-row" data-i="${i}">
+                <label class="otup-name"><input type="checkbox" data-in checked> <b>${esc(x.name)}</b> <span class="muted small">${esc([x.ageSex, x.ipNo && 'IP ' + x.ipNo].filter(Boolean).join(' · '))}</span>${m ? ' <span class="tag" title="Matched to the e-case sheet">in app</span>' : ''}</label>
+                <div class="muted small">${esc(x.procedure || x.diagnosis)}</div>
+                <div class="otup-sel"><select data-sch>${opts(SCH.map((s) => [s, s || '— not given —']), x.scheme)}</select>
+                  <label class="small"><input type="checkbox" data-sb ${x.standby ? 'checked' : ''}> standby</label></div>
+                <input data-rs list="dl-noscheme" placeholder="No-scheme reason" value="${esc(x.reason)}" ${['NO SCHEME', 'DENIED'].includes(x.scheme) ? '' : 'hidden'}>
+                ${x.schemeText && !x.scheme ? `<div class="warn-text small">Couldn't tell the status from “${esc(x.schemeText)}” — pick it.</div>` : ''}
+              </div>`; }).join('')}</div>
+            <div class="form-actions">
+              <button type="button" class="btn primary" data-otup="send">Send to scheme report</button>
+              <button type="button" class="btn" data-otup="cancel">Cancel</button>
+            </div>
+          </div>`;
+        pop.addEventListener('change', (ev) => {
+          const sel = ev.target.closest('[data-sch]');
+          if (sel) $('[data-rs]', sel.closest('.otup-row')).hidden = !['NO SCHEME', 'DENIED'].includes(sel.value);
+        });
+        pop.addEventListener('click', async (ev) => {
+          const go = ev.target.closest('[data-otup]')?.dataset.otup;
+          if (!go) return;
+          if (go === 'cancel') { pop.remove(); return; }
+          const date = $('#otup-date', pop).value;
+          if (!date) { toast('Pick the OT date', 2500); return; }
+          const cases = $$('.otup-row', pop).filter((row) => $('[data-in]', row).checked).map((row) => {
+            const x = r.rows[+row.dataset.i];
+            const m = match(x);
+            const sch = $('[data-sch]', row).value;
+            return {
+              id: m?.id || `up_${norm(x.ipNo) || norm(x.name)}`, name: x.name, ageSex: x.ageSex, ipNo: x.ipNo, diagnosis: x.diagnosis, procedure: x.procedure,
+              scheme: sch, reason: ['NO SCHEME', 'DENIED'].includes(sch) ? $('[data-rs]', row).value.trim().toUpperCase() : '', standby: $('[data-sb]', row).checked, uploaded: true,
+            };
+          });
+          pop.remove();
+          try {
+            await Store.saveSchemeReport({ date, unitId: Store.meta.unitId, cases, file: file.name });
+            schemeMine = null;
+            toast(`Scheme status of ${cases.length} patient${cases.length === 1 ? '' : 's'} (${fmtDate(date)}) sent to Unit VI`, 4000);
+          } catch (err) { toast(`Couldn't send: ${err.code || err.message}`, 5000); }
+        });
+        document.body.appendChild(pop);
+      };
 
       el.addEventListener('change', (e) => {
         const t = e.target;
