@@ -4691,7 +4691,19 @@ const App = (() => {
   // ---- Start page: the app opens here and asks which ward.
   const Home = {
     live: true,
+    unitPicked: false, // owners: chosen on this opening of the app
     render() {
+      if (Store.mode === 'firebase' && Store.isOwner() && !Home.unitPicked) {
+        return `
+        <div class="home">
+          <h2>Which unit?</h2>
+          <div class="home-units">${Store.unitKeys.map((k, i) => {
+            const u = UNITS[i];
+            const sp = SPECIALTIES[specOfUnit(u.id)]?.label || (u.id === SCHEME_UNIT ? 'Scheme report' : '');
+            return `<button type="button" class="home-unit" data-unit="${k}"><b>Unit ${esc(u.id)}</b>${sp ? `<span class="muted small">${esc(sp)}</span>` : ''}</button>`;
+          }).join('')}</div>
+        </div>`;
+      }
       const cs = allCases();
       const pre = cs.filter((c) => isActive(c)).length;
       const posted = cs.filter((c) => c.status === 'posted').length;
@@ -4703,6 +4715,7 @@ const App = (() => {
       return `
         <div class="home">
           <p class="home-hi">${h < 12 ? 'Good morning' : h < 16 ? 'Good afternoon' : 'Good evening'}${who ? `, ${esc(who.split(' ')[0])}` : ''}</p>
+          <p class="home-unit-now">Ortho Unit ${esc(Store.meta.unitId)}${Store.mode === 'firebase' && Store.isOwner() ? ' · <button type="button" class="link" data-unit-change>change unit</button>' : ''}</p>
           <h2>Which ward?</h2>
           <div class="home-wards">
             <a class="home-ward" href="#/ward"><span class="home-ico" aria-hidden="true">🛏</span><b>Pre-op ward</b><span class="muted">${pre} patient${pre === 1 ? '' : 's'}${posted ? ` · ${posted} posted` : ''}</span></a>
@@ -4715,6 +4728,19 @@ const App = (() => {
             ${extra ? `<a class="btn" href="${extra[0]}">${esc(extra[1])}</a>` : ''}
           </div>
         </div>`;
+    },
+    mount(el) {
+      el.addEventListener('click', (e) => {
+        const u = e.target.closest('[data-unit]');
+        if (u) {
+          Home.unitPicked = true;
+          if (u.dataset.unit !== Store.unitKey) Store.switchUnit(u.dataset.unit);
+          current = null;
+          render();
+          return;
+        }
+        if (e.target.closest('[data-unit-change]')) { Home.unitPicked = false; render(); }
+      });
     },
   };
 
@@ -4812,7 +4838,8 @@ const App = (() => {
     if (!same) current = { hash: location.hash, view: resolve(), role };
     const v = current.view;
     const bs = $('.brand-sub');
-    if (bs) bs.textContent = `· Ortho Unit ${Store.meta.unitId}`;
+    const choosingUnit = current.view === Home && Store.mode === 'firebase' && Store.isOwner() && !Home.unitPicked;
+    if (bs) bs.textContent = Store.unitKnown && current.view !== Gate && !choosingUnit ? `· Ortho Unit ${Store.meta.unitId}` : '';
     // Swap in a fresh element so delegated listeners from the last render don't pile up.
     // Drawers (details[data-keep]) stay open when the same page redraws — e.g. a teammate's edit syncing in.
     const keepOpen = same ? $$('details[data-keep][open]', App.el).map((d) => d.dataset.keep) : [];

@@ -174,6 +174,7 @@ const Store = (() => {
     }
     authM.onAuthStateChanged(fb.auth, (u) => {
       user = u;
+      unitKnown = false;
       stopListening();
       if (!u) status = 'signed-out';
       // Password accounts must confirm their email first (the database rules
@@ -183,7 +184,7 @@ const Store = (() => {
         status = 'connecting';
         chooseUnit().then((ok) => {
           if (user !== u) return; // signed out meanwhile
-          if (ok) listen();
+          if (ok) { unitKnown = true; listen(); }
           else status = 'denied';
           emit();
         });
@@ -240,6 +241,7 @@ const Store = (() => {
     emit();
   }
   const unitIndex = () => Math.max(0, UNIT_KEYS.indexOf(fb?.unit));
+  let unitKnown = false; // the signed-in person's unit has been worked out
 
   const ref = (coll, id) => fb.fsM.doc(fb.db, 'units', fb.unit, coll, id);
   const collRef = (coll) => fb.fsM.collection(fb.db, 'units', fb.unit, coll);
@@ -330,7 +332,7 @@ const Store = (() => {
       stopListening();
       status = 'connecting';
       emit();
-      status = (await chooseUnit()) ? (listen(), 'connecting') : 'denied';
+      status = (await chooseUnit()) ? (unitKnown = true, listen(), 'connecting') : 'denied';
     }
     emit();
   }
@@ -626,6 +628,8 @@ const Store = (() => {
     // In shared mode the unit is the one signed in to, whatever an old setting says.
     get meta() { return { ...DEFAULT_META, ...(state.meta.main || {}), ...(fb ? { unitId: UNITS[unitIndex()].id } : {}) }; },
     get unitKey() { return fb?.unit || ''; },
+    // shared mode: true once the unit is known (until then nothing should say "Unit I")
+    get unitKnown() { return mode === 'local' || unitKnown; },
     unitKeys: UNIT_KEYS,
     switchUnit,
     canManageTeam: () => mode === 'local' || isOwner() || state.members[email()]?.admin === true,
