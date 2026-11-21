@@ -1,7 +1,8 @@
 # Ward Management — notes for Claude
 
 ## Publishing (standing instruction from the owner)
-- The live site (https://vishnuharan2390.github.io/ward-management/) is GitHub Pages,
+- The live site is https://callus-madurai.pages.dev/ (Cloudflare Pages, deploys this branch automatically on
+  every push) and also https://vishnuharan2390.github.io/ward-management/ (GitHub Pages),
   built from the branch `claude/preop-case-management-eafzbl`. Work on any other
   branch is NOT live until it is on that branch.
 - The owner has said: **publish without asking.** When a change is finished and

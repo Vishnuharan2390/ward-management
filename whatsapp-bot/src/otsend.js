@@ -31,7 +31,7 @@ export function parseNumbers(text) {
 
 function cors(request, env) {
   const origin = request.headers.get('Origin') || '';
-  const allowed = String(env.APP_ORIGINS || 'https://vishnuharan2390.github.io').split(',').map((s) => s.trim()).filter(Boolean);
+  const allowed = String(env.APP_ORIGINS || 'https://callus-madurai.pages.dev,https://vishnuharan2390.github.io').split(',').map((s) => s.trim()).filter(Boolean);
   return {
     'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : allowed[0],
     'Access-Control-Allow-Methods': 'POST, OPTIONS',

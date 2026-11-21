@@ -40,7 +40,7 @@ screen, works offline, updates itself.
 1. Host it (once): GitHub repo → **Settings → Pages** → Source **Deploy from
    a branch** → branch `claude/preop-case-management-eafzbl`, folder `/ (root)`
    → **Save**. After a minute it is live at
-   `https://vishnuharan2390.github.io/ward-management/`.
+   `https://callus-madurai.pages.dev/` (also `https://vishnuharan2390.github.io/ward-management/`).
 2. On the iPhone open that link in **Safari** → **Share** → **Add to Home
    Screen** → **Add**. (Android: Chrome → ⋮ → **Install app**.)
 3. Open it from the home-screen icon.
@@ -69,7 +69,7 @@ free Spark plan is plenty for one ward). Until it is connected the app runs in
    e.g. `ortho-ward`; Google Analytics not needed).
 2. **Build → Authentication → Get started → Sign-in method**: enable
    **Email/Password** (and **Google** if you like). Then **Settings →
-   Authorized domains → Add domain** → `vishnuharan2390.github.io`.
+   Authorized domains → Add domain** → `callus-madurai.pages.dev` (and `vishnuharan2390.github.io`).
 3. **Build → Firestore Database → Create database** → location
    **asia-south1 (Mumbai)** → **Start in production mode**.
 4. **Firestore → Rules**: paste `firestore.rules` from this repo, replace
