@@ -490,9 +490,10 @@ const Store = (() => {
   // ---- scheme status of each OT list, for Unit VI's weekly scheme report ----
   // one document per unit and OT date: schemeReports/ortho-unit-N_YYYY-MM-DD
   const SCHEME_LS = LS + 'schemeReports';
-  async function saveSchemeReport(rep) {
+  // keep: an update of a list already sent (its sender and time stay)
+  async function saveSchemeReport(rep, keep = false) {
     const unit = fb ? fb.unit : 'local';
-    const doc = { ...rep, unit, by: who(), at: Date.now() };
+    const doc = keep ? { ...rep, unit } : { ...rep, unit, by: who(), at: Date.now() };
     const id = `${unit}_${rep.date}`;
     if (!fb) {
       let all = {};
@@ -502,6 +503,15 @@ const Store = (() => {
       return;
     }
     await fb.fsM.setDoc(fb.fsM.doc(fb.db, 'schemeReports', id), doc);
+  }
+  // this unit's own lists since `from` (to keep their scheme status current)
+  async function mySchemeReports(from) {
+    if (!fb) return (await schemeReports(from, '9999')).filter((r) => r.unit === 'local');
+    // one filter only (unit): a unit + date-range query would need a composite index in the console
+    const snap = await fb.fsM.getDocs(fb.fsM.query(fb.fsM.collection(fb.db, 'schemeReports'), fb.fsM.where('unit', '==', fb.unit)));
+    const out = [];
+    snap.forEach((d) => { const r = d.data(); if (r.date >= from) out.push(r); });
+    return out;
   }
   async function schemeReports(from, to) {
     if (!fb) {
@@ -641,7 +651,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember, setAdmin, setRole, specCases, saveSchemeReport, schemeReports,
+    addMember, removeMember, setAdmin, setRole, specCases, saveSchemeReport, schemeReports, mySchemeReports,
     exportAll, importAll,
   };
 })();

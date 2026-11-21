@@ -1780,3 +1780,7 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .sch-table tbody th, .sch-table tfoot th { text-align: left; }
 .sch-table tfoot td, .sch-table tfoot th { font-weight: 700; border-top: 2px solid currentColor; }
 .sch-reason { padding: .45rem 0; border-top: 1px solid var(--line, #333); }
+.sch-title { font-weight: 700; text-align: center; margin: .3rem 0 .6rem; }
+.sch-table .sch-ns { text-align: left; min-width: 14rem; font-size: .85rem; }
+.sch-table .sch-total th, .sch-table .sch-total td { font-weight: 700; border-top: 2px solid currentColor; }
+.sch-notes { margin: .5rem 0; padding-left: 1.1rem; }

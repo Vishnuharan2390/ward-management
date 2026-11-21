@@ -4328,10 +4328,11 @@ const App = (() => {
       SchemeTab.loadedWeek = mon + '|' + Store.unitKey;
       if (/^#\/spec/.test(location.hash)) { current = null; render(); }
     },
-    // per unit: each case once (its latest OT list that week), standby cases apart
+    // The unit-wise table of the department's scheme report. Each case once (its latest OT list that
+    // week); standby cases left out. `scheme` = on the OT day, `now` = today (sent back by the unit).
     summary() {
       const byUnit = {};
-      for (const r of (SchemeTab.reps || []).sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at))) {
+      for (const r of [...(SchemeTab.reps || [])].sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at))) {
         const u = (byUnit[r.unit] ||= { lists: new Set(), cases: new Map() });
         u.lists.add(r.date);
         for (const c of r.cases || []) u.cases.set(c.id || c.ipNo || c.name, { ...c, date: r.date });
@@ -4341,14 +4342,43 @@ const App = (() => {
         const u = byUnit[k] || { lists: new Set(), cases: new Map() };
         const all = [...u.cases.values()];
         const done = all.filter((c) => !c.standby);
-        const count = (s) => done.filter((c) => (c.scheme || '') === s).length;
-        return {
-          key: k, label: k === 'local' ? 'UNIT ' + Store.meta.unitId : unitLabel(k), lists: u.lists.size, total: done.length,
-          approved: count('APPROVED'), validation: count('VALIDATION'), toSubmit: count('TO BE SUBMITTED'), denied: count('DENIED'),
-          none: count('NO SCHEME'), blank: done.filter((c) => !c.scheme).length, standby: all.length - done.length,
-          noScheme: done.filter((c) => c.scheme === 'NO SCHEME' || c.scheme === 'DENIED'),
+        const nowOf = (c) => c.now || c.scheme || '';
+        const noScheme = done.filter((c) => nowOf(c) === 'NO SCHEME');
+        const r = {
+          key: k, label: k === 'local' ? Store.meta.unitId : UNITS[Store.unitKeys.indexOf(k)]?.id || '?', lists: u.lists.size,
+          total: done.length,
+          approved: done.filter((c) => c.scheme === 'APPROVED').length,
+          valDos: done.filter((c) => c.scheme === 'VALIDATION').length,
+          valLater: done.filter((c) => c.scheme === 'VALIDATION' && nowOf(c) === 'APPROVED').length,
+          denied: done.filter((c) => nowOf(c) === 'DENIED').length,
+          noScheme,
+          days: [...u.lists],
         };
+        r.applied = r.total - noScheme.length;
+        r.pending = done.filter((c) => !['APPROVED', 'VALIDATION', 'DENIED', 'NO SCHEME'].includes(c.scheme) && nowOf(c) !== 'DENIED' && nowOf(c) !== 'NO SCHEME');
+        return r;
       });
+    },
+    // "09/11/26 TO 14/11/26": Monday to Saturday, or Sunday if a unit had a Sunday list
+    title(rows) {
+      const mon = SchemeTab.week;
+      const sun = addDays(mon, 6);
+      const end = rows.some((r) => r.days.includes(sun)) ? sun : addDays(mon, 5);
+      const yy = (iso) => fmtDate(iso).replace(/\/(\d{2})(\d{2})$/, '/$2');
+      return `OPERATED CASES SCHEME STATUS UNIT WISE – ${yy(mon)} TO ${yy(end)}`;
+    },
+    // the NO SCHEME cell: count when none, else the numbered patients as in the department's model
+    noSchemeLines(r) {
+      if (!r.noScheme.length) return ['0'];
+      return r.noScheme.flatMap((c, i) => [...(i ? [''] : []), `${i + 1}. ${DeckEngine.up(c.name)} ${c.ageSex || ''}`.trim(), DeckEngine.up(c.diagnosis), DeckEngine.up(c.procedure), `REASON: ${DeckEngine.up(c.reason) || '—'}`].filter((x, j) => x !== undefined && (x !== '' || j === 0)));
+    },
+    HEAD: ['UNIT NO', 'TOTAL CASES OPERATED', 'SCHEME APPLIED FOR', 'APPROVED', 'VALIDATION ON DAY OF SURGERY', 'VALIDATION LATER APPROVED', 'DENIED', 'NO SCHEME'],
+    tableRows(rows) {
+      const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
+      return [
+        ...rows.map((r) => [r.label, r.total, r.applied, r.approved, r.valDos, r.valLater, r.denied, SchemeTab.noSchemeLines(r)]),
+        ['TOTAL', tot('total'), tot('applied'), tot('approved'), tot('valDos'), tot('valLater'), tot('denied'), [String(rows.reduce((n, r) => n + r.noScheme.length, 0))]],
+      ];
     },
     render() {
       SchemeTab.week ||= addDays(mondayOf(todayISO()), -7);
@@ -4356,8 +4386,12 @@ const App = (() => {
       const sun = addDays(mon, 6);
       if (SchemeTab.loadedWeek !== mon + '|' + Store.unitKey && !SchemeTab.loading) setTimeout(SchemeTab.load, 0);
       const rows = SchemeTab.reps ? SchemeTab.summary() : [];
-      const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
-      const reasons = rows.flatMap((r) => r.noScheme.map((c) => ({ ...c, unit: r.label })));
+      const body = SchemeTab.tableRows(rows);
+      const notes = [
+        ...rows.filter((r) => !r.lists).map((r) => `No OT list from Unit ${r.label} yet this week.`),
+        ...rows.filter((r) => r.pending.length).map((r) => `Unit ${r.label}: ${r.pending.length} case(s) applied but not yet approved / validated (${r.pending.map((c) => c.name).join(', ')}).`),
+        ...rows.flatMap((r) => r.noScheme.filter((c) => !c.reason).map((c) => `Unit ${r.label}: no reason given for ${c.name}.`)),
+      ];
       return `
         <div class="toolbar"><h2>Scheme report <span class="muted small">all units</span></h2><button class="btn small" id="sch-refresh">⟳ Refresh</button></div>
         ${SchemeTab.err ? `<p class="notice small">Couldn't read the units' OT lists (${esc(SchemeTab.err)}) — no network, or the database rules haven't been published yet.</p>` : ''}
@@ -4365,20 +4399,68 @@ const App = (() => {
           <div class="week-pick"><button class="btn small" data-wk="-7" aria-label="Week before">‹</button>
             <b>${esc(fmtDate(mon))} – ${esc(fmtDate(sun))}</b>
             <button class="btn small" data-wk="7" aria-label="Week after" ${addDays(mon, 7) > todayISO() ? 'disabled' : ''}>›</button></div>
-          <p class="muted small">From the OT lists each unit generated that week (by OT date). A case on two lists counts once, with its latest scheme status; standby cases aren't counted.</p>
           ${SchemeTab.loading && !SchemeTab.reps ? '<p class="muted">Loading…</p>' : `
+          <p class="sch-title">${esc(SchemeTab.title(rows))}</p>
           <div class="table-wrap"><table class="board sch-table">
-            <thead><tr><th>Unit</th><th>OT lists</th><th>Cases</th><th>Approved</th><th>Validation</th><th>To be submitted</th><th>Denied</th><th>No scheme</th><th>Not entered</th></tr></thead>
-            <tbody>${rows.map((r) => `<tr class="${r.lists ? '' : 'muted'}"><th>${esc(r.label)}</th><td>${r.lists}</td><td><b>${r.total}</b></td><td>${r.approved}</td><td>${r.validation}</td><td>${r.toSubmit}</td><td>${r.denied}</td><td>${r.none}</td><td>${r.blank}</td></tr>`).join('')}</tbody>
-            <tfoot><tr><th>Total</th><td>${tot('lists')}</td><td><b>${tot('total')}</b></td><td>${tot('approved')}</td><td>${tot('validation')}</td><td>${tot('toSubmit')}</td><td>${tot('denied')}</td><td>${tot('none')}</td><td>${tot('blank')}</td></tr></tfoot>
+            <thead><tr>${SchemeTab.HEAD.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>
+            <tbody>${body.map((cells, i) => `<tr class="${i === body.length - 1 ? 'sch-total' : rows[i].lists ? '' : 'muted'}">${cells.map((v, j) => (j === 7 ? `<td class="sch-ns">${v.map((l) => esc(l)).join('<br>')}</td>` : j === 0 ? `<th>${esc(v)}</th>` : `<td>${esc(v)}</td>`)).join('')}</tr>`).join('')}</tbody>
           </table></div>
-          ${rows.some((r) => r.lists === 0) ? `<p class="muted small">No OT list yet from ${esc(rows.filter((r) => !r.lists).map((r) => r.label).join(', '))} for this week.</p>` : ''}
-          <h4>No scheme / denied — reasons <span class="pill">${reasons.length}</span></h4>
-          ${reasons.map((c) => `<div class="sch-reason"><span class="tag">${esc(c.unit)}</span> <b>${esc(c.name)}</b> <span class="muted small">${esc([c.ageSex, c.ipNo && 'IP ' + c.ipNo, c.scheme].filter(Boolean).join(' · '))}</span>
-              <div class="small">${esc(c.procedure || c.diagnosis || '')}</div>
-              <div class="${c.reason ? '' : 'warn-text '}small">Reason: ${esc(c.reason || 'not given')}</div></div>`).join('') || '<p class="muted">None.</p>'}
-          <div class="form-actions"><button class="btn primary" id="sch-pdf" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download report PDF</button></div>`}
+          ${notes.length ? `<ul class="sch-notes small">${notes.map((n) => `<li>${esc(n)}</li>`).join('')}</ul>` : ''}
+          <p class="muted small">From the OT lists each unit generated that week (by OT date). A case on two lists counts once; standby cases aren't counted. "Validation later approved" fills in when the unit marks the case Approved.</p>
+          <div class="form-actions">
+            <button class="btn primary" id="sch-docx" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download Word (.docx)</button>
+            <button class="btn" id="sch-pdf" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download PDF</button>
+          </div>`}
         </div>`;
+    },
+    fileName(ext) {
+      const mon = SchemeTab.week;
+      return `SCHEME REPORT ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(addDays(mon, 6)).replace(/\//g, '-')}.${ext}`;
+    },
+    pdf() {
+      const rows = SchemeTab.summary();
+      const { jsPDF } = window.jspdf;
+      const d = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      d.setFont('helvetica', 'bold');
+      d.setFontSize(12);
+      d.text(SchemeTab.title(rows).replace('–', '-'), 148.5, 18, { align: 'center' });
+      d.autoTable({
+        startY: 25, margin: { left: 25.4, right: 25.4 }, theme: 'grid',
+        styles: { fontSize: 10, halign: 'center', valign: 'middle', lineColor: 0, lineWidth: 0.2, textColor: 0, cellPadding: 1.8 },
+        headStyles: { fillColor: [255, 255, 255], textColor: 0, fontStyle: 'bold' },
+        columnStyles: { 7: { halign: 'left', cellWidth: 82 } },
+        head: [SchemeTab.HEAD],
+        body: SchemeTab.tableRows(rows).map((cells) => cells.map((v, j) => (j === 7 ? v.join('\n') : String(v)))),
+        didParseCell: (h) => { if (h.section === 'body' && h.row.index === rows.length) h.cell.styles.fontStyle = 'bold'; },
+      });
+      SharePdf.share(new File([d.output('blob')], SchemeTab.fileName('pdf'), { type: 'application/pdf' }));
+    },
+    // A Word file in the department's layout: landscape A4, the title in the page header, one table.
+    async docx() {
+      const rows = SchemeTab.summary();
+      const x = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const run = (t, bold) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve">${x(t)}</w:t></w:r>`;
+      const para = (t, { bold, center } = {}) => `<w:p><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/>${center ? '<w:jc w:val="center"/>' : ''}</w:pPr>${run(t, bold)}</w:p>`;
+      const W = [1000, 1600, 1500, 1300, 1800, 1800, 1100, 3858];
+      const cell = (lines, w, opts) => `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/><w:vAlign w:val="center"/></w:tcPr>${(Array.isArray(lines) ? lines : [lines]).map((l) => para(l, opts)).join('')}</w:tc>`;
+      const B = '<w:top w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="000000"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="000000"/>';
+      const body = SchemeTab.tableRows(rows);
+      const table = `<w:tbl><w:tblPr><w:tblW w:w="${W.reduce((a, b) => a + b, 0)}" w:type="dxa"/><w:tblBorders>${B}</w:tblBorders><w:tblLayout w:type="fixed"/></w:tblPr>
+        <w:tblGrid>${W.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>
+        <w:tr>${SchemeTab.HEAD.map((h, j) => cell(h, W[j], { center: true })).join('')}</w:tr>
+        ${body.map((cells, i) => `<w:tr>${cells.map((v, j) => cell(j === 7 ? v : String(v), W[j], { center: j !== 7, bold: i === body.length - 1 })).join('')}</w:tr>`).join('')}</w:tbl>`;
+      const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+      const doc = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${table}${para('')}
+        <w:sectPr><w:headerReference w:type="default" r:id="rIdH"/><w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+      const header = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}>${para(SchemeTab.title(rows), { bold: true, center: true })}</w:hdr>`;
+      const z = new window.JSZip();
+      z.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/></Types>', { createFolders: false });
+      z.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>', { createFolders: false });
+      z.file('word/_rels/document.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdH" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/></Relationships>', { createFolders: false });
+      z.file('word/document.xml', doc, { createFolders: false });
+      z.file('word/header1.xml', header, { createFolders: false });
+      const blob = await z.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      offerFile(new File([blob], SchemeTab.fileName('docx'), { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
     },
     mount(el) {
       $('#sch-refresh', el)?.addEventListener('click', () => { SchemeTab.reps = null; SchemeTab.load(); render(); });
@@ -4386,42 +4468,34 @@ const App = (() => {
         const w = e.target.closest('[data-wk]');
         if (w) { SchemeTab.week = addDays(SchemeTab.week, +w.dataset.wk); SchemeTab.reps = null; render(); }
       });
-      const pdf = $('#sch-pdf', el);
-      if (pdf) pdf.onclick = () => {
-        const mon = SchemeTab.week;
-        const sun = addDays(mon, 6);
-        const rows = SchemeTab.summary();
-        const { jsPDF } = window.jspdf;
-        const d = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        d.setFont('helvetica', 'bold');
-        d.setFontSize(13);
-        d.text(`SCHEME REPORT — ${String(Store.meta.department || 'DEPARTMENT OF ORTHOPAEDICS').toUpperCase()}`, 148.5, 14, { align: 'center' });
-        d.setFontSize(11);
-        d.text(`WEEK ${fmtDate(mon)} – ${fmtDate(sun)}`, 148.5, 21, { align: 'center' });
-        const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
-        d.autoTable({
-          startY: 27, theme: 'grid', styles: { fontSize: 10, halign: 'center', lineColor: 0, textColor: 0 }, headStyles: { fillColor: [230, 230, 230], textColor: 0 },
-          head: [['UNIT', 'OT LISTS', 'CASES', 'APPROVED', 'VALIDATION', 'TO BE SUBMITTED', 'DENIED', 'NO SCHEME', 'NOT ENTERED']],
-          body: rows.map((r) => [r.label, r.lists, r.total, r.approved, r.validation, r.toSubmit, r.denied, r.none, r.blank]),
-          foot: [['TOTAL', tot('lists'), tot('total'), tot('approved'), tot('validation'), tot('toSubmit'), tot('denied'), tot('none'), tot('blank')]],
-          footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
-        });
-        const reasons = rows.flatMap((r) => r.noScheme.map((c) => [r.label, DeckEngine.up(c.name), c.ageSex || '', c.ipNo || '', DeckEngine.up(c.procedure || c.diagnosis || ''), c.scheme, DeckEngine.up(c.reason || 'NOT GIVEN')]));
-        d.setFont('helvetica', 'bold');
-        d.setFontSize(11);
-        const y = d.lastAutoTable.finalY + 9;
-        d.text('NO SCHEME / DENIED — REASONS', 14, y);
-        d.autoTable({
-          startY: y + 3, theme: 'grid', styles: { fontSize: 9, lineColor: 0, textColor: 0, valign: 'middle' }, headStyles: { fillColor: [230, 230, 230], textColor: 0 },
-          head: [['UNIT', 'NAME', 'AGE/SEX', 'IP NO', 'PROCEDURE', 'STATUS', 'REASON']],
-          body: reasons.length ? reasons : [['', 'NIL', '', '', '', '', '']],
-          columnStyles: { 4: { cellWidth: 70 }, 6: { cellWidth: 60 } },
-        });
-        const name = `SCHEME REPORT ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(sun).replace(/\//g, '-')}.pdf`;
-        SharePdf.share(new File([d.output('blob')], name, { type: 'application/pdf' }));
-      };
+      const p = $('#sch-pdf', el);
+      if (p) p.onclick = () => SchemeTab.pdf();
+      const w = $('#sch-docx', el);
+      if (w) w.onclick = () => SchemeTab.docx().catch((err) => toast('Could not make the Word file: ' + err.message, 5000));
     },
   };
+  // Each unit keeps its OT lists' scheme status up to date for Unit VI: a case marked Approved after its
+  // OT day ("validation later approved"), denied, etc. Its own last four weeks of lists, compared on sync.
+  let schemeMine = null;
+  let schemeTimer = 0;
+  function syncSchemeNow() {
+    clearTimeout(schemeTimer);
+    schemeTimer = setTimeout(async () => {
+      if (!Store.synced) return;
+      try { schemeMine ||= await Store.mySchemeReports(todayISO(-28)); } catch { return; }
+      for (const rep of schemeMine) {
+        let changed = false;
+        for (const c of rep.cases || []) {
+          const cur = Store.cases[c.id];
+          if (!cur) continue;
+          const now = cur.scheme || '';
+          const reason = ['NO SCHEME', 'DENIED'].includes(now) ? (cur.schemeReason || '') : (c.reason || '');
+          if ((c.now ?? c.scheme) !== now || (c.reason || '') !== reason) { c.now = now; c.reason = reason; changed = true; }
+        }
+        if (changed) Store.saveSchemeReport(rep, true).catch(() => {});
+      }
+    }, 5000);
+  }
   // When a unit makes its OT list, its scheme status goes to Unit VI's report.
   function sendScheme(cases, dd) {
     if (!dd?.date || !cases.length) return;
@@ -4432,7 +4506,7 @@ const App = (() => {
         id: c.id, name: c.name || '', ageSex: ageSex(c), ipNo: c.ipNo || '', diagnosis: c.diagnosis || '', procedure: c.plan || '',
         scheme: c.scheme || '', reason: ['NO SCHEME', 'DENIED'].includes(c.scheme) ? (c.schemeReason || '') : '', standby: !!c.standby,
       })),
-    }).then(() => toast('Scheme status sent to Unit VI', 2500)).catch((e) => { console.warn('scheme report', e); });
+    }).then(() => { schemeMine = null; toast('Scheme status sent to Unit VI', 2500); }).catch((e) => { console.warn('scheme report', e); });
   }
 
   // ---- Specialty tab: this unit's specialty, from all six units, and the weekly report (Mon–Sun).
@@ -4864,7 +4938,7 @@ const App = (() => {
   }
 
   function onStoreChange() {
-    if (Store.synced) { queueOffline(); tagSpecs(); }
+    if (Store.synced) { queueOffline(); tagSpecs(); syncSchemeNow(); }
     updatesChanged();
     const gateNeeded = Store.mode === 'firebase' && Store.status !== 'ok';
     if (gateNeeded !== (current?.view === Gate)) {
