@@ -1146,6 +1146,65 @@ function dcComorbAdvice(items) {
 }
 
 
+// ---- Tamil advice written from the English lines (the app's own phrases), e.g. for a summary typed
+// elsewhere, whose Tamil often can't be read back out of the PDF.
+const advKey = (s) => String(s || '').toUpperCase().replace(/^[\s*•\-–·\d.)]+/, '').replace(/[^A-Z0-9/]+/g, ' ').trim();
+function advTamil(en, c = {}, d = {}) {
+  const k = advKey(en);
+  if (!k) return '';
+  const known = [...ADVICE_PHRASES, ...DC_SPINE_ADVICE, ...Object.values(DC_MOB), ...DC_COMORB.map((x) => x.generic),
+    ...dcUsualAdvice(c, d), ...Object.entries(DC_SPLINTS).map(([s, ta]) => [`CONTINUE ${s}`, ta])];
+  const hit = known.find(([e]) => advKey(e) === k);
+  if (hit) return hit[1];
+  // review: "REVIEW IN ORTHO OPD 802 ON MONDAY AT 8AM AFTER 2 WEEKS", "REVIEW AFTER 2 WEEKS ON MONDAY IN OPD 802" …
+  if (/\bREVIEW\b/.test(k)) {
+    const w = (/(\d+)\s*WEEKS?/.exec(k) || [])[1];
+    const day = EN_DAYS.find((x) => k.includes(x));
+    const opd = (/\bOPD\s*(?:NO\s*)?(\d{2,4})\b/.exec(k) || /\b(\d{3})\b(?!\s*WEEK)/.exec(k) || [])[1];
+    const time = (/\b(\d{1,2})\s*(AM|A M)\b/.exec(k) || [])[1];
+    const dept = (/REVIEW AT (.+?) OPD/.exec(k) || [])[1];
+    if (dept && !/ORTHO/.test(dept) && w) return `${w} வாரம் கழித்து ${DC_DEPT_TA[dept] || dept} புறநோயாளிகள் பிரிவில் காண்பிக்கவும்.`;
+    if (w || day) return reviewPhrase(w || 2, day || 'MONDAY', opd || '', time ? `${time}AM` : '8AM')[1].replace(day ? '' : `${TA_DAYS[1]} `, '');
+  }
+  // the usual lines, however they are worded
+  const MEANS = [
+    [/\bNON\s?WEIGHT BEARING\b|\bNWB\b/, /WALKER/.test(k) ? DC_MOB.nwbWalker[1] : 'அடிபட்ட காலில் எடை போட வேண்டாம்.'],
+    [/\bPARTIAL WEIGHT BEARING\b|\bPWB\b/, 'வாக்கர் உதவியுடன், அடிபட்ட காலில் பாதி எடை மட்டும் போட்டு நடக்கவும்.'],
+    [/\bFULL WEIGHT BEARING\b|\bFWB\b/, DC_MOB.fwbWalker[1]],
+    [/ELEVAT/, 'அடிபட்ட கை / காலை உயர்த்தி வைக்கவும்.'],
+    [/\bDRESSING\b/, ADVICE_PHRASES[3][1]],
+    [/\bANALGESIC.*\bANTIBIOTIC|\bANTIBIOTIC.*\bANALGESIC/, ADVICE_PHRASES[0][1]],
+    [/\bANTIBIOTIC/, 'ஆன்டிபயாடிக் மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'],
+    [/\bANALGESIC|PAIN ?KILLER/, 'வலி நிவாரண மருந்துகளைத் தொடர்ந்து எடுத்துக் கொள்ளவும்.'],
+    [/QUADRICEPS|ANKLE PUMP/, DC_MOB.quads[1]],
+    [/\b(TOE|FINGER)S?\b.*MOVEMENT|MOVE (THE )?(TOES|FINGERS)/, ADVICE_PHRASES[7][1]],
+    [/WOUND\b.*\bDRY|KEEP\b.*\bDRY/, ADVICE_PHRASES[8][1]],
+    [/SUTURE REMOVAL/, ADVICE_PHRASES[9][1].replace('12', (/POD\s*(\d+)/.exec(k) || [])[1] || '12')],
+    [/\b(REPORT|COME)\b.*\b(PAIN|SWELLING|NUMBNESS|DISCOLOU?RATION)/, ADVICE_PHRASES[11][1]],
+    [/HIP PRECAUTION|AVOID SQUATTING|CROSS[\s-]?LEGGED/, DC_MOB.hipPrec[1]],
+    [/LOG ROLL/, DC_SPINE_ADVICE[0][1]],
+    [/SPIROMETR/, DC_SPINE_ADVICE[2][1]],
+    [/BED ?SORE|BACK CARE/, DC_SPINE_ADVICE[4][1]],
+  ];
+  const mean = MEANS.find(([re]) => re.test(k));
+  if (mean) return mean[1];
+  // any plaster / slab / cast to carry on with
+  if (/^CONTINUE\b.*\b(SLAB|CAST|POP|PLASTER|BACKSLAB|BACK SLAB)\b/.test(k)) return POP_TA;
+  if (/^CONTINUE\b.*\b(BRACE|BELT|COLLAR|SPLINT|BINDER)\b/.test(k)) return 'கொடுக்கப்பட்ட பட்டை / கட்டைத் தொடர்ந்து அணிந்து கொள்ளவும்.';
+  return '';
+}
+// The Tamil for a whole advice box: [lines, lines without a Tamil phrase].
+function adviceTamil(text, c, d) {
+  const lines = String(text || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const ta = [];
+  const missing = [];
+  for (const l of lines) { const t = advTamil(l, c, d); if (t) { if (!ta.includes(t)) ta.push(t); } else missing.push(l); }
+  return [ta, missing];
+}
+// Tamil read out of a PDF is often scrambled (the font has no text map): boxes, signs in the wrong place.
+const tamilGarbled = (s) => /[^\u0B80-\u0BFF\x09\x0A\x0D\x20-\x7E\u00A0\u2013\u2014\u2018-\u201D\u2022\u00B7]/.test(s)
+  || /(^|[\s(])[\u0BBE-\u0BCD]/.test(s) || /[\u0BBE-\u0BCC][\u0BBE-\u0BCD]/.test(s);
+
 function reviewPhrase(weeks, day, opd, time = '8AM') {
   const w = Number(weeks) || 2;
   const d = EN_DAYS.indexOf(day);

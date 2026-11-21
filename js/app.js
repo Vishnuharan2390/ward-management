@@ -3358,7 +3358,7 @@ const App = (() => {
                 <button type="button" class="btn small" id="rv-add">+ Add review</button>
               </div>
               <label class="span2">Advice (English)<textarea name="advice" rows="4">${esc(d.advice)}</textarea></label>
-              <label class="span2">Advice (Tamil — printed below, one line each)<textarea name="adviceTa" rows="4" lang="ta">${esc(d.adviceTa)}</textarea></label>
+              <label class="span2">Advice (Tamil — printed below, one line each) <button type="button" class="link small" id="ta-from-en">↻ from the English advice</button><textarea name="adviceTa" rows="4" lang="ta">${esc(d.adviceTa)}</textarea></label>
               <label class="span2">Discharging doctor<input name="doctor" value="${esc(d.doctor)}"></label>
             </fieldset>
             <div class="form-actions">
@@ -3500,6 +3500,12 @@ const App = (() => {
           Store.patch('cases', id, { discharge: d });
           return d;
         };
+        $('#ta-from-en', el).onclick = (e) => {
+          e.preventDefault();
+          const [ta, missing] = adviceTamil(f.elements.advice.value, c(), data());
+          f.elements.adviceTa.value = ta.join('\n');
+          toast(missing.length ? `Tamil written for ${ta.length} line${ta.length === 1 ? '' : 's'}. No Tamil phrase for: ${missing.join('; ')} — type those yourself.` : 'Tamil written from the English advice', missing.length ? 8000 : 3000);
+        };
 
         // ---- A summary typed elsewhere: read the PDF, show what was found, fill the form (and dispose).
         const SECT_LABEL = { ...DcImport.LABEL, adviceTa: 'ADVICE (TAMIL)' };
@@ -3532,6 +3538,13 @@ const App = (() => {
           try { r = await DcImport.read(file); } catch (err) { console.error(err); return toast(`Couldn't read that PDF: ${err.message}`, 6000); }
           const cc = c();
           if (!r.lines.length) return toast('That PDF has no text in it (a scan or a photo?). Save the summary from Word / Pages as a PDF and upload that.', 7000);
+          let taNote = '';
+          if (r.sections.advice && (!r.sections.adviceTa || tamilGarbled(r.sections.adviceTa))) {
+            const garbled = !!r.sections.adviceTa;
+            const [ta, missing] = adviceTamil(r.sections.advice, cc, {});
+            if (ta.length) r.sections.adviceTa = ta.join('\n'); else delete r.sections.adviceTa;
+            taNote = `${garbled ? "The Tamil in the PDF couldn't be read (the font scrambles it), so it" : 'The Tamil advice'} is written from the English advice${missing.length ? `; no Tamil phrase for: ${missing.join('; ')}` : ''}.`;
+          }
           const ipPdf = String(r.fields.ipNo || '').replace(/\W/g, '');
           const ipCase = String(cc.ipNo || '').replace(/\W/g, '');
           const other = ipPdf && ipCase && ipPdf !== ipCase;
@@ -3546,6 +3559,7 @@ const App = (() => {
               ${other ? `<p class="notice">⚠ This PDF says IP no. <b>${esc(r.fields.ipNo)}</b>, but this patient is IP <b>${esc(cc.ipNo)}</b>${r.fields.name ? ` (${esc(r.fields.name)} in the PDF)` : ''}. Check it's the right patient.</p>` : ''}
               <label>Disposition<select id="imp-disp">${opts(Object.entries(DISPOSITIONS).map(([k, v]) => [k, v.label]), r.disposition)}</select></label>
               <p class="muted small">${rows.length ? 'Untick anything you don\'t want copied in.' : 'No headings or labelled fields were recognised — the PDF can still be kept as the discharge summary.'}</p>
+              ${taNote ? `<p class="muted small">ⓘ ${esc(taNote)}</p>` : ''}
               <div class="imp-rows">${rows.map(([key, label, v]) => `<label class="imp-row"><input type="checkbox" data-imp="${key}" checked><span><b>${esc(label)}</b><span class="muted small">${esc(String(v).replace(/\n/g, ' · ').slice(0, 140))}${String(v).length > 140 ? '…' : ''}</span></span></label>`).join('')}</div>
               <label class="small"><input type="checkbox" id="imp-keep" checked> Keep this PDF as the discharge summary</label>
               <div class="form-actions">
