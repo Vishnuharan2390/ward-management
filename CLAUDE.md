@@ -53,5 +53,5 @@
 - Removal steps are at the top of js/demo.js.
 
 ## Logo
-- The emblem is the Andry tree (assets/andry-tree.svg; title bar + hospital panel via CSS mask). assets/icons/logo.svg = that tree
+- The emblem is the Andry tree (assets/andry-tree.svg; title bar + hospital panel via CSS mask). assets/icons/callus-tree.svg = that tree
   in white on navy; the PNG app icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).

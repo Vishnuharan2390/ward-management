@@ -17,7 +17,7 @@ v, label = sys.argv[1], sys.argv[2]
 index = root / 'index.html'
 s = index.read_text()
 s = re.sub(r'v\d+ · [^<]+</span>', f'v{v} · {label}</span>', s)
-s = re.sub(r'(src|href)="((?:js|css)/[^"?]+|config\.js)(\?v=\d+)?"', lambda m: f'{m.group(1)}="{m.group(2)}?v={v}"', s)
+s = re.sub(r'(src|href)="((?:js|css|assets/icons)/[^"?]+|config\.js)(\?v=\d+)?"', lambda m: f'{m.group(1)}="{m.group(2)}?v={v}"', s)
 index.write_text(s)
 
 sw = root / 'sw.js'
