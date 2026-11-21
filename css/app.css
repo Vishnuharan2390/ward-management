@@ -1712,18 +1712,24 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .crop-wrap { position: fixed; inset: 0; z-index: 1000; background: #0b0b0c; color: #fff; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
 .crop-top { display: flex; justify-content: space-between; align-items: baseline; gap: .5rem; padding: .7rem 1rem; font-size: .9rem; }
 .crop-top span { opacity: .6; font-size: .8rem; }
-.crop-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; }
-.crop-area { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.crop-stage { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 8px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.crop-frame { padding: 18px; overflow: hidden; }
+.crop-area { position: relative; }
 .crop-area canvas { display: block; }
-.crop-box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .58); outline: 2px solid #fff; cursor: move; }
-.crop-box::before, .crop-box::after { content: ''; position: absolute; inset: 33.3% 0; border-top: 1px solid rgba(255,255,255,.35); border-bottom: 1px solid rgba(255,255,255,.35); pointer-events: none; }
+.crop-box { position: absolute; box-shadow: 0 0 0 9999px rgba(0, 0, 0, .6); outline: 2px solid #fff; pointer-events: none; }
+.crop-box::before, .crop-box::after { content: ''; position: absolute; inset: 33.3% 0; border-top: 1px solid rgba(255,255,255,.35); border-bottom: 1px solid rgba(255,255,255,.35); }
 .crop-box::after { inset: 0 33.3%; border: 0; border-left: 1px solid rgba(255,255,255,.35); border-right: 1px solid rgba(255,255,255,.35); }
-.crop-box i { position: absolute; width: 34px; height: 34px; z-index: 1; }
-.crop-box i::after { content: ''; position: absolute; width: 18px; height: 18px; border: 4px solid #fff; }
-.crop-box i[data-h="tl"] { left: -12px; top: -12px; cursor: nwse-resize; } .crop-box i[data-h="tl"]::after { left: 8px; top: 8px; border-right: 0; border-bottom: 0; }
-.crop-box i[data-h="tr"] { right: -12px; top: -12px; cursor: nesw-resize; } .crop-box i[data-h="tr"]::after { right: 8px; top: 8px; border-left: 0; border-bottom: 0; }
-.crop-box i[data-h="bl"] { left: -12px; bottom: -12px; cursor: nesw-resize; } .crop-box i[data-h="bl"]::after { left: 8px; bottom: 8px; border-right: 0; border-top: 0; }
-.crop-box i[data-h="br"] { right: -12px; bottom: -12px; cursor: nwse-resize; } .crop-box i[data-h="br"]::after { right: 8px; bottom: 8px; border-left: 0; border-top: 0; }
+.crop-box i { position: absolute; width: 22px; height: 22px; border: 5px solid #fff; }
+.crop-box i[data-h="tl"] { left: -5px; top: -5px; border-right: 0; border-bottom: 0; }
+.crop-box i[data-h="tr"] { right: -5px; top: -5px; border-left: 0; border-bottom: 0; }
+.crop-box i[data-h="bl"] { left: -5px; bottom: -5px; border-right: 0; border-top: 0; }
+.crop-box i[data-h="br"] { right: -5px; bottom: -5px; border-left: 0; border-top: 0; }
+.crop-box b { position: absolute; background: #fff; border-radius: 3px; }
+.crop-box b[data-e="t"], .crop-box b[data-e="b"] { left: 50%; width: 30px; height: 5px; margin-left: -15px; }
+.crop-box b[data-e="t"] { top: -3px; } .crop-box b[data-e="b"] { bottom: -3px; }
+.crop-box b[data-e="l"], .crop-box b[data-e="r"] { top: 50%; height: 30px; width: 5px; margin-top: -15px; }
+.crop-box b[data-e="l"] { left: -3px; } .crop-box b[data-e="r"] { right: -3px; }
+.crop-box[data-active] { outline-color: #ffd34d; }
 .crop-bar { display: flex; gap: .5rem; justify-content: center; flex-wrap: wrap; padding: .7rem 1rem 1rem; }
 .crop-bar .btn { min-width: 3.2rem; }
 
@@ -1747,3 +1753,5 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: .3rem .9rem; }
 .kv dt { opacity: .65; }
 .role-pick { padding: .1rem .3rem; font-size: .85rem; }
+.crop-box i, .crop-box b { filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, .95)) drop-shadow(0 0 3px rgba(0, 0, 0, .6)); }
+.crop-box { box-shadow: 0 0 0 1px rgba(0, 0, 0, .7), 0 0 0 9999px rgba(0, 0, 0, .6); }

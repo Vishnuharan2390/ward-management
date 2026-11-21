@@ -2,6 +2,7 @@
 // drag the corners to crop, drag inside to move, ⟲ rotates 90°, Full resets, ✓ Use keeps it,
 // Don't add leaves it out. cropAll(files) → the pictures to add, as JPEG files.
 const ImageCrop = (() => {
+  const PAD = 18; // room round the picture so the handles at its edges aren't cut off
   const MAX_SRC = 2400; // working copy (phone memory); the upload is shrunk to 1600 later anyway
 
   function load(file) {
@@ -39,9 +40,9 @@ const ImageCrop = (() => {
       wrap.setAttribute('role', 'dialog');
       wrap.setAttribute('aria-label', 'Crop picture');
       wrap.innerHTML = `
-        <div class="crop-top"><b>Crop${total > 1 ? ` · ${n} of ${total}` : ''}</b><span>Drag the corners · drag inside to move</span></div>
-        <div class="crop-stage"><div class="crop-area"><canvas></canvas>
-          <div class="crop-box"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i></div></div></div>
+        <div class="crop-top"><b>Crop${total > 1 ? ` · ${n} of ${total}` : ''}</b><span>Drag across the part you want · then fine-tune a corner or side</span></div>
+        <div class="crop-stage"><div class="crop-frame"><div class="crop-area"><canvas></canvas>
+          <div class="crop-box"><i data-h="tl"></i><i data-h="tr"></i><i data-h="bl"></i><i data-h="br"></i><b data-e="t"></b><b data-e="b"></b><b data-e="l"></b><b data-e="r"></b></div></div></div></div>
         <div class="crop-bar">
           <button type="button" class="btn" data-c="rot" aria-label="Rotate">⟲</button>
           <button type="button" class="btn" data-c="full">Full</button>
@@ -58,8 +59,8 @@ const ImageCrop = (() => {
       let r = null; // crop rectangle in display px: { x, y, w, h }
 
       function layout(keep) {
-        const sw = stage.clientWidth - 16;
-        const sh = stage.clientHeight - 16;
+        const sw = stage.clientWidth - 16 - 2 * PAD;
+        const sh = stage.clientHeight - 16 - 2 * PAD;
         const s = Math.min(sw / src.width, sh / src.height);
         const old = { W, H };
         W = Math.round(src.width * s);
@@ -72,30 +73,56 @@ const ImageCrop = (() => {
         area.style.width = W + 'px';
         area.style.height = H + 'px';
         cv.getContext('2d').drawImage(src, 0, 0, cv.width, cv.height);
-        r = keep && r && old.W ? { x: (r.x * W) / old.W, y: (r.y * H) / old.H, w: (r.w * W) / old.W, h: (r.h * H) / old.H } : { x: 0, y: 0, w: W, h: H };
+        // start a little inside the picture, so every corner and side is in easy reach
+        const ix = Math.round(W * 0.06);
+        const iy = Math.round(H * 0.06);
+        r = keep && r && old.W ? { x: (r.x * W) / old.W, y: (r.y * H) / old.H, w: (r.w * W) / old.W, h: (r.h * H) / old.H } : { x: ix, y: iy, w: W - 2 * ix, h: H - 2 * iy };
         draw();
       }
       function draw() {
         Object.assign(box.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' });
       }
 
-      // dragging: a corner resizes, inside moves
+      // Touch anywhere: near a corner (within GRAB px) resizes from it, near a side moves that side,
+      // anywhere else draws a new crop from that point.
       const MIN = 40;
+      const GRAB = 30;
       let drag = null;
-      area.addEventListener('pointerdown', (e) => {
-        const h = e.target.dataset?.h;
-        if (!h && !e.target.closest('.crop-box')) return;
+      const at = (e) => {
+        const b = area.getBoundingClientRect();
+        return { x: Math.min(Math.max(0, e.clientX - b.left), W), y: Math.min(Math.max(0, e.clientY - b.top), H) };
+      };
+      function grab(p) {
+        const nx = Math.abs(p.x - r.x) <= GRAB ? 'l' : Math.abs(p.x - (r.x + r.w)) <= GRAB ? 'r' : '';
+        const ny = Math.abs(p.y - r.y) <= GRAB ? 't' : Math.abs(p.y - (r.y + r.h)) <= GRAB ? 'b' : '';
+        const inX = p.x >= r.x - GRAB && p.x <= r.x + r.w + GRAB;
+        const inY = p.y >= r.y - GRAB && p.y <= r.y + r.h + GRAB;
+        if (nx && ny) return ny + nx; // corner
+        if (nx && inY) return nx; // side
+        if (ny && inX) return ny;
+        return 'draw'; // anywhere else: draw the crop afresh
+      }
+      stage.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.crop-bar')) return;
         e.preventDefault();
-        area.setPointerCapture(e.pointerId);
-        drag = { h: h || 'move', x0: e.clientX, y0: e.clientY, r0: { ...r } };
+        stage.setPointerCapture(e.pointerId);
+        const p = at(e);
+        drag = { h: grab(p), p0: p, r0: { ...r } };
+        box.dataset.active = drag.h;
       });
-      area.addEventListener('pointermove', (e) => {
+      stage.addEventListener('pointermove', (e) => {
         if (!drag) return;
-        const dx = e.clientX - drag.x0;
-        const dy = e.clientY - drag.y0;
+        const p = at(e);
+        const dx = p.x - drag.p0.x;
+        const dy = p.y - drag.p0.y;
         const o = drag.r0;
         let { x, y, w, h } = o;
-        if (drag.h === 'move') {
+        if (drag.h === 'draw') {
+          if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+          x = Math.min(drag.p0.x, p.x); y = Math.min(drag.p0.y, p.y);
+          w = Math.max(MIN, Math.abs(dx)); h = Math.max(MIN, Math.abs(dy));
+          x = Math.min(x, W - w); y = Math.min(y, H - h);
+        } else if (drag.h === 'move') {
           x = Math.min(Math.max(0, o.x + dx), W - o.w);
           y = Math.min(Math.max(0, o.y + dy), H - o.h);
         } else {
@@ -107,9 +134,9 @@ const ImageCrop = (() => {
         r = { x, y, w, h };
         draw();
       });
-      const end = () => { drag = null; };
-      area.addEventListener('pointerup', end);
-      area.addEventListener('pointercancel', end);
+      const end = () => { drag = null; delete box.dataset.active; };
+      stage.addEventListener('pointerup', end);
+      stage.addEventListener('pointercancel', end);
       const onResize = () => layout(true);
       window.addEventListener('resize', onResize);
 

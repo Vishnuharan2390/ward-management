@@ -13,7 +13,8 @@ const CASE_STATUS = {
 
 // Departments a case can be transferred out to (and back in from, into the pre-op ward).
 // The key is the case status and the tab's address (#/plastic). Add a line here for another one.
-// Where a case can go from the wards. Order = the order of the buttons and of the AP / chief folders.
+// Where a case can go from the wards. Order = the order of the buttons and of the AP / chief folders
+// (after Pre-op and Post-op): retained, SICU, pay ward, then the transfer outs.
 // backToWard: coming back, the case returns to the ward it left (else always the pre-op ward).
 const stayWords = (where, inWhere) => ({
   outBtn: `Shift to ${where}`, outQ: (n) => `Shift ${n} to ${where}?`, outToast: (n) => `${n} shifted to ${where}`, withTag: `In ${where} since`,
@@ -23,10 +24,6 @@ const stayWords = (where, inWhere) => ({
   spent: inWhere, movedTo: `moved to ${where}`, backH: 'Back in the ward (last 14 days)',
 });
 const TRANSFER_DEPTS = {
-  neuro: { short: 'Neurosurgery', long: 'Neurosurgery', tab: 'Neurosurgery transfer outs', status: 'Neurosurgery T/O', btn: 'NS T/O', folder: 'NS T/O' },
-  plastic: { short: 'Plastic', long: 'Plastic surgery', tab: 'Plastic transfer outs', status: 'Plastic T/O', btn: 'Plastic T/O', folder: 'Plastic T/O' },
-  vascular: { short: 'Vascular', long: 'Vascular surgery', tab: 'Vascular transfer outs', status: 'Vascular T/O', btn: 'Vascular T/O', folder: 'Vascular T/O' },
-  surgery: { short: 'Surgery', long: 'General surgery', tab: 'Surgery transfer outs', status: 'Surgery T/O', btn: 'Surgery T/O', folder: 'Surgery T/O' },
   // Not a department: the case is kept back (out of the wards and the OT list) under "Retained cases".
   retained: {
     short: 'Retained', long: 'Retained cases', tab: 'Retained cases', status: 'Retained', btn: 'Retained', folder: 'Retained',
@@ -38,8 +35,12 @@ const TRANSFER_DEPTS = {
       spent: 'retained', movedTo: 'moved to Retained cases', backH: 'Back in the pre-op ward (last 14 days)',
     },
   },
-  payward: { short: 'Pay ward', long: 'Pay ward', tab: 'Pay ward cases', status: 'Pay ward', btn: 'Pay ward', folder: 'Pay ward', backToWard: true, say: stayWords('the pay ward', 'in the pay ward') },
   sicu: { short: 'SICU', long: 'Surgical ICU', tab: 'SICU cases', status: 'SICU', btn: 'SICU', folder: 'SICU', backToWard: true, say: stayWords('SICU', 'in SICU') },
+  payward: { short: 'Pay ward', long: 'Pay ward', tab: 'Pay ward cases', status: 'Pay ward', btn: 'Pay ward', folder: 'Pay ward', backToWard: true, say: stayWords('the pay ward', 'in the pay ward') },
+  neuro: { short: 'Neurosurgery', long: 'Neurosurgery', tab: 'Neurosurgery transfer outs', status: 'Neurosurgery T/O', btn: 'NS T/O', folder: 'NS T/O' },
+  plastic: { short: 'Plastic', long: 'Plastic surgery', tab: 'Plastic transfer outs', status: 'Plastic T/O', btn: 'Plastic T/O', folder: 'Plastic T/O' },
+  vascular: { short: 'Vascular', long: 'Vascular surgery', tab: 'Vascular transfer outs', status: 'Vascular T/O', btn: 'Vascular T/O', folder: 'Vascular T/O' },
+  surgery: { short: 'Surgery', long: 'General surgery', tab: 'Surgery transfer outs', status: 'Surgery T/O', btn: 'Surgery T/O', folder: 'Surgery T/O' },
 };
 // Wording for one entry: its own `say`, or the transfer-out wording built from its names.
 function deptSay(k) {
