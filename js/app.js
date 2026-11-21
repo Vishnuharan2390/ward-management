@@ -3887,14 +3887,6 @@ const App = (() => {
           </fieldset>
         </form>
 
-        <div class="card" id="myward">
-          <h3>This phone is for</h3>
-          <p class="muted small">Which ward the app opens on, on this device.</p>
-          <div class="chips">
-            <button class="chip${lsGet('wm.myWard') !== 'post' ? ' on' : ''}" data-myward="pre">Pre-op ward</button>
-            <button class="chip${lsGet('wm.myWard') === 'post' ? ' on' : ''}" data-myward="post">Post-op ward</button>
-          </div>
-        </div>
 
         <div class="card" id="look">
           <h3>Look</h3>
@@ -3968,13 +3960,6 @@ const App = (() => {
     },
     mount(el) {
       $('#prof', el).onchange = (e) => Store.setProfile({ [e.target.name]: e.target.value.trim() });
-      $('#myward', el).addEventListener('click', (e) => {
-        const k = e.target.closest('[data-myward]')?.dataset.myward;
-        if (!k) return;
-        lsSet('wm.myWard', k);
-        toast(k === 'post' ? 'This phone now opens on the Post-op Ward' : 'This phone now opens on the e-Case Sheet');
-        render();
-      });
       $('#look', el).addEventListener('click', (e) => {
         const k = e.target.closest('[data-ui-pick]')?.dataset.uiPick;
         if (!k) return;
@@ -4703,6 +4688,36 @@ const App = (() => {
     },
   };
 
+  // ---- Start page: the app opens here and asks which ward.
+  const Home = {
+    live: true,
+    render() {
+      const cs = allCases();
+      const pre = cs.filter((c) => isActive(c)).length;
+      const posted = cs.filter((c) => c.status === 'posted').length;
+      const post = cs.filter((c) => c.status === 'postop').length;
+      const S = SPECIALTIES[specOfUnit(Store.meta.unitId)];
+      const extra = S ? ['#/spec', `${S.label} cases`] : Store.meta.unitId === SCHEME_UNIT ? ['#/spec', 'Scheme report'] : null;
+      const who = String(Store.profile().name || Store.user?.displayName || '').trim();
+      const h = new Date().getHours();
+      return `
+        <div class="home">
+          <p class="home-hi">${h < 12 ? 'Good morning' : h < 16 ? 'Good afternoon' : 'Good evening'}${who ? `, ${esc(who.split(' ')[0])}` : ''}</p>
+          <h2>Which ward?</h2>
+          <div class="home-wards">
+            <a class="home-ward" href="#/ward"><span class="home-ico" aria-hidden="true">🛏</span><b>Pre-op ward</b><span class="muted">${pre} patient${pre === 1 ? '' : 's'}${posted ? ` · ${posted} posted` : ''}</span></a>
+            <a class="home-ward" href="#/postward"><span class="home-ico" aria-hidden="true">🩹</span><b>Post-op ward</b><span class="muted">${post} patient${post === 1 ? '' : 's'}</span></a>
+          </div>
+          <div class="home-more">
+            <a class="btn" href="#/">e-Case sheets</a>
+            <a class="btn" href="#/ot">OT list</a>
+            <a class="btn" href="#/deck">Admission day PPT</a>
+            ${extra ? `<a class="btn" href="${extra[0]}">${esc(extra[1])}</a>` : ''}
+          </div>
+        </div>`;
+    },
+  };
+
   const ROUTES = [
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
@@ -4733,7 +4748,8 @@ const App = (() => {
       return Folders;
     }
     // House surgeons: their to-do and the e-case sheets; not the wards' rounds, OT list or PPTs.
-    if (view === 'hs' && (/^#?\/?$/.test(h) || /^#\/(ward|postward|ot(\/list)?|deck|postop|updates|import(\/.*)?|folders)$/.test(h))) return Todo;
+    if (view === 'hs' && (/^#?\/?$/.test(h) || /^#\/(home|ward|postward|ot(\/list)?|deck|postop|updates|import(\/.*)?|folders)$/.test(h))) return Todo;
+    if (h === '#/home') return Home;
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
     if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
@@ -4753,7 +4769,7 @@ const App = (() => {
     if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
     if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
     if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
-    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec)\b/);
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|home)\b/);
     return m ? '#/' + m[1] : '#/';
   }
   // The tabs this view has, which one is open, and the PGs' count of new HS updates.
@@ -5029,8 +5045,9 @@ const App = (() => {
 
   function start() {
     App.el = $('#view');
-    // A post-op PG's phone opens on the post-op ward.
-    if ((!location.hash || location.hash === '#/') && lsGet('wm.myWard') === 'post') location.replace('#/postward');
+    // Opening the app: the start page, which asks which ward.
+    // (only when opened fresh — the home-screen icon opens the bare address; a reload keeps its page)
+    if (!location.hash || location.hash === '#') location.replace('#/home');
     Store.subscribe(onStoreChange);
     window.addEventListener('hashchange', () => {
       current = null;
