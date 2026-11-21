@@ -58,5 +58,22 @@ service cloud.firestore {
     match /units/{unit}/{coll}/{doc} {
       allow read, write: if coll != 'members' && isMember(unit);
     }
+
+    // Specialty units read (never write) the cases of their specialty from every unit, with their
+    // pictures: Unit I arthroplasty, II arthroscopy, III tumour, IV spine, V paediatrics.
+    // A case's `specs` list is set by its own unit's app from the plan / diagnosis / age.
+    function mySpecs() {
+      return (exists(/databases/$(database)/documents/units/ortho-unit-1/members/$(me())) ? ['arthroplasty'] : [])
+        .concat(exists(/databases/$(database)/documents/units/ortho-unit-2/members/$(me())) ? ['arthroscopy'] : [])
+        .concat(exists(/databases/$(database)/documents/units/ortho-unit-3/members/$(me())) ? ['tumour'] : [])
+        .concat(exists(/databases/$(database)/documents/units/ortho-unit-4/members/$(me())) ? ['spine'] : [])
+        .concat(exists(/databases/$(database)/documents/units/ortho-unit-5/members/$(me())) ? ['paediatrics'] : []);
+    }
+    match /units/{unit}/cases/{id} {
+      allow read: if signedIn() && resource.data.get('specs', []).hasAny(mySpecs());
+    }
+    match /units/{unit}/images/{id} {
+      allow get: if signedIn() && get(/databases/$(database)/documents/units/$(unit)/cases/$(resource.data.caseId)).data.get('specs', []).hasAny(mySpecs());
+    }
   }
 }

@@ -1767,3 +1767,10 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 /* the buttons stay in view while the list scrolls */
 .dc-imp-pop .sug-box { padding-bottom: 0; }
 .dc-imp-pop .form-actions { position: sticky; bottom: 0; margin: .4rem -1rem 0; padding: .7rem 1rem calc(.7rem + env(safe-area-inset-bottom)); background: var(--card, #1b1b1d); border-top: 1px solid var(--line, #333); z-index: 1; }
+
+/* Specialty tab */
+.spec-row { display: flex; gap: .6rem; align-items: flex-start; padding: .55rem 0; border-top: 1px solid var(--line, #333); }
+.spec-row:first-of-type { border-top: 0; }
+.spec-main { flex: 1; min-width: 0; }
+.week-pick { display: flex; align-items: center; gap: .6rem; margin: .3rem 0 .5rem; }
+.warn-text { color: var(--amber, #b26b00); }

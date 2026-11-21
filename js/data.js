@@ -449,6 +449,27 @@ function allTodos(c) {
     ...(c.work?.anaes && c.work.anaes !== 'Assessed' ? pacOpen(c).map((l) => ({ kind: 'pac', key: pacKey(l), line: `PAC: ${l.toUpperCase()}`, at: null })) : []),
   ];
 }
+// ---- Unit specialties: each specialty unit sees its cases from all six units (tab + weekly report).
+// `on`: which text decides — the plan / procedure for operations, everything for the rest.
+const SPECIALTIES = {
+  arthroplasty: { unit: 'I', label: 'Arthroplasty', on: 'plan',
+    re: /HEMI\s?-?\s?ARTHROPLASTY|BIPOLAR|AUSTIN MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTHA\b|TOTAL HIP|\bTKR\b|\bTKA\b|TOTAL KNEE|ARTHROPLASTY|\bUKR\b|\bUKA\b|UNICONDYLAR KNEE|REVISION (THR|TKR|HIP|KNEE)/ },
+  arthroscopy: { unit: 'II', label: 'Arthroscopy', on: 'all',
+    re: /ARTHROSCOP|\bSCOPY\b|\bACL\b|\bPCL\b|CRUCIATE|MENISC|BANKART|LATARJET|ROTATOR CUFF|\bMPFL\b|\bSLAP\b|LIGAMENT RECONSTRUCTION/ },
+  tumour: { unit: 'III', label: 'Tumour', on: 'all',
+    re: /TUMOU?R|\bGCT\b|GIANT CELL|SARCOMA|CHONDROMA|EXOSTOSIS|BONE CYST|\bABC\b|\bUBC\b|METASTA|MYELOMA|OSTEOID OSTEOMA|CHONDROBLASTOMA|EWING|LIPOMA|NEOPLASM|LYTIC LESION|SPACE OCCUPYING|MEGAPROSTHESIS|EN ?BLOC|WIDE EXCISION/ },
+  spine: { unit: 'IV', label: 'Spine', on: 'all',
+    re: /\bSPINE\b|\bSPINAL\b|VERTEBRA|\b[CDTL]\s?\d{1,2}\b|DORSOLUMBAR|THORACOLUMBAR|\bDORSAL\b|\bLUMBAR\b|BURST|PEDICLE|LAMINECTOMY|DISCECTOMY|\bPSF\b|\bTLIF\b|\bPLIF\b|\bACDF\b|SPONDYL|\bPOTT|PARAPLEGI|QUADRIPLEGI|QUADRIPARESIS|PARAPARESIS|\bIVDP\b|\bPIVD\b|CANAL STENOSIS|LISTHESIS|CORD INJURY/ },
+  paediatrics: { unit: 'V', label: 'Paediatric', on: 'all', age: 15,
+    re: /\bCTEV\b|CLUB ?FOOT|\bDDH\b|PERTHES|\bSCFE\b|CEREBRAL PALSY|PAEDIATRIC|PEDIATRIC/ },
+};
+const specOfUnit = (romanId) => Object.keys(SPECIALTIES).find((k) => SPECIALTIES[k].unit === romanId) || '';
+function specsOf(c) {
+  const all = String(`${c.diagnosis || ''} ${c.plan || ''} ${c.procedureDone || ''}`).toUpperCase();
+  const op = String(`${c.plan || ''} ${c.procedureDone || ''}`).toUpperCase();
+  return Object.entries(SPECIALTIES).filter(([, S]) => S.re.test(S.on === 'plan' ? op : all) || (S.age && ageYears(c) < S.age)).map(([k]) => k);
+}
+
 // What each person sees: the team list role decides (Settings → Team).
 function viewOfRole(role) {
   const r = String(role || '').toLowerCase();

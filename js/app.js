@@ -4309,6 +4309,137 @@ const App = (() => {
     };
   }
 
+  // ---- Specialty tab: this unit's specialty, from all six units, and the weekly report (Mon–Sun).
+  const unitLabel = (key) => (key ? 'UNIT ' + (UNITS[Store.unitKeys.indexOf(key)]?.id || '?') : 'UNIT ' + Store.meta.unitId);
+  const mondayOf = (iso) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
+  const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const operatedOn = (c) => c.surgeryDate || (['postop', 'discharged'].includes(c.status) || TRANSFER_DEPTS[c.status] ? c.otDate || '' : '');
+  const statusWord = (c) => (c.status === 'postop' ? 'Post-op' : c.status === 'posted' ? 'Posted' : c.status === 'discharged' ? 'Discharged' : TRANSFER_DEPTS[c.status] ? TRANSFER_DEPTS[c.status].folder : 'Pre-op');
+  const SpecTab = {
+    live: false,
+    data: null,
+    loadedFor: '',
+    week: '',
+    spec: () => specOfUnit(Store.meta.unitId),
+    async load() {
+      const spec = SpecTab.spec();
+      SpecTab.loading = true;
+      let list;
+      try { list = await Store.specCases(spec); } catch (e) { list = []; list.failed = ['all']; }
+      // this unit's own cases straight from the phone (their tags may not be saved yet)
+      const mine = Object.entries(Store.cases).filter(([, c]) => specsOf(c).includes(spec)).map(([id, c]) => ({ id, unit: Store.unitKey, ...c }));
+      SpecTab.data = [...list.filter((c) => c.unit !== Store.unitKey && c.unit !== ''), ...mine];
+      SpecTab.data.failed = list.failed;
+      SpecTab.loading = false;
+      SpecTab.loadedFor = spec + '|' + Store.unitKey;
+      if (/^#\/spec/.test(location.hash)) { current = null; render(); }
+    },
+    render() {
+      const spec = SpecTab.spec();
+      const S = SPECIALTIES[spec];
+      if (!S) return '<div class="card empty">This unit has no specialty tab.</div>';
+      if (SpecTab.loadedFor !== spec + '|' + Store.unitKey && !SpecTab.loading) setTimeout(SpecTab.load, 0);
+      const list = SpecTab.data || [];
+      // the last full week by default (the report is sent on Monday for the week before)
+      SpecTab.week ||= addDays(mondayOf(todayISO()), -7);
+      const mon = SpecTab.week;
+      const sun = addDays(mon, 6);
+      const inWards = list.filter((c) => c.status !== 'discharged').sort((a, b) => String(a.doa || '').localeCompare(String(b.doa || '')));
+      const done = list.filter((c) => { const d = operatedOn(c); return d && d >= mon && d <= sun; }).sort((a, b) => operatedOn(a).localeCompare(operatedOn(b)));
+      const row = (c, week) => {
+        const pre = (c.images ? Object.values(c.images) : []).filter((i) => i.kind === 'xray').length;
+        const post = (c.images ? Object.values(c.images) : []).filter((i) => i.kind === 'poxray').length;
+        return `<div class="spec-row">
+          <span class="tag">${esc(unitLabel(c.unit))}</span>
+          <div class="spec-main"><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}</span>
+            <div class="small">${esc(c.diagnosis || '')}</div>
+            <div class="muted small">${esc([c.procedureDone ? '✓ ' + c.procedureDone : c.plan ? '▸ ' + c.plan : '', week ? 'DOS ' + fmtDate(operatedOn(c)) : statusWord(c), !week && c.doa ? 'DOA ' + fmtDate(c.doa) : ''].filter(Boolean).join(' · '))}</div>
+            ${week ? `<div class="small ${pre && post ? 'muted' : 'warn-text'}">${pre ? `✓ pre-op X-ray (${pre})` : '✗ no pre-op X-ray'} · ${post ? `✓ post-op X-ray (${post})` : '✗ no post-op X-ray'}${hasText(c.implantsUsed || c.implants) ? '' : ' · no implants written'}</div>` : ''}
+          </div>
+          ${c.unit === Store.unitKey || !c.unit ? `<a class="btn small" href="#/case/${esc(c.id)}">Open</a>` : ''}
+        </div>`;
+      };
+      const failed = list.failed?.length ? `<p class="notice small">Couldn't read ${list.failed.includes('all') ? 'the other units' : list.failed.map(unitLabel).join(', ')} — no network, or the database rules haven't been published yet.</p>` : '';
+      return `
+        <div class="toolbar"><h2>${esc(S.label)} cases <span class="muted small">all units</span></h2><button class="btn small" id="spec-refresh">⟳ Refresh</button></div>
+        ${failed}
+        ${SpecTab.loading && !SpecTab.data ? '<div class="card empty">Loading the cases from all units…</div>' : `
+        <div class="card">
+          <h3>Weekly report</h3>
+          <div class="week-pick"><button class="btn small" data-wk="-7" aria-label="Week before">‹</button>
+            <b>${esc(fmtDate(mon))} – ${esc(fmtDate(sun))}</b>
+            <button class="btn small" data-wk="7" aria-label="Week after" ${addDays(mon, 7) > todayISO() ? 'disabled' : ''}>›</button></div>
+          <p class="muted small">${done.length} ${S.label.toLowerCase()} case${done.length === 1 ? '' : 's'} operated in all units that week. One slide per case — name, age, sex, unit, diagnosis, procedure, implants — then the pre-op and post-op radiographs.</p>
+          ${done.map((c) => row(c, true)).join('')}
+          <div class="form-actions"><button class="btn primary" id="spec-ppt" ${done.length ? '' : 'disabled'}>Download PowerPoint</button></div>
+        </div>
+        <div class="card">
+          <h3>In the wards now <span class="pill">${inWards.length}</span></h3>
+          ${inWards.map((c) => row(c, false)).join('') || `<p class="muted">No ${S.label.toLowerCase()} cases in any unit right now.</p>`}
+        </div>`}`;
+    },
+    mount(el) {
+      $('#spec-refresh', el)?.addEventListener('click', () => { SpecTab.data = null; SpecTab.load(); render(); });
+      el.addEventListener('click', (e) => {
+        const w = e.target.closest('[data-wk]');
+        if (w) { SpecTab.week = addDays(SpecTab.week, +w.dataset.wk); render(); }
+      });
+      const btn = $('#spec-ppt', el);
+      if (btn) btn.onclick = async () => {
+        const S = SPECIALTIES[SpecTab.spec()];
+        const mon = SpecTab.week;
+        const sun = addDays(mon, 6);
+        const done = (SpecTab.data || []).filter((c) => { const d = operatedOn(c); return d && d >= mon && d <= sun; }).sort((a, b) => operatedOn(a).localeCompare(operatedOn(b)));
+        const imgsOf = (c, kind) => Object.entries(c.images || {}).filter(([, i]) => i.kind === kind).sort((a, b) => (a[1].at || 0) - (b[1].at || 0)).map(([iid]) => iid);
+        const st = {
+          noCover: true,
+          unit: Store.meta.unitId,
+          date: sun,
+          cons: {},
+          cases: done.map((c) => ({
+            id: `${c.unit}:${c.id}`,
+            title: `${S.label.toUpperCase()} CASES ${fmtDate(mon)} – ${fmtDate(sun)}`,
+            status: '',
+            rows: [
+              { k: 'NAME', v: DeckEngine.up(c.name), kb: true, vb: true },
+              { k: 'AGE / SEX', v: DeckEngine.up(ageSex(c)), vb: true },
+              { k: 'UNIT', v: unitLabel(c.unit) },
+              { k: 'DIAGNOSIS', v: DeckEngine.up(c.diagnosis), vb: true, diag: true },
+              { k: 'PROCEDURE DONE', v: DeckEngine.up(c.procedureDone || c.plan) },
+              { k: 'IMPLANTS USED', v: DeckEngine.up(c.implantsUsed || c.implants || '—') },
+              { k: 'DATE OF SURGERY', v: fmtDate(operatedOn(c)) },
+            ],
+            slides: [['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY']].map(([k, label]) => ({ id: `${c.unit}:${c.id}:${k}`, label, images: imgsOf(c, k) })).filter((x) => x.images.length),
+          })),
+        };
+        btn.disabled = true;
+        btn.textContent = 'Building…';
+        try {
+          const imgs = {};
+          let missing = 0;
+          for (const c of done) {
+            for (const iid of [...imgsOf(c, 'xray'), ...imgsOf(c, 'poxray')]) {
+              const data = await Store.getImage(iid, c.unit || undefined);
+              if (!data) { missing++; continue; }
+              const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = data; });
+              if (img) imgs[iid] = { data, w: img.naturalWidth, h: img.naturalHeight, url: data };
+            }
+          }
+          const pres = DeckEngine.buildPptx(window.PptxGenJS, st, imgs);
+          const blob = await pres.write({ outputType: 'blob' });
+          offerFile(new File([blob], `${S.label.toUpperCase()} CASES ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(sun).replace(/\//g, '-')}.pptx`, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+          if (missing) toast(`${missing} radiograph(s) couldn't be loaded (no network?) — the rest are in.`, 5000);
+        } catch (err) {
+          console.error(err);
+          toast('Could not build the PowerPoint: ' + err.message, 5000);
+        } finally {
+          btn.disabled = false;
+          btn.textContent = 'Download PowerPoint';
+        }
+      };
+    },
+  };
+
   const ROUTES = [
     [/^#?\/?$/, () => Dashboard],
     [/^#\/ward$/, () => Ward],
@@ -4342,6 +4473,7 @@ const App = (() => {
     if (view === 'hs' && (/^#?\/?$/.test(h) || /^#\/(ward|postward|ot(\/list)?|deck|postop|updates|import(\/.*)?|folders)$/.test(h))) return Todo;
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
+    if (h === '#/spec') return SpecTab;
     if (h === '#/cases') return Dashboard;
     if (h === '#/folders') return Folders;
     if ((m = h.match(/^#\/c\/(\w+)$/))) return ConsultCase(m[1]);
@@ -4358,7 +4490,7 @@ const App = (() => {
     if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
     if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
     if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
-    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases)\b/);
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec)\b/);
     return m ? '#/' + m[1] : '#/';
   }
   // The tabs this view has, which one is open, and the PGs' count of new HS updates.
@@ -4373,6 +4505,11 @@ const App = (() => {
     if (up) {
       const n = view === 'full' ? unseenUpdates() : 0;
       up.innerHTML = `HS updates${n ? ` <span class="pill new">${n}</span>` : ''}`;
+    }
+    const sp = $('#nav a[href="#/spec"]');
+    if (sp) {
+      const S = SPECIALTIES[specOfUnit(Store.meta.unitId)];
+      if (S) sp.textContent = `${S.label} cases`; else sp.hidden = true;
     }
     document.documentElement.dataset.view = view;
   }
@@ -4588,8 +4725,20 @@ const App = (() => {
     }
   }
 
+  let specTimer = 0;
+  function tagSpecs() {
+    clearTimeout(specTimer);
+    specTimer = setTimeout(() => {
+      if (!Store.synced) return;
+      for (const [id, c] of Object.entries(Store.cases)) {
+        const want = specsOf(c);
+        if (JSON.stringify(want) !== JSON.stringify(c.specs || [])) Store.patch('cases', id, { specs: want });
+      }
+    }, 2500);
+  }
+
   function onStoreChange() {
-    if (Store.synced) queueOffline();
+    if (Store.synced) { queueOffline(); tagSpecs(); }
     updatesChanged();
     const gateNeeded = Store.mode === 'firebase' && Store.status !== 'ok';
     if (gateNeeded !== (current?.view === Gate)) {

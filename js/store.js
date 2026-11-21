@@ -141,8 +141,9 @@ const Store = (() => {
     } catch { /* phone storage full: still shown this time */ }
   }
   // From the server, waiting at most `ms` (a bad signal can otherwise hang for a long time).
-  async function fetchRemote(id, ms = 20000) {
-    const get = fb.fsM.getDoc(ref('images', id)).then((d) => d.data()?.data).catch(() => null);
+  const imgRef = (id, unit) => (unit && unit !== fb.unit ? fb.fsM.doc(fb.db, 'units', unit, 'images', id) : ref('images', id));
+  async function fetchRemote(id, ms = 20000, unit) {
+    const get = fb.fsM.getDoc(imgRef(id, unit)).then((d) => d.data()?.data).catch(() => null);
     return Promise.race([get, new Promise((res) => setTimeout(() => res(null), ms))]);
   }
 
@@ -410,7 +411,7 @@ const Store = (() => {
     await patch('cases', caseId, { ['images.' + id]: { kind, caption, at: rec.at, by: rec.by } });
   }
   const inFlight = new Map();
-  async function getImage(id) {
+  async function getImage(id, unit) {
     if (imgCache.has(id)) return imgCache.get(id);
     if (!fb) {
       const rec = await idbDo('get', id);
@@ -421,8 +422,8 @@ const Store = (() => {
     const p = (async () => {
       // 1. this phone's copy, 2. Firestore's offline copy, 3. the server
       let data = (await cacheDo('get', id).catch(() => null))?.data;
-      if (!data) data = await fb.fsM.getDocFromCache(ref('images', id)).then((d) => d.data()?.data).catch(() => null);
-      if (!data) data = await fetchRemote(id);
+      if (!data) data = await fb.fsM.getDocFromCache(imgRef(id, unit)).then((d) => d.data()?.data).catch(() => null);
+      if (!data) data = await fetchRemote(id, 20000, unit);
       if (data) {
         imgCache.set(id, data);
         if (!savedIds?.has(id)) keep(id, data);
@@ -469,6 +470,21 @@ const Store = (() => {
     } else await idbDo('delete', id);
     imgCache.delete(id);
     await patch('cases', caseId, { ['images.' + id]: DELETE });
+  }
+
+  // ---- a specialty's cases from every unit (the rules let a specialty unit read only those) ----
+  async function specCases(spec) {
+    if (!fb) return Object.entries(state.cases).filter(([, c]) => (c.specs || []).includes(spec)).map(([id, c]) => ({ id, unit: '', ...c }));
+    const out = [];
+    const failed = [];
+    await Promise.all(UNIT_KEYS.map(async (u) => {
+      try {
+        const snap = await fb.fsM.getDocs(fb.fsM.query(fb.fsM.collection(fb.db, 'units', u, 'cases'), fb.fsM.where('specs', 'array-contains', spec)));
+        snap.forEach((d) => out.push({ id: d.id, unit: u, ...migrateCase(d.data()) }));
+      } catch (e) { failed.push(u); console.warn('specialty cases', u, e.code || e); }
+    }));
+    out.failed = failed;
+    return out;
   }
 
   // ---- team (shared mode) ----
@@ -597,7 +613,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember, setAdmin, setRole,
+    addMember, removeMember, setAdmin, setRole, specCases,
     exportAll, importAll,
   };
 })();
