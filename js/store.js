@@ -5,7 +5,9 @@
 // editing different parts of the same case never overwrite each other.
 const Store = (() => {
   const CFG = window.WARD_CONFIG || {};
-  const LS = 'wm.v1.';
+  // Guest demo (temporary, js/demo.js): sample patients in this browser only, kept apart from real data.
+  const guest = (() => { try { return localStorage.getItem('wm.guest') === '1'; } catch { return false; } })();
+  const LS = guest ? 'wm.guest.' : 'wm.v1.';
   const COLLS = ['cases', 'implants', 'levels', 'meta', 'updates'];
   const state = { cases: {}, implants: {}, levels: {}, meta: {}, members: {}, updates: {} };
   const subs = new Set();
@@ -18,7 +20,7 @@ const Store = (() => {
 
   // Firebase sign-in needs a real web address; a downloaded copy opened as a
   // file stays in local mode.
-  const mode = CFG.firebase && location.protocol.startsWith('http') ? 'firebase' : 'local';
+  const mode = !guest && CFG.firebase && location.protocol.startsWith('http') ? 'firebase' : 'local';
   const emit = () => subs.forEach((f) => f());
 
   // ---- profile (per device) ----
@@ -91,7 +93,7 @@ const Store = (() => {
   let idbP = null;
   function idb() {
     idbP ||= new Promise((res, rej) => {
-      const r = indexedDB.open('ward-images', 1);
+      const r = indexedDB.open(guest ? 'ward-images-guest' : 'ward-images', 1);
       r.onupgradeneeded = () => r.result.createObjectStore('images', { keyPath: 'id' });
       r.onsuccess = () => res(r.result);
       r.onerror = () => rej(r.error);
@@ -308,7 +310,8 @@ const Store = (() => {
     }
   }
 
-  async function signInEmail(mail, password) {
+  async function signInEmail(mail, password, remember = true) {
+    if (fb.authM.setPersistence) await fb.authM.setPersistence(fb.auth, remember ? fb.authM.browserLocalPersistence : fb.authM.browserSessionPersistence).catch(() => {});
     await fb.authM.signInWithEmailAndPassword(fb.auth, mail.trim(), password);
   }
   async function signUpEmail(mail, password) {
@@ -618,6 +621,7 @@ const Store = (() => {
     init,
     subscribe: (f) => subs.add(f),
     get mode() { return mode; },
+    get guest() { return guest; },
     get status() { return status; },
     // true once cases and meta are known up to date (always in local mode)
     get synced() { return mode === 'local' || !!(syncFresh.cases && syncFresh.meta); },

@@ -3934,7 +3934,7 @@ const App = (() => {
         </div>` : ''}
         <div class="card">
           <h3>Sharing</h3>
-          ${Store.mode === 'local'
+          ${Store.guest ? '<p><b>Guest demo.</b> These are sample patients, on this phone only. <button class="btn small" data-guest-exit>Leave the demo</button></p>' : Store.mode === 'local'
             ? (window.WARD_CONFIG?.firebase
               ? '<p>This copy was opened as a file, so it runs in <b>local mode</b>: data stays in this browser only. For live sharing, open <b>https://callus-madurai.pages.dev/</b> (or <b>https://vishnuharan2390.github.io/ward-management/</b>) instead.</p>'
               : '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and senior PGs, connect Firebase — see <b>README.md</b>.</p>')
@@ -4152,11 +4152,12 @@ const App = (() => {
       if (s === 'signed-out') {
         const m = Gate.mode;
         return `<div class="card gate">
-          <h2>Pre-op Ward</h2>
+          <h2>Callus</h2>
           <p class="muted">${m === 'up' ? 'Create your account with the email your unit added to the team.' : m === 'reset' ? 'We will email you a link to set a new password.' : 'Sign in with the email your unit added to the team.'}</p>
-          <form id="email-form" class="gate-form" autocomplete="on">
-            <label>Email<input name="email" type="email" autocomplete="username" required></label>
-            ${m === 'reset' ? '' : `<label>Password<input name="password" type="password" autocomplete="${m === 'up' ? 'new-password' : 'current-password'}" minlength="6" required></label>`}
+          <form id="email-form" class="gate-form" autocomplete="on" method="post" action="#">
+            <label>Email<input id="username" name="email" type="email" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+            ${m === 'reset' ? '' : `<label>Password<input id="password" name="password" type="password" autocomplete="${m === 'up' ? 'new-password' : 'current-password'}" minlength="6" required></label>
+            <label class="small gate-keep"><input type="checkbox" name="keep" checked> Keep me signed in on this phone</label>`}
             <button class="btn primary">${m === 'up' ? 'Create account' : m === 'reset' ? 'Send reset link' : 'Sign in'}</button>
           </form>
           <div class="gate-links">
@@ -4164,6 +4165,9 @@ const App = (() => {
           </div>
           <div class="gate-or"><span>or</span></div>
           <button class="btn" id="signin">Sign in with Google</button>
+          <div class="gate-or"><span>just looking?</span></div>
+          <button class="btn" id="guest">👀 Look around as a guest</button>
+          <p class="muted small">Sample patients only, on this phone — none of the unit's patients.</p>
         </div>`;
       }
       return '<div class="empty">Connecting…</div>';
@@ -4180,6 +4184,8 @@ const App = (() => {
       })[e.code] || 'Sign-in failed: ' + (e.code || e.message), 4000);
       const si = $('#signin', el);
       if (si) si.onclick = () => Store.signIn().catch(fail);
+      const gu = $('#guest', el);
+      if (gu) gu.onclick = () => { try { localStorage.setItem('wm.guest', '1'); } catch { /* ignore */ } location.hash = '#/home'; location.reload(); };
       const so = $('#signout', el);
       if (so) so.onclick = () => Store.signOut();
       const re = $('#retry', el);
@@ -4214,7 +4220,9 @@ const App = (() => {
             } else if (Gate.mode === 'up') {
               await Store.signUpEmail(mail, f.elements.password.value);
             } else {
-              await Store.signInEmail(mail, f.elements.password.value);
+              await Store.signInEmail(mail, f.elements.password.value, f.elements.keep ? f.elements.keep.checked : true);
+              // Chrome / Android: offer to save the password (Safari offers it when the form is submitted)
+              try { if (window.PasswordCredential) navigator.credentials.store(new PasswordCredential(f)); } catch { /* not supported */ }
             }
           } catch (err) {
             fail(err);
@@ -4856,7 +4864,16 @@ const App = (() => {
     window.scrollTo(0, same ? y : 0);
     paintNav();
     updateSync();
+    if (Store.guest && !$('#guest-bar')) {
+      $('header.top').insertAdjacentHTML('afterend', '<div id="guest-bar">Guest demo — sample patients only · <button type="button" class="link" data-guest-exit>Leave</button></div>');
+    }
   }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-guest-exit]')) return;
+    try { localStorage.removeItem('wm.guest'); } catch { /* ignore */ }
+    location.hash = '#/home';
+    location.reload();
+  });
 
   function updateSync() {
     const s = $('#sync');
@@ -5086,6 +5103,7 @@ const App = (() => {
     $('#dl-noscheme').innerHTML = NO_SCHEME_REASONS.map((r) => `<option value="${esc(r)}">`).join('');
     render();
     Store.init();
+    if (Store.guest && !Object.keys(Store.cases).length) Demo.seed().then(() => render());
     // Ask the phone not to clear the saved radiographs when space runs low.
     try { navigator.storage?.persist?.(); } catch { /* not supported */ }
     Store.loadSaved?.().then(paintOffline);

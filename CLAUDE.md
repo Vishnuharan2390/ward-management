@@ -46,3 +46,11 @@
 - Tab #/spec ("Arthroplasty cases" etc.): cases in the wards now + weekly (Mon–Sun) report PowerPoint (DeckEngine, noCover).
 - Unit VI's tab (#/spec) is the **Scheme report** instead: every OT list generated (sendScheme in js/app.js) writes
   schemeReports/<unit>_<OT date> (scheme + reason per case); Unit VI reads a Mon–Sun week, PDF via jsPDF autotable.
+
+## Guest demo (temporary — owner will ask to remove it)
+- Gate → "Look around as a guest" sets `localStorage wm.guest=1`: forced local mode, own storage prefix `wm.guest.` and
+  IndexedDB `ward-images-guest`, seeded with sample patients by js/demo.js. Never touches Firebase.
+- Removal steps are at the top of js/demo.js.
+
+## Logo
+- assets/icons/logo.svg is the source; the PNG icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).

@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION with each release so phones
 // pick up the new files; data never goes through here (it lives in the
 // browser's storage or Firestore).
-const VERSION = 'v180';
+const VERSION = 'v181';
 const CACHE = 'preop-ward-' + VERSION;
 const SHELL = [
   './',
@@ -25,6 +25,7 @@ const SHELL = [
   'js/crop.js',
   'js/dc-import.js',
   'js/ot-import.js',
+  'js/demo.js',
   'js/vendor/pdfjs/pdf.min.js',
   'js/vendor/pdfjs/pdf.worker.min.js',
   'js/consent.js',
@@ -39,6 +40,7 @@ const SHELL = [
   'js/update.js',
   'assets/letterhead.jpg',
   'assets/andry-tree.svg',
+  'assets/icons/logo.svg',
   'assets/icons/apple-touch-icon.png',
   'assets/icons/icon-192.png',
   'assets/icons/icon-512.png',
