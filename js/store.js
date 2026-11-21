@@ -487,6 +487,34 @@ const Store = (() => {
     return out;
   }
 
+  // ---- scheme status of each OT list, for Unit VI's weekly scheme report ----
+  // one document per unit and OT date: schemeReports/ortho-unit-N_YYYY-MM-DD
+  const SCHEME_LS = LS + 'schemeReports';
+  async function saveSchemeReport(rep) {
+    const unit = fb ? fb.unit : 'local';
+    const doc = { ...rep, unit, by: who(), at: Date.now() };
+    const id = `${unit}_${rep.date}`;
+    if (!fb) {
+      let all = {};
+      try { all = JSON.parse(localStorage.getItem(SCHEME_LS)) || {}; } catch { /* ignore */ }
+      all[id] = doc;
+      localStorage.setItem(SCHEME_LS, JSON.stringify(all));
+      return;
+    }
+    await fb.fsM.setDoc(fb.fsM.doc(fb.db, 'schemeReports', id), doc);
+  }
+  async function schemeReports(from, to) {
+    if (!fb) {
+      let all = {};
+      try { all = JSON.parse(localStorage.getItem(SCHEME_LS)) || {}; } catch { /* ignore */ }
+      return Object.values(all).filter((r) => r.date >= from && r.date <= to);
+    }
+    const snap = await fb.fsM.getDocs(fb.fsM.query(fb.fsM.collection(fb.db, 'schemeReports'), fb.fsM.where('date', '>=', from), fb.fsM.where('date', '<=', to)));
+    const out = [];
+    snap.forEach((d) => out.push(d.data()));
+    return out;
+  }
+
   // ---- team (shared mode) ----
   // The member's doc in this unit and their entry in the department directory are written together;
   // the database rules refuse it if they are already on another unit's team.
@@ -613,7 +641,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember, setAdmin, setRole, specCases,
+    addMember, removeMember, setAdmin, setRole, specCases, saveSchemeReport, schemeReports,
     exportAll, importAll,
   };
 })();

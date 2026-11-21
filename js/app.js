@@ -2386,6 +2386,7 @@ const App = (() => {
                   <label>Ward<input data-f="ward" value="${esc(c.ward)}"></label>
                   <label>Level<select data-f="level">${levelOpts(c.level)}</select></label>
                   <label>Scheme status<select data-f="scheme">${schemeOpts(c.scheme)}</select></label>
+                  ${['NO SCHEME', 'DENIED'].includes(c.scheme) ? `<label class="span2">No-scheme reason<input data-f="schemeReason" list="dl-noscheme" value="${esc(c.schemeReason || '')}" placeholder="Why no scheme (for Unit VI's report)"></label>` : ''}
                   <label>Anaesthesia assessment<select data-f="work.anaes"><option value="">—</option>${opts(PAC_OPTIONS, c.work?.anaes || '')}</select></label>
                   <label class="span3">Diagnosis<textarea data-f="diagnosis" rows="2">${esc(c.diagnosis)}</textarea></label>
                   <label class="span3">Plan<textarea data-f="plan" rows="2">${esc(c.plan)}</textarea></label>
@@ -2601,6 +2602,7 @@ const App = (() => {
       if (!$('#ot-go', el)) return;
       const generate = (twice) => {
         const [cases, dd] = build();
+        sendScheme(cases, dd);
         if ($('#ot-mark', el).checked) {
           cases.filter((c) => c.status !== 'posted').forEach((c) => Store.patch('cases', c.id, { status: 'posted', otDate: dd.date }));
         }
@@ -2611,7 +2613,7 @@ const App = (() => {
       };
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
-      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); SharePdf.ot(cases, dd); };
+      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); sendScheme(cases, dd); SharePdf.ot(cases, dd); };
       // The unit's WhatsApp bot sends the PDF to the OT contacts in Settings.
       const waBot = $('#ot-wa-bot', el);
       // One tap: the share sheet first (iPhone only opens it straight from a tap) to pick the group,
@@ -2619,6 +2621,7 @@ const App = (() => {
       if (waBot) waBot.onclick = async () => {
         const nums = otWaNumbers();
         const [cases, dd] = build();
+        sendScheme(cases, dd);
         const file = SharePdf.otPdf(cases, dd);
         await SharePdf.share(file);
         if (!confirm(`Also send it from the unit's WhatsApp bot to the ${nums.length} OT contact${nums.length === 1 ? '' : 's'}?\n\n${nums.join('\n')}`)) return;
@@ -2646,6 +2649,7 @@ const App = (() => {
         const to = String(Store.meta.otEmail || '').trim();
         if (!to) return toast('Add the OT list email address in Settings first', 4000);
         const [cases, dd] = build();
+        sendScheme(cases, dd);
         SharePdf.otEmail(cases, dd, to);
       };
       // Phones get a real PDF file (window.print is unreliable there); computers keep the print dialog.
@@ -4309,6 +4313,128 @@ const App = (() => {
     };
   }
 
+
+  // ---- Unit VI: the weekly scheme report, from every unit's OT lists (Mon–Sun by OT date).
+  const SchemeTab = {
+    live: false,
+    week: '',
+    reps: null,
+    loadedWeek: '',
+    async load() {
+      const mon = SchemeTab.week;
+      SchemeTab.loading = true;
+      try { SchemeTab.reps = await Store.schemeReports(mon, addDays(mon, 6)); SchemeTab.err = ''; } catch (e) { SchemeTab.reps = []; SchemeTab.err = e.code || e.message; }
+      SchemeTab.loading = false;
+      SchemeTab.loadedWeek = mon + '|' + Store.unitKey;
+      if (/^#\/spec/.test(location.hash)) { current = null; render(); }
+    },
+    // per unit: each case once (its latest OT list that week), standby cases apart
+    summary() {
+      const byUnit = {};
+      for (const r of (SchemeTab.reps || []).sort((a, b) => (a.date + a.at).localeCompare(b.date + b.at))) {
+        const u = (byUnit[r.unit] ||= { lists: new Set(), cases: new Map() });
+        u.lists.add(r.date);
+        for (const c of r.cases || []) u.cases.set(c.id || c.ipNo || c.name, { ...c, date: r.date });
+      }
+      const keys = Store.mode === 'firebase' ? Store.unitKeys : ['local'];
+      return keys.map((k) => {
+        const u = byUnit[k] || { lists: new Set(), cases: new Map() };
+        const all = [...u.cases.values()];
+        const done = all.filter((c) => !c.standby);
+        const count = (s) => done.filter((c) => (c.scheme || '') === s).length;
+        return {
+          key: k, label: k === 'local' ? 'UNIT ' + Store.meta.unitId : unitLabel(k), lists: u.lists.size, total: done.length,
+          approved: count('APPROVED'), validation: count('VALIDATION'), toSubmit: count('TO BE SUBMITTED'), denied: count('DENIED'),
+          none: count('NO SCHEME'), blank: done.filter((c) => !c.scheme).length, standby: all.length - done.length,
+          noScheme: done.filter((c) => c.scheme === 'NO SCHEME' || c.scheme === 'DENIED'),
+        };
+      });
+    },
+    render() {
+      SchemeTab.week ||= addDays(mondayOf(todayISO()), -7);
+      const mon = SchemeTab.week;
+      const sun = addDays(mon, 6);
+      if (SchemeTab.loadedWeek !== mon + '|' + Store.unitKey && !SchemeTab.loading) setTimeout(SchemeTab.load, 0);
+      const rows = SchemeTab.reps ? SchemeTab.summary() : [];
+      const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
+      const reasons = rows.flatMap((r) => r.noScheme.map((c) => ({ ...c, unit: r.label })));
+      return `
+        <div class="toolbar"><h2>Scheme report <span class="muted small">all units</span></h2><button class="btn small" id="sch-refresh">⟳ Refresh</button></div>
+        ${SchemeTab.err ? `<p class="notice small">Couldn't read the units' OT lists (${esc(SchemeTab.err)}) — no network, or the database rules haven't been published yet.</p>` : ''}
+        <div class="card">
+          <div class="week-pick"><button class="btn small" data-wk="-7" aria-label="Week before">‹</button>
+            <b>${esc(fmtDate(mon))} – ${esc(fmtDate(sun))}</b>
+            <button class="btn small" data-wk="7" aria-label="Week after" ${addDays(mon, 7) > todayISO() ? 'disabled' : ''}>›</button></div>
+          <p class="muted small">From the OT lists each unit generated that week (by OT date). A case on two lists counts once, with its latest scheme status; standby cases aren't counted.</p>
+          ${SchemeTab.loading && !SchemeTab.reps ? '<p class="muted">Loading…</p>' : `
+          <div class="table-wrap"><table class="board sch-table">
+            <thead><tr><th>Unit</th><th>OT lists</th><th>Cases</th><th>Approved</th><th>Validation</th><th>To be submitted</th><th>Denied</th><th>No scheme</th><th>Not entered</th></tr></thead>
+            <tbody>${rows.map((r) => `<tr class="${r.lists ? '' : 'muted'}"><th>${esc(r.label)}</th><td>${r.lists}</td><td><b>${r.total}</b></td><td>${r.approved}</td><td>${r.validation}</td><td>${r.toSubmit}</td><td>${r.denied}</td><td>${r.none}</td><td>${r.blank}</td></tr>`).join('')}</tbody>
+            <tfoot><tr><th>Total</th><td>${tot('lists')}</td><td><b>${tot('total')}</b></td><td>${tot('approved')}</td><td>${tot('validation')}</td><td>${tot('toSubmit')}</td><td>${tot('denied')}</td><td>${tot('none')}</td><td>${tot('blank')}</td></tr></tfoot>
+          </table></div>
+          ${rows.some((r) => r.lists === 0) ? `<p class="muted small">No OT list yet from ${esc(rows.filter((r) => !r.lists).map((r) => r.label).join(', '))} for this week.</p>` : ''}
+          <h4>No scheme / denied — reasons <span class="pill">${reasons.length}</span></h4>
+          ${reasons.map((c) => `<div class="sch-reason"><span class="tag">${esc(c.unit)}</span> <b>${esc(c.name)}</b> <span class="muted small">${esc([c.ageSex, c.ipNo && 'IP ' + c.ipNo, c.scheme].filter(Boolean).join(' · '))}</span>
+              <div class="small">${esc(c.procedure || c.diagnosis || '')}</div>
+              <div class="${c.reason ? '' : 'warn-text '}small">Reason: ${esc(c.reason || 'not given')}</div></div>`).join('') || '<p class="muted">None.</p>'}
+          <div class="form-actions"><button class="btn primary" id="sch-pdf" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download report PDF</button></div>`}
+        </div>`;
+    },
+    mount(el) {
+      $('#sch-refresh', el)?.addEventListener('click', () => { SchemeTab.reps = null; SchemeTab.load(); render(); });
+      el.addEventListener('click', (e) => {
+        const w = e.target.closest('[data-wk]');
+        if (w) { SchemeTab.week = addDays(SchemeTab.week, +w.dataset.wk); SchemeTab.reps = null; render(); }
+      });
+      const pdf = $('#sch-pdf', el);
+      if (pdf) pdf.onclick = () => {
+        const mon = SchemeTab.week;
+        const sun = addDays(mon, 6);
+        const rows = SchemeTab.summary();
+        const { jsPDF } = window.jspdf;
+        const d = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        d.setFont('helvetica', 'bold');
+        d.setFontSize(13);
+        d.text(`SCHEME REPORT — ${String(Store.meta.department || 'DEPARTMENT OF ORTHOPAEDICS').toUpperCase()}`, 148.5, 14, { align: 'center' });
+        d.setFontSize(11);
+        d.text(`WEEK ${fmtDate(mon)} – ${fmtDate(sun)}`, 148.5, 21, { align: 'center' });
+        const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
+        d.autoTable({
+          startY: 27, theme: 'grid', styles: { fontSize: 10, halign: 'center', lineColor: 0, textColor: 0 }, headStyles: { fillColor: [230, 230, 230], textColor: 0 },
+          head: [['UNIT', 'OT LISTS', 'CASES', 'APPROVED', 'VALIDATION', 'TO BE SUBMITTED', 'DENIED', 'NO SCHEME', 'NOT ENTERED']],
+          body: rows.map((r) => [r.label, r.lists, r.total, r.approved, r.validation, r.toSubmit, r.denied, r.none, r.blank]),
+          foot: [['TOTAL', tot('lists'), tot('total'), tot('approved'), tot('validation'), tot('toSubmit'), tot('denied'), tot('none'), tot('blank')]],
+          footStyles: { fillColor: [240, 240, 240], textColor: 0, fontStyle: 'bold' },
+        });
+        const reasons = rows.flatMap((r) => r.noScheme.map((c) => [r.label, DeckEngine.up(c.name), c.ageSex || '', c.ipNo || '', DeckEngine.up(c.procedure || c.diagnosis || ''), c.scheme, DeckEngine.up(c.reason || 'NOT GIVEN')]));
+        d.setFont('helvetica', 'bold');
+        d.setFontSize(11);
+        const y = d.lastAutoTable.finalY + 9;
+        d.text('NO SCHEME / DENIED — REASONS', 14, y);
+        d.autoTable({
+          startY: y + 3, theme: 'grid', styles: { fontSize: 9, lineColor: 0, textColor: 0, valign: 'middle' }, headStyles: { fillColor: [230, 230, 230], textColor: 0 },
+          head: [['UNIT', 'NAME', 'AGE/SEX', 'IP NO', 'PROCEDURE', 'STATUS', 'REASON']],
+          body: reasons.length ? reasons : [['', 'NIL', '', '', '', '', '']],
+          columnStyles: { 4: { cellWidth: 70 }, 6: { cellWidth: 60 } },
+        });
+        const name = `SCHEME REPORT ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(sun).replace(/\//g, '-')}.pdf`;
+        SharePdf.share(new File([d.output('blob')], name, { type: 'application/pdf' }));
+      };
+    },
+  };
+  // When a unit makes its OT list, its scheme status goes to Unit VI's report.
+  function sendScheme(cases, dd) {
+    if (!dd?.date || !cases.length) return;
+    Store.saveSchemeReport({
+      date: dd.date,
+      unitId: Store.meta.unitId,
+      cases: cases.map((c) => ({
+        id: c.id, name: c.name || '', ageSex: ageSex(c), ipNo: c.ipNo || '', diagnosis: c.diagnosis || '', procedure: c.plan || '',
+        scheme: c.scheme || '', reason: ['NO SCHEME', 'DENIED'].includes(c.scheme) ? (c.schemeReason || '') : '', standby: !!c.standby,
+      })),
+    }).then(() => toast('Scheme status sent to Unit VI', 2500)).catch((e) => { console.warn('scheme report', e); });
+  }
+
   // ---- Specialty tab: this unit's specialty, from all six units, and the weekly report (Mon–Sun).
   const unitLabel = (key) => (key ? 'UNIT ' + (UNITS[Store.unitKeys.indexOf(key)]?.id || '?') : 'UNIT ' + Store.meta.unitId);
   const mondayOf = (iso) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.toISOString().slice(0, 10); };
@@ -4473,7 +4599,7 @@ const App = (() => {
     if (view === 'hs' && (/^#?\/?$/.test(h) || /^#\/(ward|postward|ot(\/list)?|deck|postop|updates|import(\/.*)?|folders)$/.test(h))) return Todo;
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
-    if (h === '#/spec') return SpecTab;
+    if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
     if (h === '#/cases') return Dashboard;
     if (h === '#/folders') return Folders;
     if ((m = h.match(/^#\/c\/(\w+)$/))) return ConsultCase(m[1]);
@@ -4509,7 +4635,7 @@ const App = (() => {
     const sp = $('#nav a[href="#/spec"]');
     if (sp) {
       const S = SPECIALTIES[specOfUnit(Store.meta.unitId)];
-      if (S) sp.textContent = `${S.label} cases`; else sp.hidden = true;
+      if (S) sp.textContent = `${S.label} cases`; else if (Store.meta.unitId === SCHEME_UNIT) sp.textContent = 'Scheme report'; else sp.hidden = true;
     }
     document.documentElement.dataset.view = view;
   }
@@ -4776,6 +4902,7 @@ const App = (() => {
     document.addEventListener('focusout', () => {
       setTimeout(() => { if (deferred && !editing()) render(); }, 0);
     });
+    $('#dl-noscheme').innerHTML = NO_SCHEME_REASONS.map((r) => `<option value="${esc(r)}">`).join('');
     render();
     Store.init();
     // Ask the phone not to clear the saved radiographs when space runs low.

@@ -1774,3 +1774,9 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .spec-main { flex: 1; min-width: 0; }
 .week-pick { display: flex; align-items: center; gap: .6rem; margin: .3rem 0 .5rem; }
 .warn-text { color: var(--amber, #b26b00); }
+
+/* Unit VI scheme report */
+.sch-table td, .sch-table th { text-align: center; }
+.sch-table tbody th, .sch-table tfoot th { text-align: left; }
+.sch-table tfoot td, .sch-table tfoot th { font-weight: 700; border-top: 2px solid currentColor; }
+.sch-reason { padding: .45rem 0; border-top: 1px solid var(--line, #333); }

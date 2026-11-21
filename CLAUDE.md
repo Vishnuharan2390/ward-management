@@ -43,3 +43,5 @@
   by its own unit's app (tagSpecs in js/app.js). firestore.rules let a specialty unit read (not write) cases whose
   `specs` contain its specialty, and their images, from every unit (Store.specCases / getImage(id, unit)).
 - Tab #/spec ("Arthroplasty cases" etc.): cases in the wards now + weekly (Mon–Sun) report PowerPoint (DeckEngine, noCover).
+- Unit VI's tab (#/spec) is the **Scheme report** instead: every OT list generated (sendScheme in js/app.js) writes
+  schemeReports/<unit>_<OT date> (scheme + reason per case); Unit VI reads a Mon–Sun week, PDF via jsPDF autotable.

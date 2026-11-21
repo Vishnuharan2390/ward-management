@@ -463,6 +463,10 @@ const SPECIALTIES = {
   paediatrics: { unit: 'V', label: 'Paediatric', on: 'all', age: 15,
     re: /\bCTEV\b|CLUB ?FOOT|\bDDH\b|PERTHES|\bSCFE\b|CEREBRAL PALSY|PAEDIATRIC|PEDIATRIC/ },
 };
+// Unit VI compiles the weekly scheme report from every unit's OT lists.
+const SCHEME_UNIT = 'VI';
+const NO_SCHEME_REASONS = ['NO CMCHIS CARD', 'NOT ELIGIBLE (INCOME / RATION CARD)', 'OUT OF STATE PATIENT', 'DOCUMENTS NOT AVAILABLE', 'PATIENT NOT WILLING',
+  'PROCEDURE NOT COVERED', 'IMPLANT NOT COVERED', 'SCHEME LIMIT EXHAUSTED', 'EMERGENCY — NOT REGISTERED IN TIME'];
 const specOfUnit = (romanId) => Object.keys(SPECIALTIES).find((k) => SPECIALTIES[k].unit === romanId) || '';
 function specsOf(c) {
   const all = String(`${c.diagnosis || ''} ${c.plan || ''} ${c.procedureDone || ''}`).toUpperCase();

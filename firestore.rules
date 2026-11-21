@@ -59,6 +59,15 @@ service cloud.firestore {
       allow read, write: if coll != 'members' && isMember(unit);
     }
 
+    // Scheme status of each OT list, sent when a unit makes its OT list; Unit VI compiles the weekly
+    // scheme report from them. A unit writes only its own; Unit VI (and owners) read them all.
+    match /schemeReports/{id} {
+      allow read: if signedIn() && (isMember('ortho-unit-6') || isMember(resource.data.unit));
+      allow create: if signedIn() && isMember(request.resource.data.unit) && id.matches(request.resource.data.unit + '_.*');
+      allow update: if signedIn() && isMember(resource.data.unit) && request.resource.data.unit == resource.data.unit;
+      allow delete: if isOwner();
+    }
+
     // Specialty units read (never write) the cases of their specialty from every unit, with their
     // pictures: Unit I arthroplasty, II arthroscopy, III tumour, IV spine, V paediatrics.
     // A case's `specs` list is set by its own unit's app from the plan / diagnosis / age.
