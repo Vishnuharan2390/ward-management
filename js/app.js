@@ -1749,7 +1749,7 @@ const App = (() => {
         if (!c) return notFound();
         const r = readiness(c);
         const d = daysSince(c.doa);
-        const images = listOf(c.images);
+        const images = caseImages(id);
         const opinions = listOf(c.opinions);
         const tasks = listOf(c.tasks);
         return `
@@ -2156,7 +2156,7 @@ const App = (() => {
   // case in order X-ray → CT → MRI, oldest first within each.
   const IMG_ORDER = IMAGE_KINDS.map((k) => k.k);
   const caseImages = (caseId, kind) => listOf(Store.cases[caseId]?.images)
-    .filter((i) => !kind || i.kind === kind)
+    .filter((i) => (kind ? i.kind === kind : i.kind !== 'dcpdf'))
     .sort((a, b) => IMG_ORDER.indexOf(a.kind) - IMG_ORDER.indexOf(b.kind) || (a.at || 0) - (b.at || 0));
 
   // Small picture icon + count beside a name; opens this patient's images in the viewer.
@@ -2305,7 +2305,7 @@ const App = (() => {
               <thead><tr><th title="Change the order">Order</th><th></th><th>Name</th><th>Age/Sex</th><th>Diagnosis</th><th>Plan</th><th>DOA</th><th>Anaesthesia</th><th>Scheme</th><th class="ot-rg">Radiographs</th><th></th></tr></thead>
               <tbody>
                 ${pool.map((c, pi) => {
-                  const n = listOf(c.images).length;
+                  const n = caseImages(c.id).length;
                   return `<tr class="${d.selected.includes(c.id) ? 'picked' : ''}" data-row="${c.id}" data-case="${c.id}">
                   <td class="ot-move"><button class="icon" data-omove="-1" ${pi ? '' : 'disabled'} aria-label="Move up" title="Move up">↑</button><button class="icon" data-omove="1" ${pi < pool.length - 1 ? '' : 'disabled'} aria-label="Move down" title="Move down">↓</button></td>
                   <td><input type="checkbox" data-pick="${c.id}" ${d.selected.includes(c.id) ? 'checked' : ''} aria-label="Select ${esc(c.name)}"></td>
@@ -3310,6 +3310,13 @@ const App = (() => {
         const field = ([k, l, rows, btn]) => `${k === 'condition' ? condHelp : ''}<label class="span2">${l}${btn ? ` <button type="button" class="link small" data-tpl="${btn[0]}">${btn[1]}</button>` : ''}<textarea name="${k}" rows="${rows}">${esc(d[k])}</textarea></label>${k === 'treatment' ? drugBtns : ''}`;
         return `
           <h2>Discharge / transfer — ${esc(c.name)} <span class="muted small">${esc(ageSex(c))} · IP ${esc(c.ipNo)}</span></h2>
+          <div class="card dc-upload">
+            <div><b>Typed the summary yourself?</b> <span class="muted small">Upload the PDF — its details fill in below and you can dispose the patient. Your PDF is kept as the discharge summary.</span></div>
+            <div class="dc-upload-row">
+              <label class="btn primary">📄 Upload discharge summary PDF<input type="file" accept="application/pdf,.pdf" id="dc-pdf" hidden></label>
+              ${caseImages(id, 'dcpdf').length ? `<button type="button" class="btn" id="dc-pdf-open">Open the uploaded summary</button>` : ''}
+            </div>
+          </div>
           <form id="dc-form" class="card form" autocomplete="off">
             <fieldset><legend>Disposition</legend>
               <div class="span2 radios">${Object.entries(DISPOSITIONS).map(([k, v]) => `<label class="chip ${d.disposition === k ? 'on' : ''}"><input type="radio" name="disposition" value="${k}" ${d.disposition === k ? 'checked' : ''} hidden>${v.label}</label>`).join('')}</div>
@@ -3493,6 +3500,91 @@ const App = (() => {
           Store.patch('cases', id, { discharge: d });
           return d;
         };
+
+        // ---- A summary typed elsewhere: read the PDF, show what was found, fill the form (and dispose).
+        const SECT_LABEL = { ...DcImport.LABEL, adviceTa: 'ADVICE (TAMIL)' };
+        const FIELD_LABEL = { arNo: 'AR no', dos: 'Date of surgery', dod: 'Date of discharge', dodTime: 'Time', consultant: 'Consultant', attender: 'Attender', phone: 'Ph. no', contact: 'Contact no', address: 'Address' };
+        const fillForm = (r, pick) => {
+          const set = (name, v) => { if (f.elements[name] && hasText(v)) f.elements[name].value = v; };
+          for (const k of Object.keys(FIELD_LABEL)) if (pick.has('f:' + k)) set(k, r.fields[k]);
+          for (const [k, v] of Object.entries(r.sections)) {
+            if (!pick.has('s:' + k)) continue;
+            if (k === 'opNotes') { opNotes = v; continue; }
+            set(k, v);
+          }
+          const radio = [...f.querySelectorAll('[name=disposition]')].find((x) => x.value === r.disposition);
+          if (radio && !radio.checked) { radio.checked = true; radio.dispatchEvent(new Event('change', { bubbles: true })); }
+        };
+        let opNotes = '';
+        const keepPdf = async (file) => {
+          const url = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(file); });
+          if (url.length > 950000) { toast('Your PDF is too large to keep with the case (over ~700 KB) — the details were still filled in.', 6000); return false; }
+          for (const old of caseImages(id, 'dcpdf')) await Store.deleteImage(id, old.id);
+          await Store.addImage(id, 'dcpdf', url.replace(/^data:[^;,]*/, 'data:application/pdf'), file.name.replace(/\.[^.]+$/, ''));
+          return true;
+        };
+        $('#dc-pdf', el).onchange = async (e) => {
+          const file = e.target.files[0];
+          e.target.value = '';
+          if (!file) return;
+          toast('Reading the PDF…', 8000);
+          let r;
+          try { r = await DcImport.read(file); } catch (err) { console.error(err); return toast(`Couldn't read that PDF: ${err.message}`, 6000); }
+          const cc = c();
+          if (!r.lines.length) return toast('That PDF has no text in it (a scan or a photo?). Save the summary from Word / Pages as a PDF and upload that.', 7000);
+          const ipPdf = String(r.fields.ipNo || '').replace(/\W/g, '');
+          const ipCase = String(cc.ipNo || '').replace(/\W/g, '');
+          const other = ipPdf && ipCase && ipPdf !== ipCase;
+          const rows = [
+            ...Object.keys(FIELD_LABEL).filter((k) => hasText(r.fields[k])).map((k) => ['f:' + k, FIELD_LABEL[k], k === 'dos' || k === 'dod' ? fmtDate(r.fields[k]) : r.fields[k]]),
+            ...Object.entries(r.sections).map(([k, v]) => ['s:' + k, SECT_LABEL[k] || k, v]),
+          ];
+          const pop = document.createElement('div');
+          pop.className = 'sug-back dc-imp-pop';
+          pop.innerHTML = `<div class="sug-box card" role="dialog" aria-label="Discharge summary read">
+              <h3>From ${esc(file.name)}</h3>
+              ${other ? `<p class="notice">⚠ This PDF says IP no. <b>${esc(r.fields.ipNo)}</b>, but this patient is IP <b>${esc(cc.ipNo)}</b>${r.fields.name ? ` (${esc(r.fields.name)} in the PDF)` : ''}. Check it's the right patient.</p>` : ''}
+              <label>Disposition<select id="imp-disp">${opts(Object.entries(DISPOSITIONS).map(([k, v]) => [k, v.label]), r.disposition)}</select></label>
+              <p class="muted small">${rows.length ? 'Untick anything you don\'t want copied in.' : 'No headings or labelled fields were recognised — the PDF can still be kept as the discharge summary.'}</p>
+              <div class="imp-rows">${rows.map(([key, label, v]) => `<label class="imp-row"><input type="checkbox" data-imp="${key}" checked><span><b>${esc(label)}</b><span class="muted small">${esc(String(v).replace(/\n/g, ' · ').slice(0, 140))}${String(v).length > 140 ? '…' : ''}</span></span></label>`).join('')}</div>
+              <label class="small"><input type="checkbox" id="imp-keep" checked> Keep this PDF as the discharge summary</label>
+              <div class="form-actions">
+                <button type="button" class="btn primary" data-imp-go="dispose">Fill &amp; dispose</button>
+                <button type="button" class="btn" data-imp-go="fill">Fill the form only</button>
+                <button type="button" class="btn" data-imp-go="cancel">Cancel</button>
+              </div>
+            </div>`;
+          pop.addEventListener('click', async (ev) => {
+            const go = ev.target.closest('[data-imp-go]')?.dataset.impGo;
+            if (!go) return;
+            if (go === 'cancel') { pop.remove(); return; }
+            const pick = new Set($$('[data-imp]', pop).filter((x) => x.checked).map((x) => x.dataset.imp));
+            r.disposition = $('#imp-disp', pop).value;
+            const keep = $('#imp-keep', pop).checked;
+            pop.remove();
+            fillForm(r, pick);
+            const d = data();
+            if (opNotes) d.opNotes = opNotes;
+            d.fromPdf = file.name;
+            Store.patch('cases', id, { discharge: d });
+            if (keep) await keepPdf(file);
+            if (go === 'fill') { toast('Filled in from your PDF — check it, then Save', 4000); return; }
+            const st = DISPOSITIONS[d.disposition].status;
+            if (st === 'postop' && c().status !== 'postop') transferToPostop(id);
+            else if (c().status !== st) Store.patch('cases', id, { status: st });
+            toast(`${c().name || 'Case'} disposed — ${DISPOSITIONS[d.disposition].label}`, 4000);
+            location.hash = '#/case/' + id;
+          });
+          document.body.appendChild(pop);
+        };
+        const pdfOpen = $('#dc-pdf-open', el);
+        if (pdfOpen) pdfOpen.onclick = async () => {
+          const im = caseImages(id, 'dcpdf').at(-1);
+          const url = im && await Store.getImage(im.id);
+          if (!url) return toast("Couldn't load the summary (no network?)", 4000);
+          const blob = await (await fetch(url)).blob();
+          offerFile(new File([blob], `${(im.caption || 'DISCHARGE SUMMARY').replace(/[\\/:*?"<>|]+/g, ' ')}.pdf`, { type: 'application/pdf' }));
+        };
         $('#dc-save', el).onclick = () => {
           save();
           toast('Draft saved');
@@ -3578,8 +3670,18 @@ const App = (() => {
           btn.textContent = 'Building…';
           try {
             await loadDeckImages(st);
-            st.pages = await DcPages.render(cc, d, Store.meta); // the discharge summary, a page per slide, at the end
-            st.pageAspect = DcPages.ASPECT;
+            // the discharge summary, a page per slide, at the end — your uploaded PDF if there is one
+            const up = caseImages(id, 'dcpdf').at(-1);
+            const upUrl = up && await Store.getImage(up.id);
+            if (upUrl) {
+              const doc = await DcImport.open(await (await fetch(upUrl)).blob());
+              const pages = await DcImport.pageImages(doc);
+              st.pages = pages.map((p) => p.data);
+              st.pageAspect = pages[0]?.aspect || DcPages.ASPECT;
+            } else {
+              st.pages = await DcPages.render(cc, d, Store.meta);
+              st.pageAspect = DcPages.ASPECT;
+            }
             const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
             const blob = await pres.write({ outputType: 'blob' });
             // NAME_AGE-SEX_IPNO.pptx — a "/" isn't allowed in file names, so 26/M is written 26-M.

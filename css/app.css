@@ -1755,3 +1755,11 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .role-pick { padding: .1rem .3rem; font-size: .85rem; }
 .crop-box i, .crop-box b { filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, .95)) drop-shadow(0 0 3px rgba(0, 0, 0, .6)); }
 .crop-box { box-shadow: 0 0 0 1px rgba(0, 0, 0, .7), 0 0 0 9999px rgba(0, 0, 0, .6); }
+
+/* Discharge: upload a summary typed elsewhere */
+.dc-upload { display: grid; gap: .6rem; }
+.dc-upload-row { display: flex; flex-wrap: wrap; gap: .5rem; }
+.dc-imp-pop .sug-box { max-height: 88vh; overflow: auto; }
+.imp-rows { display: grid; gap: .1rem; margin: .4rem 0; }
+.imp-row { display: flex; gap: .5rem; align-items: flex-start; padding: .35rem 0; border-top: 1px solid var(--line, #333); }
+.imp-row > span { display: grid; }
