@@ -40,7 +40,7 @@
 - This is a view, not a security boundary: firestore.rules still let any unit member read/write the unit.
 
 ## Unit specialties (SPECIALTIES in js/data.js)
-- I arthroplasty, II arthroscopy, III tumour, IV spine, V paediatrics, VI foot & ankle. Each case gets `specs` (specsOf) written
+- I arthroplasty, II arthroscopy, III tumour, IV spine, V paediatrics (VI is called "Foot & ankle" — UNIT_NAMES, a label only). Each case gets `specs` (specsOf) written
   by its own unit's app (tagSpecs in js/app.js). firestore.rules let a specialty unit read (not write) cases whose
   `specs` contain its specialty, and their images, from every unit (Store.specCases / getImage(id, unit)).
 - Tab #/spec ("Arthroplasty cases" etc.): cases in the wards now + weekly (Mon–Sun) report PowerPoint (DeckEngine, noCover).

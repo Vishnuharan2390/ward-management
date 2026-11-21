@@ -4707,7 +4707,7 @@ const App = (() => {
           <h2>Which unit?</h2>
           <div class="home-units">${Store.unitKeys.map((k, i) => {
             const u = UNITS[i];
-            const sp = SPECIALTIES[specOfUnit(u.id)]?.label || '';
+            const sp = SPECIALTIES[specOfUnit(u.id)]?.label || UNIT_NAMES[u.id] || '';
             return `<button type="button" class="home-unit" data-unit="${k}"><b>Unit ${esc(u.id)}</b>${sp ? `<span class="muted small">${esc(sp)}</span>` : ''}</button>`;
           }).join('')}</div>
         </div>`;
@@ -4717,13 +4717,13 @@ const App = (() => {
       const posted = cs.filter((c) => c.status === 'posted').length;
       const post = cs.filter((c) => c.status === 'postop').length;
       const S = SPECIALTIES[specOfUnit(Store.meta.unitId)];
-      const extra = S ? ['#/spec', `${S.label} cases`] : null;
+      const extra = S ? ['#/spec', `${S.label} cases`] : Store.meta.unitId === SCHEME_UNIT ? ['#/scheme', 'Scheme report'] : null;
       const who = String(Store.profile().name || Store.user?.displayName || '').trim();
       const h = new Date().getHours();
       return `
         <div class="home">
           <p class="home-hi">${h < 12 ? 'Good morning' : h < 16 ? 'Good afternoon' : 'Good evening'}${who ? `, ${esc(who.split(' ')[0])}` : ''}</p>
-          <p class="home-unit-now">Ortho Unit ${esc(Store.meta.unitId)}${Store.mode === 'firebase' && Store.isOwner() ? ' · <button type="button" class="link" data-unit-change>change unit</button>' : ''}</p>
+          <p class="home-unit-now">Ortho Unit ${esc(Store.meta.unitId)}${UNIT_NAMES[Store.meta.unitId] ? ` · ${esc(UNIT_NAMES[Store.meta.unitId])}` : ''}${Store.mode === 'firebase' && Store.isOwner() ? ' · <button type="button" class="link" data-unit-change>change unit</button>' : ''}</p>
           <h2>Which ward?</h2>
           <div class="home-wards">
             <a class="home-ward" href="#/ward"><span class="home-ico" aria-hidden="true">🛏</span><b>Pre-op ward</b><span class="muted">${pre} patient${pre === 1 ? '' : 's'}${posted ? ` · ${posted} posted` : ''}</span></a>
@@ -4786,7 +4786,7 @@ const App = (() => {
     if (h === '#/home') return Home;
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
-    if (h === '#/spec') return SpecTab;
+    if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
     if (h === '#/scheme') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : Home;
     if (h === '#/cases') return Dashboard;
     if (h === '#/folders') return Folders;
