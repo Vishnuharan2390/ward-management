@@ -1,21 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="cortex" x1="0" x2="1" y1="0" y2="0">
-      <stop offset="0" stop-color="#cfc6ae"/><stop offset=".22" stop-color="#f4efe2"/>
-      <stop offset=".5" stop-color="#fffdf7"/><stop offset=".78" stop-color="#f4efe2"/><stop offset="1" stop-color="#c7bda3"/>
+    <linearGradient id="cortex" gradientUnits="userSpaceOnUse" x1="200" x2="312" y1="0" y2="0">
+      <stop offset="0" stop-color="#cfc6ae"/><stop offset=".3" stop-color="#f4efe2"/>
+      <stop offset=".5" stop-color="#fffdf7"/><stop offset=".7" stop-color="#f4efe2"/><stop offset="1" stop-color="#c7bda3"/>
     </linearGradient>
+    <radialGradient id="head" cx=".4" cy=".35" r=".7">
+      <stop offset="0" stop-color="#fffdf7"/><stop offset=".7" stop-color="#efe8d8"/><stop offset="1" stop-color="#cfc6ae"/>
+    </radialGradient>
     <linearGradient id="callus" x1="0" x2="1" y1="0" y2="0">
       <stop offset="0" stop-color="#d9932a"/><stop offset=".5" stop-color="#f8c65a"/><stop offset="1" stop-color="#d48a22"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="#13294b"/>
-  <g transform="rotate(-40 256 256)">
-    <path d="M256 198 C324 226 324 286 256 314 C188 286 188 226 256 198Z" fill="url(#callus)"/>
-    <path d="M234 200 C234 165 200 150 192 120 C186 96 206 74 228 84 C240 90 248 92 256 88 C264 92 272 90 284 84 C306 74 326 96 320 120 C312 150 278 165 278 200 L278 312 C278 347 312 362 320 392 C326 416 306 438 284 428 C272 422 264 420 256 424 C248 420 240 422 228 428 C206 438 186 416 192 392 C200 362 234 347 234 312Z" fill="url(#cortex)"/>
-    <rect x="249" y="168" width="14" height="176" rx="7" fill="#ddd3bb" opacity=".45"/>
+  <g transform="translate(14 -4) rotate(-38 242 262)">
+    <!-- fusiform fracture callus -->
+    <path d="M256 196 C304 238 304 312 256 354 C208 312 208 238 256 196Z" fill="url(#callus)"/>
+    <!-- femur: neck, trochanters, shaft, condyles -->
+    <path d="M238 196 C232 188 224 184 228 174 C232 164 224 150 212 140 L204 128 L224 96 C242 104 258 100 270 92 C280 82 298 84 302 98 C306 122 290 152 280 174 C275 188 274 198 274 212 L274 350 C274 380 300 392 306 412 C310 430 300 446 284 444 C274 442 266 434 258 436 C250 438 240 448 224 446 C206 442 200 424 206 406 C214 388 238 378 238 350Z" fill="url(#cortex)"/>
+    <!-- femoral head -->
+    <circle cx="198" cy="110" r="33" fill="url(#head)"/>
+    <!-- medullary canal -->
+    <rect x="250" y="206" width="12" height="140" rx="6" fill="#ddd3bb" opacity=".45"/>
+    <!-- intertrochanteric line, physeal scar -->
     <g fill="none" stroke="#d6ccb2" stroke-width="3" stroke-linecap="round">
-      <path d="M208 132 Q256 150 304 132"/><path d="M208 380 Q256 362 304 380"/>
+      <path d="M234 168 Q262 140 286 130"/><path d="M214 402 Q256 388 298 404"/>
     </g>
-    <path d="M234 250 L247 261 L257 251 L267 263 L278 257" fill="none" stroke="#13294b" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- healing fracture line -->
+    <path d="M238 270 L249 280 L258 271 L267 282 L274 276" fill="none" stroke="#13294b" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>
