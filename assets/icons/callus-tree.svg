@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- Callus app icon: the Andry tree (assets/andry-tree.svg) in white on navy. -->
   <rect width="512" height="512" rx="112" fill="#13294b"/>
+  <rect x="11" y="11" width="490" height="490" rx="101" fill="none" stroke="#d32f2f" stroke-width="22"/>
   <g transform="translate(136.0 110.0) scale(3.0)" color="#fff" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
   
   <path d="M10 96 Q40 91 70 96" stroke-width="2.2"/>
