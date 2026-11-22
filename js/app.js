@@ -832,7 +832,7 @@ const App = (() => {
     const chips = (box, list2) => list2.map((x) => `<button type="button" class="chip" data-add="${box}" data-text="${esc(x)}">+ ${esc(x)}</button>`).join('');
     const nav = (where) => `<div class="rd-nav rd-${where}">
         <button class="btn rd-btn" data-rd="-1" ${i ? '' : 'disabled'}>‹ Prev</button>
-        ${where === 'top' ? `<select id="rd-jump" aria-label="Go to patient">${list.map((x, j) => `<option value="${x.id}"${j === i ? ' selected' : ''}>${j + 1}. ${esc(x.name)}</option>`).join('')}</select>` : `<span class="muted small">${i + 1} of ${list.length}</span>`}
+        ${where === 'top' ? `<select id="rd-jump" aria-label="Go to patient">${list.map((x, j) => `<option value="${x.id}"${j === i ? ' selected' : ''}>${j + 1}. ${esc(x.name)}${derangedList(x).length ? ' ⚠' : ''}</option>`).join('')}</select>` : `<span class="muted small">${i + 1} of ${list.length}</span>`}
         <button class="btn primary rd-btn" data-rd="1" ${i < list.length - 1 ? '' : 'disabled'}>Next ›</button>
       </div>`;
     return `<div class="rounds" data-nbcase="${c.id}">
@@ -847,6 +847,7 @@ const App = (() => {
           </div>
         </div>
         <div class="rd-dx">${esc(c.diagnosis)}</div>${bedsoreLine(c)}${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
+        ${derangedHTML(c)}
         ${reviewHTML(c)}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
           <textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea>
@@ -860,6 +861,24 @@ const App = (() => {
       ${nav('bottom')}
       ${bedsoreHTML(c) || suggestHTML(c)}
     </div>`;
+  }
+
+  // ---- Rounds: the latest values that are out of range, so nobody has to read through every result.
+  function derangedHTML(c) {
+    const d = derangedList(c);
+    if (!d.length) return '';
+    const asked = String(invTodoText(c) || '').toUpperCase();
+    const reps = [...new Set(d.map((x) => x.repeat))].filter((r) => !asked.includes(r));
+    const ago = (date) => {
+      if (!date) return '';
+      const n = Math.round((new Date(todayISO()) - new Date(date)) / 864e5);
+      return n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`;
+    };
+    return `<div class="rd-der" role="note">
+        <div class="rd-der-h">⚠ Deranged <span class="pill bad">${d.length}</span></div>
+        <ul>${d.map((x) => `<li class="${x.flag}"><b>${esc(x.text)}</b>${x.date ? ` <span class="muted small">${esc(ago(x.date))}</span>` : ''}</li>`).join('')}</ul>
+        ${reps.length ? `<div class="rd-chips">${reps.map((r) => `<button type="button" class="chip" data-add="inv" data-text="${esc(r)}">+ Repeat ${esc(r)}</button>`).join('')}</div>` : ''}
+      </div>`;
   }
 
   // ---- Rounds: "From earlier rounds" — yesterday's investigations, opinions and to-dos, with a place
@@ -5066,6 +5085,9 @@ const App = (() => {
       for (const [id, c] of Object.entries(Store.cases)) {
         const want = specsOf(c);
         if (JSON.stringify(want) !== JSON.stringify(c.specs || [])) Store.patch('cases', id, { specs: want });
+        // viral markers positive → (HBsAg+/HCV+/PLHA) in the diagnosis (letter case aside: typing makes it capitals)
+        const dx = diagnosisWithViral(c);
+        if (dx.toUpperCase() !== String(c.diagnosis || '').trim().toUpperCase()) Store.patch('cases', id, { diagnosis: dx });
       }
     }, 2500);
   }

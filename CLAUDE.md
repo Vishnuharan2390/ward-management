@@ -58,3 +58,7 @@
 
 ## Wards
 - Ward fields are a dropdown of WARDS (js/data.js) via wardOpts in js/app.js; an old free-typed ward stays selectable.
+
+## Rounds alerts
+- Rounds card: "Deranged" panel (derangedList in js/data.js, derangedHTML in js/app.js) + "Repeat X" chips; ⚠ in the patient jump list.
+- Positive HBsAg / HCV / HIV → diagnosis gets "(HBsAg+/HCV+/PLHA)" (diagnosisWithViral, kept in sync inside tagSpecs).

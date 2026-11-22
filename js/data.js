@@ -510,6 +510,44 @@ function abnormalList(c) {
   return out;
 }
 
+// Rounds: every deranged latest value (viral markers left out — they go into the diagnosis),
+// with its date and what to write to repeat it.
+function derangedList(c) {
+  const out = [];
+  const seen = new Set();
+  const check = (p, rep) => {
+    if (seen.has(p.k) || p.text || p.options) return;
+    seen.add(p.k);
+    const l = latest(c, p.k);
+    const f = l && flagOf(l.value, p);
+    if (f) out.push({ label: p.label, text: `${p.label} ${fmtVal(l.value, p)}${FLAG_MARK[f]}`, flag: f, date: l.date, repeat: rep || p.label.toUpperCase() });
+  };
+  for (const g of LAB_GROUPS) {
+    if (g.k === 'vm' || g.k === 'vctc') continue;
+    g.params.forEach((p) => check(p, g.k === 'inflam' ? p.label.toUpperCase() : p.k === 'rbs' ? 'RBS' : g.label));
+  }
+  customParams(c).forEach((p) => check(p));
+  Object.values(c.charts || {}).forEach((ch) => (ch.cols || []).forEach((p) => check(p)));
+  return out;
+}
+
+// Viral markers: positives are shown in the diagnosis in brackets — (HBsAg+/HCV+/PLHA).
+const VIRAL_TAG_RE = /\s*\((?:HBSAG\+|HCV\+|PLHA)(?:\s*\/\s*(?:HBSAG\+|HCV\+|PLHA))*\)/gi;
+function viralTag(c) {
+  const pos = (k, re) => re.test(String(latest(c, k)?.value || '').trim());
+  const t = [];
+  if (pos('hbsag', /^(pos|reac|\+)/i)) t.push('HBsAg+');
+  if (pos('hcv', /^(pos|reac|\+)/i)) t.push('HCV+');
+  if (pos('hiv', /^(reac|pos|\+)/i)) t.push('PLHA');
+  return t.length ? `(${t.join('/')})` : '';
+}
+// The diagnosis with the viral-marker bracket brought up to date ('' tag = bracket removed).
+function diagnosisWithViral(c) {
+  const base = String(c.diagnosis || '').replace(VIRAL_TAG_RE, '').trim();
+  const tag = viralTag(c);
+  return tag ? (base ? `${base} ${tag}` : tag) : base;
+}
+
 // ---- Monitoring charts ---------------------------------------------------
 const P = (k) => ALL_PARAMS.find((p) => p.k === k);
 const CHART_TEMPLATES = {
