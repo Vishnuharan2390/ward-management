@@ -65,5 +65,5 @@
 
 ## WhatsApp chat → admission day PPT
 - Deck page "📎 Add exported WhatsApp chat" (#deck-wa) → Import.readChat (js/app.js) → WaImport.readExport (js/wa-import.js).
-  Posts give name/age/sex, IP, ward, mode, diagnosis, phone, address, plan, treatment (Rx: / RX_LINE), written by = sender;
+  Posts give name/age/sex, IP, ward, mode, diagnosis, phone, address (saved to the case, NOT shown on the PPT page or slides), plan, treatment (Rx: / RX_LINE), written by = sender;
   "Professor:"/"DAOS:" lines that day fill the title slide; consolidation is counted if still empty.
