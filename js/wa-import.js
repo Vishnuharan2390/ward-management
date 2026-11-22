@@ -14,6 +14,8 @@ const WaImport = (() => {
   // "Udayakumar 26/M", "MURUGAN, 45 / F", "Selvi 62yrs/F", "Raja 30 M", "Baby Kavya 3y/F"
   const NAME_RE = /^(.*?[A-Za-z].*?)[\s,.\-:]+(\d{1,3})\s*(?:y(?:rs?|ears?)?|yo)?\.?\s*(?:\/|\s|,|-)\s*(m|f|male|female)\b\.?(.*)$/i;
   const CASE_RE = /^\s*case\s*(?:no\.?|number|#)?\s*[:.\-]?\s*(\d+)\b\s*[:.\-]?\s*(.*)$/i;
+  // Treatment lines ("Inj TT", "AK slab", "IV fluids", "Skin traction" …)
+  const RX_LINE = /^[\-•*·\d.)\s]*(inj\.?|tab\.?|t\.|cap\.?|syp\.?|iv\s?fluids?|ivf\b|ns\b|rl\b|pop\b|.*\bslab\b|above knee|below knee|\bak\b|\bbk\b|skin traction|skeletal traction|traction\b|tt\b|analgesics?|antibiotics?|limb elevation|elevation\b|wound (wash|toilet|debridement)|dressing|thomas splint|cuff (and|&) collar|arm sling|sling\b|immobili[sz]|cervical collar|philadelphia|log ?roll|catheteri[sz]|foley|nbm\b|npo\b|o2\b|oxygen)/i;
   const MODE_RE = /^(n?mlc\b.*|.*\b(rta|tta|assault|fall|accidental|work ?spot|electrocution|self inflicted|old rta)\b.*)$/i;
 
   const modeOf = (line) => {
@@ -26,7 +28,19 @@ const WaImport = (() => {
     const lines = clean(text).split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
     const out = { caseNo: '', name: '', age: '', sex: '', mode: '', ipNo: '', ward: '', diagnosis: '' };
     const rest = [];
+    const rx = [];
+    let inRx = false;
     for (let line of lines) {
+      // phone, address, plan and treatment lines (for the admission day PPT)
+      const ph = line.match(/(?:\b(?:ph(?:one)?|mob(?:ile)?|cell|contact|no)\.?\s*[:.\-]?\s*)?(?:\+?91[\s\-]?)?\b([6-9]\d{4}[\s\-]?\d{5})\b/i);
+      if (ph && !out.phone) { out.phone = ph[1].replace(/\D/g, ''); line = line.replace(ph[0], '').replace(/^[\s,;:.\-]+|[\s,;:.\-]+$/g, ''); if (!line) continue; }
+      const ad = line.match(/^(?:address|addr|place|native|from|resi(?:dence)?)\s*[:.\-]\s*(.+)$/i);
+      if (ad) { out.address = ad[1].trim().toUpperCase(); continue; }
+      const pl = line.match(/^(?:plan|planned|proposed)\s*[:.\-]\s*(.+)$/i);
+      if (pl) { out.plan = pl[1].trim().toUpperCase(); inRx = false; continue; }
+      const rh = line.match(/^(?:rx|tx|treatment|management|given|ttt)\s*(?:given)?\s*[:.\-]?\s*(.*)$/i);
+      if (rh && (/[:.\-]/.test(line.slice(0, 14)) || /^(rx|tx)\b/i.test(line))) { inRx = true; if (rh[1].trim()) rx.push(rh[1].trim()); continue; }
+      if (inRx || RX_LINE.test(line)) { rx.push(line.replace(/^[\-•*·\d.)\s]+/, '').trim()); continue; }
       const cm = !out.caseNo && line.match(CASE_RE);
       if (cm) {
         out.caseNo = cm[1];
@@ -51,6 +65,7 @@ const WaImport = (() => {
       if (!out.mode && MODE_RE.test(line) && line.length <= 40) { out.mode = modeOf(line); continue; }
       rest.push(line);
     }
+    if (rx.length) out.treatment = rx.filter(Boolean).map((x) => x.toUpperCase()).join('\n');
     out.diagnosis = rest.join(' ').replace(/^(dx|diagnosis)\s*[:.\-]\s*/i, '').replace(/\s+/g, ' ').trim().toUpperCase();
     if (!out.name || !(out.diagnosis || out.caseNo)) return null;
     return out;
@@ -109,8 +124,23 @@ const WaImport = (() => {
       idx.forEach((k) => used.add(k));
       const extra = idx.flatMap((k) => msgs[k].files);
       if (before.length) files.unshift(...extra); else files.push(...extra);
-      out.push({ ...c, doa: m.date, t: m.t, sender: m.sender, files });
+      out.push({ ...c, doa: m.date, t: m.t, sender: m.sender, writtenBy: /^[+\d\s()\-]+$|^you$/i.test(m.sender) ? '' : m.sender.replace(/^(dr\.?\s*)/i, 'DR. ').toUpperCase(), files });
     });
+    return out;
+  }
+
+  // "Professor: …" / "Chief: …" and "DAOS: …" posted on a day → the admission day PPT's title slide.
+  function titlesFromChat(msgs) {
+    const out = {};
+    for (const m of msgs) {
+      for (const line of String(m.text || '').split('\n')) {
+        const p = line.match(/^\s*(?:prof(?:essor)?|chief|unit chief|hod)\s*(?:on duty|of the day)?\s*[:\-–]\s*(.+)$/i);
+        const d = line.match(/^\s*(?:daos|duty ap|ap on duty|duty assistant professor)\s*[:\-–]\s*(.+)$/i);
+        if (p || d) out[m.date] ||= {};
+        if (p) out[m.date].professor = p[1].trim().toUpperCase();
+        if (d) out[m.date].daos = d[1].trim().toUpperCase();
+      }
+    }
     return out;
   }
 
@@ -144,14 +174,16 @@ const WaImport = (() => {
   // posts need them — a whole-group export can hold months of photos.)
   async function readExport(file, wantPhotos = () => true) {
     if (/\.txt$/i.test(file.name) || file.type === 'text/plain') {
-      return casesFromChat(parseChat(await file.text())).map((c) => ({ ...c, photos: [], missing: c.files.length }));
+      const msgs = parseChat(await file.text());
+      return Object.assign(casesFromChat(msgs).map((c) => ({ ...c, photos: [], missing: c.files.length })), { titles: titlesFromChat(msgs) });
     }
     const zip = await JSZip.loadAsync(file);
     const entries = Object.values(zip.files).filter((f) => !f.dir);
     const chat = entries.find((f) => /(^|\/)_chat\.txt$/i.test(f.name)) || entries.find((f) => /\.txt$/i.test(f.name));
     if (!chat) throw new Error('No chat text in this zip');
     const byName = new Map(entries.map((f) => [f.name.split('/').pop().toLowerCase(), f]));
-    const cases = casesFromChat(parseChat(await chat.async('string')));
+    const msgs = parseChat(await chat.async('string'));
+    const cases = Object.assign(casesFromChat(msgs), { titles: titlesFromChat(msgs) });
     for (const c of cases) {
       c.photos = [];
       if (!wantPhotos(c)) { c.skippedPhotos = c.files.length; continue; }
@@ -166,5 +198,5 @@ const WaImport = (() => {
 
   const key = (name, age) => `${String(name).toUpperCase().replace(/[^A-Z]/g, '')}|${String(age || '').replace(/\D/g, '')}`;
 
-  return { parseCaseText, parseChat, casesFromChat, readExport, guessKind, key };
+  return { parseCaseText, parseChat, casesFromChat, titlesFromChat, readExport, guessKind, key };
 })();

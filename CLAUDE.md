@@ -62,3 +62,8 @@
 ## Rounds alerts
 - Rounds card: "Deranged" panel (derangedList in js/data.js, derangedHTML in js/app.js) + "Repeat X" chips; ⚠ in the patient jump list.
 - Positive HBsAg / HCV / HIV → diagnosis gets "(HBsAg+/HCV+/PLHA)" (diagnosisWithViral, kept in sync inside tagSpecs).
+
+## WhatsApp chat → admission day PPT
+- Deck page "📎 Add exported WhatsApp chat" (#deck-wa) → Import.readChat (js/app.js) → WaImport.readExport (js/wa-import.js).
+  Posts give name/age/sex, IP, ward, mode, diagnosis, phone, address, plan, treatment (Rx: / RX_LINE), written by = sender;
+  "Professor:"/"DAOS:" lines that day fill the title slide; consolidation is counted if still empty.

@@ -496,6 +496,7 @@ const App = (() => {
               ${c.phone != null || c.address != null ? `<label>Phone<input data-i="${i}" data-f="phone" inputmode="tel" value="${esc(c.phone || '')}"></label>
               <label>Address<input data-i="${i}" data-f="address" value="${esc(c.address || '')}"></label>` : ''}
               ${c.treatment != null ? `<label class="span2">Treatment<textarea data-i="${i}" data-f="treatment" rows="2">${esc(c.treatment)}</textarea></label>` : ''}
+              ${c.writtenBy != null ? `<label class="span2">Case sheet written by<input data-i="${i}" data-f="writtenBy" value="${esc(c.writtenBy || '')}"></label>` : ''}
             </div>
             ${c.photos.length ? `<div class="imp-photos">${c.photos.map((ph, j) => `
               <figure><img src="${ph.url}" alt=""><select data-i="${i}" data-p="${j}">${kinds.map(([k, l]) => `<option value="${k}"${k === ph.kind ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></figure>`).join('')}</div>` : ''}
@@ -563,11 +564,26 @@ const App = (() => {
         }
       }
       Import.items = cases;
+      Import.titles = cases.titles || {};
       Import.otherDay = false;
       Import.markDay();
       Import.applyDoa();
       Import.busy = '';
       render();
+    },
+    async readChat(f) {
+      Import.busy = 'Reading the chat…';
+      render();
+      try {
+        // From the admission day PPT: only that day's photos are unpacked from the export.
+        const win = Import.dayWindow();
+        Import.source = 'wa';
+        await Import.load(await WaImport.readExport(f, (c) => !win || c.t == null || (c.t >= win[0] && c.t < win[1])));
+      } catch (err) {
+        Import.busy = '';
+        render();
+        toast(`Couldn't read that file (${err.message}). Pick the .zip or .txt from WhatsApp's Export chat.`, 6000);
+      }
     },
     mount(el) {
       const pptIn = $('#imp-ppt', el);
@@ -592,22 +608,7 @@ const App = (() => {
         }
       };
       const file = $('#imp-file', el);
-      if (file) file.onchange = async () => {
-        const f = file.files[0];
-        if (!f) return;
-        Import.busy = 'Reading the chat…';
-        render();
-        try {
-          // From the admission day PPT: only that day's photos are unpacked from the export.
-          const win = Import.dayWindow();
-          Import.source = 'wa';
-          await Import.load(await WaImport.readExport(f, (c) => !win || c.t == null || (c.t >= win[0] && c.t < win[1])));
-        } catch (err) {
-          Import.busy = '';
-          render();
-          toast(`Couldn't read that file (${err.message}). Pick the .zip or .txt from WhatsApp's Export chat.`, 6000);
-        }
-      };
+      if (file) file.onchange = () => { if (file.files[0]) Import.readChat(file.files[0]); };
       const read = $('#imp-read', el);
       if (read) read.onclick = () => {
         const c = WaImport.parseCaseText($('#imp-text', el).value);
@@ -699,7 +700,13 @@ const App = (() => {
             if (A != null && B != null) return A - B;
             return pos.get(a) - pos.get(b);
           });
-          saveDeckCfg(Import.doa, { ...cfg, order: ordered });
+          const next = { ...cfg, order: ordered };
+          const tt = Import.source === 'wa' ? Import.titles?.[Import.doa] : null;
+          if (tt?.professor && !cfg.professor) next.professor = tt.professor;
+          if (tt?.daos && !cfg.daos) next.daos = tt.daos;
+          // consolidation: counted from the cases (left alone if someone already typed it in)
+          if (!Object.values(cfg.cons || {}).some((v) => String(v ?? '').trim())) next.cons = countCons(deckState(Import.doa, next));
+          saveDeckCfg(Import.doa, next);
         }
         location.hash = Import.back;
       };
@@ -2966,7 +2973,7 @@ const App = (() => {
           }).join('') || '<div class="empty">No cases on this date yet. Tap “+ Add case” below.</div>'}
           <div class="deck-add-row">
             <button class="btn primary" id="deck-new">+ Add case ${st.cases.length + 1}</button>
-            <a class="btn wa" href="#/import/deck/${esc(date)}">From WhatsApp</a>
+            <label class="btn wa">📎 Add exported WhatsApp chat<input type="file" id="deck-wa" accept=".zip,.txt,application/zip,text/plain" hidden></label>
             <a class="btn" href="#/import/deck/${esc(date)}">From PowerPoint</a>
             ${others.length ? `<select id="deck-add" aria-label="Add an existing case"><option value="">or add an existing case…</option>${others.map((c) => `<option value="${c.id}">${esc(c.name)}${c.ipNo ? ' · IP ' + esc(c.ipNo) : ''} — DOA ${esc(fmtDate(c.doa))}</option>`).join('')}</select>` : ''}
           </div>
@@ -3008,6 +3015,15 @@ const App = (() => {
       drawPreview();
 
       $('#deck-date', el).onchange = (e) => { Deck.date = e.target.value || todayISO(); render(); };
+      const wa = $('#deck-wa', el);
+      if (wa) wa.onchange = () => {
+        const f = wa.files[0];
+        if (!f) return;
+        Import.items = null;
+        Import.usePosted = false;
+        location.hash = `#/import/deck/${date}`;
+        setTimeout(() => Import.readChat(f), 0);
+      };
       $('#deck-prof', el).onchange = (e) => save((x) => { x.professor = e.target.value.trim().toUpperCase(); }, false);
       $('#deck-daos', el).onchange = (e) => save((x) => { x.daos = e.target.value.trim().toUpperCase(); }, false);
       $('#deck-pv', el).onclick = () => { Deck.showPreview = !Deck.showPreview; render(); };
