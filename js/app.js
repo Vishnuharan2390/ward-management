@@ -487,7 +487,7 @@ const App = (() => {
               <label class="span2">Name<input data-i="${i}" data-f="name" value="${esc(c.name)}"></label>
               <label>Age<input data-i="${i}" data-f="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex${sexSel(i, c.sex)}</label>
-              <label>IP no.<input data-i="${i}" data-f="ipNo" value="${esc(c.ipNo)}"></label>
+              <label>IP no.<input data-i="${i}" data-f="ipNo" inputmode="numeric" value="${esc(c.ipNo)}"></label>
               <label>Ward<select data-i="${i}" data-f="ward">${wardOpts(c.ward)}</select></label>
               <label>Mode<input data-i="${i}" data-f="mode" list="dl-mode" value="${esc(c.mode)}"></label>
               <label>DOA<input type="date" data-i="${i}" data-f="doa" value="${esc(c.doa)}"></label>
@@ -1471,11 +1471,11 @@ const App = (() => {
               <label class="span2">Name<input name="name" required value="${esc(c.name)}"></label>
               <label>Age<input name="age" inputmode="numeric" value="${esc(c.age)}"></label>
               <label>Sex<select name="sex">${opts([['', '—'], ['M', 'Male'], ['F', 'Female'], ['O', 'Other']], c.sex || '')}</select></label>
-              <label>IP number<input name="ipNo" value="${esc(c.ipNo)}"></label>
+              <label>IP number<input name="ipNo" inputmode="numeric" value="${esc(c.ipNo)}"></label>
               <label>Ward<select name="ward">${wardOpts(c.ward)}</select></label>
               <label>Date of admission<input type="date" name="doa" value="${esc(c.doa)}"></label>
               <label>Attender<input name="attender" value="${esc(c.attender)}"></label>
-              <label>Phone<input name="phone" type="tel" value="${esc(c.phone)}"></label>
+              <label>Phone<input name="phone" type="tel" inputmode="tel" value="${esc(c.phone)}"></label>
               <label>Address<input name="address" value="${esc(c.address)}"></label>
             </fieldset>
  <fieldset class="card" id="sec-plan"><legend>Diagnosis & plan</legend>
@@ -2370,7 +2370,7 @@ const App = (() => {
             <label class="span2">Name<input name="name" required></label>
             <label>Age<input name="age" inputmode="numeric"></label>
             <label>Sex<select name="sex"><option></option><option>M</option><option>F</option></select></label>
-            <label>IP no.<input name="ipNo"></label>
+            <label>IP no.<input name="ipNo" inputmode="numeric"></label>
             <label>Ward<select name="ward">${wardOpts('')}</select></label>
             <label class="span2">Diagnosis<textarea name="diagnosis" rows="2" required></textarea></label>
             <label class="span2">Plan<input name="plan"></label>
@@ -3440,8 +3440,8 @@ const App = (() => {
               <label>Date of discharge / transfer<input type="date" name="dod" value="${esc(d.dod)}"></label>
               <label>Time<input name="dodTime" value="${esc(d.dodTime)}"></label>
               <label>Attender<input name="attender" value="${esc(d.attender)}"></label>
-              <label>Ph. no<input name="phone" type="tel" value="${esc(d.phone)}"></label>
-              <label>Contact no (optional)<input name="contact" type="tel" value="${esc(d.contact)}"></label>
+              <label>Ph. no<input name="phone" type="tel" inputmode="tel" value="${esc(d.phone)}"></label>
+              <label>Contact no (optional)<input name="contact" type="tel" inputmode="tel" value="${esc(d.contact)}"></label>
               <label class="span2">Address<input name="address" value="${esc(d.address)}"></label>
             </fieldset>
             <fieldset><legend>Summary</legend>
@@ -3456,7 +3456,7 @@ const App = (() => {
               <div class="span2 chips">${ADVICE_PHRASES.map(([en], i) => `<button type="button" class="chip" data-phrase="${i}">+ ${esc(en)}</button>`).join('')}</div>
               <div class="span2 review-row">
                 <span>Review after</span>
-                <input id="rv-weeks" type="number" min="1" value="2">
+                <input id="rv-weeks" type="number" min="1" value="2" inputmode="numeric">
                 <span>weeks on</span>
                 <select id="rv-day">${opts(EN_DAYS.slice(1), 'MONDAY')}</select>
                 <span>OPD</span><input id="rv-opd" value="${esc(m.opd || '')}">
