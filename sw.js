@@ -1,7 +1,7 @@
 // Offline cache for the app shell. Bump VERSION with each release so phones
 // pick up the new files; data never goes through here (it lives in the
 // browser's storage or Firestore).
-const VERSION = 'v191';
+const VERSION = 'v192';
 const CACHE = 'preop-ward-' + VERSION;
 const SHELL = [
   './',
@@ -26,6 +26,7 @@ const SHELL = [
   'js/dc-import.js',
   'js/ot-import.js',
   'js/demo.js',
+  'js/clear.js',
   'js/vendor/pdfjs/pdf.min.js',
   'js/vendor/pdfjs/pdf.worker.min.js',
   'js/consent.js',

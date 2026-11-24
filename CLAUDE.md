@@ -67,3 +67,7 @@
 - Deck page "📎 Add exported WhatsApp chat" (#deck-wa) → Import.readChat (js/app.js) → WaImport.readExport (js/wa-import.js).
   Posts give name/age/sex, IP, ward, mode, diagnosis, phone, address (saved to the case, NOT shown on the PPT page or slides), plan, treatment (Rx: / RX_LINE), written by = sender;
   "Professor:"/"DAOS:" lines that day fill the title slide; consolidation is counted if still empty.
+
+## Clear (×) in text boxes
+- js/clear.js marks every text input / textarea (>= 90px wide, not readonly; opt out with data-no-clear) with .has-clr;
+  the × is a CSS background in the right padding, shown when .filled; a tap there empties the box and fires input + change.
