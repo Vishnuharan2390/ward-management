@@ -1,4 +1,4 @@
-// A small × at the right edge of every text box (shown when it has something in it): one tap empties it.
+// A small × at the right edge of every text box (shown when it has something in it): one tap empties it, with an Undo toast for 6 s.
 // Works on whatever any page draws: boxes are marked after each redraw, and the tap is caught on the document.
 // Clearing fires the box's own input + change events, so each page saves the empty value the usual way.
 (() => {
@@ -37,15 +37,55 @@
     if (e.clientX < r.right - HIT || e.clientX > r.right) return false;
     return el.tagName === 'TEXTAREA' ? e.clientY - r.top <= HIT + 4 : true;
   };
+  const set = (el, v) => {
+    el.value = v;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    filled(el);
+  };
+  // Which box this is, so Undo still finds it if the page was redrawn after the save.
+  const keyOf = (el) => {
+    const own = [...el.attributes].filter((a) => a.name === 'name' || a.name === 'id' || a.name.startsWith('data-')).map((a) => `${a.name}=${a.value}`).sort().join('&');
+    const ctx = [];
+    for (let n = el.parentElement; n; n = n.parentElement) {
+      for (const a of n.attributes || []) if (/^data-(case|nbcase|dcase|rv-key|i)$/.test(a.name) || a.name === 'id') ctx.push(`${a.name}=${a.value}`);
+    }
+    return `${el.tagName}|${own}|${ctx.join('&')}|${location.hash}`;
+  };
+
+  // "Cleared · Undo" for a few seconds after each clear.
+  let undoEl;
+  let undoT;
+  function offerUndo(el, old) {
+    const key = keyOf(el);
+    if (!undoEl) {
+      undoEl = document.createElement('div');
+      undoEl.id = 'undo-toast';
+      undoEl.setAttribute('role', 'status');
+      document.body.appendChild(undoEl);
+    }
+    undoEl.innerHTML = '<span>Cleared</span><button type="button">Undo</button>';
+    undoEl.classList.add('show');
+    clearTimeout(undoT);
+    undoT = setTimeout(() => undoEl.classList.remove('show'), 6000);
+    undoEl.querySelector('button').onclick = () => {
+      clearTimeout(undoT);
+      undoEl.classList.remove('show');
+      const box = el.isConnected ? el : [...document.querySelectorAll(el.tagName)].find((x) => keyOf(x) === key);
+      if (!box) return;
+      set(box, old);
+      box.focus();
+    };
+  }
+
   function clear(e) {
     const el = e.target;
     if (!el.classList?.contains('has-clr') || !el.classList.contains('filled') || !onX(el, e)) return;
     e.preventDefault();
-    el.value = '';
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    filled(el);
+    const old = el.value;
+    set(el, '');
     el.focus();
+    offerUndo(el, old);
   }
   document.addEventListener('click', clear, true);
 })();
