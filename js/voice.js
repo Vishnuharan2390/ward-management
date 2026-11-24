@@ -55,10 +55,12 @@ const Voice = (() => {
     }
   }
 
-  // Adds a 🎤 button to every text area under `root`.
-  function attach(root) {
+  // Adds a 🎤 button to every text area under `root` (and one-line text boxes with { inputs: true }).
+  function attach(root, { inputs = false } = {}) {
     if (!SR || !root) return;
-    root.querySelectorAll('textarea:not([data-novoice])').forEach((ta) => {
+    const sel = inputs ? 'textarea:not([data-novoice]), input:not([type]):not([data-novoice]), input[type=text]:not([data-novoice])' : 'textarea:not([data-novoice])';
+    root.querySelectorAll(sel).forEach((ta) => {
+      if (ta.disabled || ta.readOnly || ta.offsetWidth < 140) return;
       if (ta.dataset.voice) return;
       ta.dataset.voice = '1';
       const btn = document.createElement('button');
@@ -70,6 +72,13 @@ const Voice = (() => {
       btn.textContent = '🎤';
       ta.insertAdjacentElement('afterend', btn);
       ta.parentElement.classList.add('mic-host');
+      if (ta.tagName === 'INPUT' || ta.offsetHeight < 70) {
+        // one-line box: the 🎤 sits inside it, left of the clear ×
+        ta.classList.add('mic-field');
+        btn.classList.add('mic-in');
+        btn.style.top = `${ta.offsetTop + (ta.offsetHeight - 30) / 2}px`;
+        btn.style.bottom = 'auto';
+      }
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const same = active && active.ta === ta;

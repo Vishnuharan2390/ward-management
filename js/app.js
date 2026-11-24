@@ -3490,6 +3490,7 @@ const App = (() => {
       mount(el) {
         const f = $('#dc-form', el);
         if (!f) return;
+        Voice.attach(f, { inputs: true }); // 🎤 dictation in every discharge summary box
         const c = () => Store.cases[id];
         const data = () => Object.fromEntries(new FormData(f).entries());
         const addLine = (name, line) => {

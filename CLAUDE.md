@@ -72,3 +72,7 @@
 - js/clear.js marks every text input / textarea (>= 90px wide, not readonly; opt out with data-no-clear) with .has-clr;
   the × is a CSS background in the right padding, shown when .filled; a tap there empties the box and fires input + change.
   Then a "Cleared · Undo" toast (#undo-toast, 6 s) puts the text back — found again by keyOf if the page was redrawn.
+
+## Dictation
+- js/voice.js (browser speech recognition, en-IN). Switched on only in the discharge summary: Voice.attach(#dc-form, { inputs: true })
+  in Discharge().mount. 🎤 bottom-right of big boxes; inside one-line / short boxes left of the clear × (.mic-in).
