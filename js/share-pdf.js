@@ -70,29 +70,25 @@ const SharePdf = (() => {
     const posted = cases.filter((c) => c.status === 'posted').length;
     const body = cases.map((c, i) => {
       const dx = [U(c.diagnosis)];
-      if (post) {
-        if (c.procedureDone || c.plan) dx.push('DONE: ' + U(c.procedureDone || c.plan));
-        if (podOf(c) != null) dx.push('POD ' + podOf(c));
-      } else {
-        if (c.plan) dx.push('PLAN: ' + U(c.plan));
-        if (c.procedureDone) dx.push('DONE: ' + U(c.procedureDone)); // pre-op ward: only when entered
-      }
-      const todo = [...lines(invTodoText(c)).map((x) => 'INV: ' + x), ...lines(opTodoText(c))];
+      // no plan here — the diagnosis, and the procedure once it is done
+      if (c.procedureDone) dx.push('DONE: ' + U(c.procedureDone));
+      if (post && podOf(c) != null) dx.push('POD ' + podOf(c));
       return [
         String(i + 1),
         [U(c.name) + (c.status === 'posted' ? ' (POSTED)' : ''), clean([ageSex(c), c.ipNo && 'IP ' + c.ipNo].filter(Boolean).join(' - '))].join('\n'),
         dx.join('\n'),
-        todo.join('\n'),
+        lines(invTodoText(c)).join('\n'),
+        lines(opTodoText(c)).join('\n'),
         post ? U(c.scheme) : clean(assessmentScheme(c)),
       ];
     });
     const postedRows = new Set(cases.map((c, i) => (c.status === 'posted' ? i : -1)).filter((i) => i >= 0));
     const d = tablePdf(`${unitName(meta.unitId)} - ${ward} STATUS`, `${fmtDate(todayISO())} - ${cases.length} cases${posted ? ` - ${posted} posted` : ''}`,
-      ['NO', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', "TO DO'S", post ? 'SCHEME' : 'PAC / SCHEME'], body,
-      { 0: { cellWidth: 8.5 }, 1: { cellWidth: 32 }, 2: { cellWidth: 41 }, 3: { cellWidth: todoColW(post) }, 4: { cellWidth: 25, fontSize: 8 } }, postedRows);
+      ['NO', 'NAME', post ? 'DIAGNOSIS / PROCEDURE' : 'DIAGNOSIS', 'INVESTIGATION', 'OPINIONS', post ? 'SCHEME' : 'PAC / SCHEME'], body,
+      // 138 mm across: no 8 · name 26 · diagnosis 30 · investigation 27 · opinions 26 · scheme 21
+      { 0: { cellWidth: 8 }, 1: { cellWidth: 26 }, 2: { cellWidth: 30 }, 3: { cellWidth: 27, fontSize: 8.5 }, 4: { cellWidth: 26, fontSize: 8.5 }, 5: { cellWidth: PW - 2 * PM - 117, fontSize: 8 } }, postedRows);
     return new File([d.output('blob')], `${post ? 'POSTOP' : 'PREOP'}_WARD_STATUS_${stamp()}.pdf`, { type: 'application/pdf' });
   }
-  const todoColW = () => PW - 2 * PM - (8.5 + 32 + 41 + 25);
 
   // Pending works: what is still to be done, case by case.
   function pendingPdf(cases, meta, post) {

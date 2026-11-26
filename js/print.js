@@ -139,16 +139,17 @@ const Print = (() => {
       <tr${c.status === 'posted' ? ' class="pr-posted"' : ''}>
         <td class="nb-sno">${i + 1}</td>
         <td><b>${esc(c.name)}</b>${c.status === 'posted' ? ' (POSTED)' : ''}<div class="pr-sub">${esc(ageSex(c))} · ${esc(c.ipNo)}${c.ward ? ' · ' + esc(c.ward) : ''}</div></td>
-        <td>${nl(c.diagnosis)}${c.plan ? `<div class="pr-sub">▸ ${esc(c.plan)}</div>` : ''}${c.procedureDone ? `<div class="pr-sub">✓ DONE: ${esc(c.procedureDone)}</div>` : ''}</td>
-        <td class="nb-todo">${invTodoText(c).trim() ? `<b class="pr-flag">${nl(invTodoText(c).trim())}</b>` : ''}${opTodoText(c).split('\n').filter(Boolean).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
+        <td>${nl(c.diagnosis)}${c.procedureDone ? `<div class="pr-sub">✓ DONE: ${esc(c.procedureDone)}</div>` : ''}</td>
+        <td class="nb-todo">${invTodoText(c).split('\n').filter((t) => t.trim()).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
+        <td class="nb-todo">${opTodoText(c).split('\n').filter((t) => t.trim()).map((t) => `<span>${esc(t)}</span>`).join('')}</td>
         <td>${esc(assessmentScheme(c))}</td>
       </tr>`).join('');
     const html = `
       <div class="pr nb">
         <div class="nb-head"><b>${esc(unitName(meta.unitId))} — ${esc(title)}</b><span>${fmtDate(todayISO())} · ${cases.length} cases</span></div>
         <table class="nb-table">
-          <colgroup><col style="width:6%"><col style="width:17%"><col style="width:30%"><col style="width:32%"><col style="width:15%"></colgroup>
-          <thead><tr><th>S.NO</th><th>NAME</th><th>DIAGNOSIS</th><th>TO DO'S</th><th>ASSESSMENT / SCHEME</th></tr></thead>
+          <colgroup><col style="width:6%"><col style="width:17%"><col style="width:26%"><col style="width:19%"><col style="width:19%"><col style="width:13%"></colgroup>
+          <thead><tr><th>S.NO</th><th>NAME</th><th>DIAGNOSIS</th><th>INVESTIGATION</th><th>OPINIONS</th><th>ASSESSMENT / SCHEME</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>`;
