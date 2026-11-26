@@ -126,3 +126,8 @@
 ## Day badges
 - dayTag(c) in js/app.js beside every patient name (notebook, detailed, rounds, case list, case sheet): pre-op "D10" = daysSince(DOA),
   post-op "POD 3" = daysSince(surgeryDate || otDate). Blue pill for D, yellow for POD.
+
+## Census (#/census, Census in js/app.js; nav tab "Census")
+- Weekly (Mon–Sun) / monthly / yearly, ‹ › to move. Own unit; owners also "All units" (Store.unitsCases reads every unit, column per unit).
+- Admissions (DOA), operations (operatedOn), discharges by disposition (discharge.dod), transfers out (c[dept].out), under care at the end,
+  average pre-op stay and length of stay; breakdowns by mode of injury, subspecialty, scheme. PDF (jsPDF), PowerPoint (ReportDeck), CSV list.

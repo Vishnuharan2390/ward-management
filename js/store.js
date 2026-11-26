@@ -492,6 +492,21 @@ const Store = (() => {
     return out;
   }
 
+  // ---- every case of the given units (owners: all six, for the department census) ----
+  async function unitsCases(units = UNIT_KEYS) {
+    if (!fb) return Object.entries(state.cases).map(([id, c]) => ({ id, unit: '', ...c }));
+    const out = [];
+    const failed = [];
+    await Promise.all(units.map(async (u) => {
+      try {
+        const snap = await fb.fsM.getDocs(fb.fsM.collection(fb.db, 'units', u, 'cases'));
+        snap.forEach((d) => out.push({ id: d.id, unit: u, ...migrateCase(d.data()) }));
+      } catch (e) { failed.push(u); console.warn('census cases', u, e.code || e); }
+    }));
+    out.failed = failed;
+    return out;
+  }
+
   // ---- scheme status of each OT list, for Unit VI's weekly scheme report ----
   // one document per unit and OT date: schemeReports/ortho-unit-N_YYYY-MM-DD
   const SCHEME_LS = LS + 'schemeReports';
@@ -659,7 +674,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember, setAdmin, setRole, specCases, saveSchemeReport, schemeReports, mySchemeReports,
+    addMember, removeMember, setAdmin, setRole, specCases, unitsCases, saveSchemeReport, schemeReports, mySchemeReports,
     exportAll, importAll,
   };
 })();

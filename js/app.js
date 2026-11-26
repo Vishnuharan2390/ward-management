@@ -3351,7 +3351,8 @@ const App = (() => {
       return;
     }
     const m = $('#modal');
-    m.innerHTML = `<div class="sheet card"><h3>PowerPoint is ready</h3><p class="muted small">${esc(file.name)} (${(file.size / 1048576).toFixed(1)} MB)</p>
+    const kind = /\.pptx$/i.test(file.name) ? 'PowerPoint' : /\.csv$/i.test(file.name) ? 'Spreadsheet' : /\.pdf$/i.test(file.name) ? 'PDF' : /\.docx$/i.test(file.name) ? 'Word file' : 'File';
+    m.innerHTML = `<div class="sheet card"><h3>${kind} is ready</h3><p class="muted small">${esc(file.name)} (${(file.size / 1048576).toFixed(1)} MB)</p>
       <div class="actions"><button class="btn primary" data-f="save">Save to device</button>${canShare ? '<button class="btn" data-f="share">Share (WhatsApp, Drive, Files…)</button>' : ''}<button class="btn" data-f="close">Close</button></div></div>`;
     m.classList.add('sheet-wrap');
     m.hidden = false;
@@ -4723,6 +4724,192 @@ const App = (() => {
   const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const operatedOn = (c) => c.surgeryDate || (['postop', 'discharged'].includes(c.status) || TRANSFER_DEPTS[c.status] ? c.otDate || '' : '');
   const statusWord = (c) => (c.status === 'postop' ? 'Post-op' : c.status === 'posted' ? 'Posted' : c.status === 'discharged' ? 'Discharged' : TRANSFER_DEPTS[c.status] ? TRANSFER_DEPTS[c.status].folder : 'Pre-op');
+  // ---- Census: admissions, operations, discharges… for a week, a month or a year (this unit, or all units for owners)
+  const Census = {
+    live: true,
+    mode: 'month', // week | month | year
+    anchor: '',
+    scope: 'unit', // unit | all
+    all: null,
+    loading: false,
+    range() {
+      const a = (Census.anchor ||= todayISO());
+      if (Census.mode === 'week') { const mon = mondayOf(a); const sun = addDays(mon, 6); return [mon, sun, `${fmtDate(mon)} – ${fmtDate(sun)}`]; }
+      const y = +a.slice(0, 4);
+      if (Census.mode === 'year') return [`${y}-01-01`, `${y}-12-31`, String(y)];
+      const m = +a.slice(5, 7);
+      const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const name = new Date(Date.UTC(y, m - 1, 1)).toLocaleString('en-GB', { month: 'long', timeZone: 'UTC' });
+      return [`${a.slice(0, 7)}-01`, `${a.slice(0, 7)}-${String(last).padStart(2, '0')}`, `${name} ${y}`];
+    },
+    step(dir) {
+      const a = Census.anchor || todayISO();
+      if (Census.mode === 'week') Census.anchor = addDays(a, 7 * dir);
+      else if (Census.mode === 'year') Census.anchor = `${+a.slice(0, 4) + dir}-01-01`;
+      else { const d = new Date(Date.UTC(+a.slice(0, 4), +a.slice(5, 7) - 1 + dir, 1)); Census.anchor = d.toISOString().slice(0, 10); }
+    },
+    owner: () => Store.mode === 'firebase' && Store.isOwner(),
+    cases() {
+      if (Census.scope === 'all' && Census.owner()) return Census.all || [];
+      return Object.entries(Store.cases).map(([id, c]) => ({ id, unit: Store.unitKey || '', ...c }));
+    },
+    async loadAll() {
+      Census.loading = true;
+      render();
+      try { Census.all = await Store.unitsCases(); } catch { Census.all = []; Census.all.failed = ['all']; }
+      Census.loading = false;
+      if (/^#\/census/.test(location.hash)) { current = null; render(); }
+    },
+    MODE_GROUPS: [['RTA / TTA', /RTA|TTA|ROAD|TRAFFIC/], ['Fall from height', /HEIGHT/], ['Fall', /FALL|SLIP/], ['Assault', /ASSAULT/], ['Accidental injury', /ACCIDENT/],
+      ['Workspot injury', /WORK/], ['Self inflicted', /SELF/], ['Electrocution', /ELECTRO/]],
+    stats(list, from, to) {
+      const inR = (d) => !!d && d >= from && d <= to;
+      const adm = list.filter((c) => inR(c.doa));
+      const ops = list.filter((c) => inR(operatedOn(c)));
+      const dis = list.filter((c) => c.status === 'discharged' && inR(c.discharge?.dod));
+      const disBy = Object.fromEntries(Object.keys(DISPOSITIONS).filter((k) => DISPOSITIONS[k].status === 'discharged').map((k) => [k, 0]));
+      dis.forEach((c) => { const k = c.discharge?.disposition in disBy ? c.discharge.disposition : 'discharge'; disBy[k]++; });
+      const trans = Object.fromEntries(Object.keys(TRANSFER_DEPTS).map((k) => [k, list.filter((c) => inR(c[k]?.out)).length]));
+      const inWard = list.filter((c) => c.doa && c.doa <= to && !(c.status === 'discharged' && (!c.discharge?.dod || c.discharge.dod <= to))).length;
+      const days = (a, b) => Math.round((new Date(b) - new Date(a)) / 864e5);
+      const avg = (arr) => (arr.length ? Math.round((arr.reduce((x, y) => x + y, 0) / arr.length) * 10) / 10 : null);
+      const los = avg(dis.filter((c) => c.doa).map((c) => days(c.doa, c.discharge.dod)).filter((n) => n >= 0));
+      const preop = avg(ops.filter((c) => c.doa).map((c) => days(c.doa, operatedOn(c))).filter((n) => n >= 0));
+      const group = (arr, keyOf) => { const m = new Map(); arr.forEach((c) => { const k = keyOf(c); m.set(k, (m.get(k) || 0) + 1); }); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+      const modeOf = (c) => { const t = String(c.mode || '').toUpperCase(); return t ? (Census.MODE_GROUPS.find(([, re]) => re.test(t))?.[0] || 'Other') : 'Not recorded'; };
+      const specOf = (c) => { const s = specsOf(c)[0]; return s ? SPECIALTIES[s].label : 'Trauma / general'; };
+      const schemeOf = (c) => String(c.scheme || '').trim() || 'Not recorded';
+      return {
+        adm, ops, dis, disBy, trans, inWard, los, preop,
+        transTotal: Object.values(trans).reduce((a, b) => a + b, 0),
+        byMode: group(adm, modeOf), bySpec: group(ops, specOf), byScheme: group(ops, schemeOf),
+      };
+    },
+    // the summary lines (label, value of a stats object)
+    LINES: [
+      ['Admissions', (s) => s.adm.length], ['Operations', (s) => s.ops.length], ['Discharged (all)', (s) => s.dis.length],
+      ['  Discharge', (s) => s.disBy.discharge], ['  Discharge at request', (s) => s.disBy.dar], ['  AMA', (s) => s.disBy.ama],
+      ['  Absconded', (s) => s.disBy.absconded], ['  Expired', (s) => s.disBy.expired], ['Transferred out', (s) => s.transTotal],
+      ['Under care at the end of the period', (s) => s.inWard], ['Average pre-op stay (days)', (s) => s.preop ?? '—'], ['Average length of stay (days)', (s) => s.los ?? '—'],
+    ],
+    units(list) {
+      if (!(Census.scope === 'all' && Census.owner())) return null;
+      return Store.unitKeys.map((k, i) => ({ label: UNITS[i].id, list: list.filter((c) => c.unit === k) }));
+    },
+    scopeLabel: () => (Census.scope === 'all' && Census.owner() ? 'ALL UNITS' : `ORTHO UNIT ${Store.meta.unitId}`),
+    render() {
+      const [from, to, label] = Census.range();
+      if (Census.scope === 'all' && Census.owner() && !Census.all && !Census.loading) setTimeout(Census.loadAll, 0);
+      const list = Census.cases();
+      const s = Census.stats(list, from, to);
+      const units = Census.units(list);
+      const per = units ? units.map((u) => ({ ...u, s: Census.stats(u.list, from, to) })) : null;
+      const tile = (n, l, hi) => `<div class="cz-tile${hi ? ' hi' : ''}"><b>${esc(String(n))}</b><span>${esc(l)}</span></div>`;
+      const small = (title, rows) => `<div class="card cz-card"><h3>${esc(title)}</h3>${rows.length ? `<table class="board cz-tbl"><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><th>${esc(String(v))}</th></tr>`).join('')}</tbody></table>` : '<p class="muted small">None</p>'}</div>`;
+      const failed = Census.all?.failed?.length ? `<p class="notice small">Couldn't read ${Census.all.failed.includes('all') ? 'the other units' : Census.all.failed.map(unitLabel).join(', ')} — no network?</p>` : '';
+      return `
+        <div class="toolbar"><h2>Census <span class="muted small">${esc(Census.scopeLabel().toLowerCase())}</span></h2></div>
+        <div class="card">
+          <div class="chips">${[['week', 'Weekly'], ['month', 'Monthly'], ['year', 'Yearly']].map(([k, l]) => `<button class="chip${Census.mode === k ? ' on' : ''}" data-cz-mode="${k}">${l}</button>`).join('')}
+            ${Census.owner() ? `<span class="cz-sep"></span><button class="chip${Census.scope === 'unit' ? ' on' : ''}" data-cz-scope="unit">Unit ${esc(Store.meta.unitId)}</button><button class="chip${Census.scope === 'all' ? ' on' : ''}" data-cz-scope="all">All units</button>` : ''}</div>
+          <div class="week-pick"><button class="btn small" data-cz-step="-1" aria-label="Before">‹</button><b>${esc(label)}</b>
+            <button class="btn small" data-cz-step="1" aria-label="After" ${to >= todayISO() ? 'disabled' : ''}>›</button></div>
+          ${failed}
+          ${Census.loading ? '<p class="muted">Loading all units…</p>' : `
+          <div class="cz-tiles">${tile(s.adm.length, 'Admissions', true)}${tile(s.ops.length, 'Operations')}${tile(s.dis.length, 'Discharged')}${tile(s.disBy.expired, 'Expired')}${tile(s.transTotal, 'Transferred out')}${tile(s.inWard, 'Under care at end')}</div>
+          <div class="table-wrap"><table class="board cz-main">
+            <thead><tr><th></th>${per ? per.map((u) => `<th>Unit ${esc(u.label)}</th>`).join('') : ''}<th>${per ? 'Total' : esc(label)}</th></tr></thead>
+            <tbody>${Census.LINES.map(([l, f]) => `<tr class="${l.startsWith('  ') ? 'sub' : ''}"><td>${esc(l.trim())}</td>${per ? per.map((u) => `<td>${esc(String(f(u.s)))}</td>`).join('') : ''}<th>${esc(String(f(s)))}</th></tr>`).join('')}</tbody>
+          </table></div>
+          <div class="form-actions"><button class="btn primary" id="cz-pdf">Download PDF</button><button class="btn" id="cz-ppt">PowerPoint</button><button class="btn" id="cz-csv">Patient list (Excel / CSV)</button></div>`}
+        </div>
+        ${Census.loading ? '' : `<div class="cz-grid">
+          ${small('Admissions by mode of injury', s.byMode)}
+          ${small('Operations by subspecialty', s.bySpec)}
+          ${small('Operations by scheme', s.byScheme)}
+          ${small('Transferred out to', Object.entries(s.trans).filter(([, n]) => n).map(([k, n]) => [TRANSFER_DEPTS[k].long, n]))}
+        </div>`}`;
+    },
+    // ---- downloads
+    fileName(ext) {
+      const [from, to] = Census.range();
+      return `CENSUS ${Census.scopeLabel()} ${fmtDate(from).replace(/\//g, '-')} TO ${fmtDate(to).replace(/\//g, '-')}.${ext}`;
+    },
+    table() {
+      const [from, to, label] = Census.range();
+      const list = Census.cases();
+      const s = Census.stats(list, from, to);
+      const per = (Census.units(list) || []).map((u) => ({ ...u, s: Census.stats(u.list, from, to) }));
+      const head = ['', ...per.map((u) => `UNIT ${u.label}`), per.length ? 'TOTAL' : label.toUpperCase()];
+      const rows = Census.LINES.map(([l, f]) => [l.trim().toUpperCase(), ...per.map((u) => f(u.s)), f(s)]);
+      return { head, rows, s, label, from, to };
+    },
+    pdf() {
+      const { head, rows, s, label } = Census.table();
+      const { jsPDF } = window.jspdf;
+      const d = new jsPDF({ orientation: head.length > 4 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
+      const W = d.internal.pageSize.getWidth();
+      d.setFont('helvetica', 'bold');
+      d.setFontSize(13);
+      d.text(`CENSUS - ${Census.scopeLabel()} - ${label.toUpperCase()}`, W / 2, 16, { align: 'center' });
+      d.setFontSize(9);
+      d.setFont('helvetica', 'normal');
+      d.text('Department of Orthopaedic Surgery & Traumatology, Govt. Rajaji Hospital & Madurai Medical College', W / 2, 21, { align: 'center' });
+      const opt = (startY, h, b) => ({ startY, theme: 'grid', head: [h], body: b, styles: { fontSize: 9, halign: 'center', textColor: 0, lineColor: 120, lineWidth: 0.1 },
+        headStyles: { fillColor: [19, 41, 75], textColor: 255 }, columnStyles: { 0: { halign: 'left', fontStyle: 'bold' } }, margin: { left: 14, right: 14 } });
+      d.autoTable(opt(26, head, rows.map((r) => r.map(String))));
+      let y = d.lastAutoTable.finalY + 8;
+      for (const [title, list] of [['ADMISSIONS BY MODE OF INJURY', s.byMode], ['OPERATIONS BY SUBSPECIALTY', s.bySpec], ['OPERATIONS BY SCHEME', s.byScheme]]) {
+        if (!list.length) continue;
+        d.autoTable({ ...opt(y, [title, 'NO.'], list.map(([k, n]) => [k.toUpperCase(), String(n)])), tableWidth: 110 });
+        y = d.lastAutoTable.finalY + 6;
+      }
+      SharePdf.share(new File([d.output('blob')], Census.fileName('pdf'), { type: 'application/pdf' }));
+    },
+    async ppt() {
+      const { head, rows, s, label } = Census.table();
+      await ReportDeck.loadLogo();
+      const pres = ReportDeck.create();
+      ReportDeck.cover(pres, { title: 'Census report', sub: label, lines: [Census.scopeLabel(), `${s.adm.length} ADMISSIONS · ${s.ops.length} OPERATIONS · ${s.dis.length} DISCHARGES`] });
+      const a = pres.addSlide({ masterName: 'RPT' });
+      ReportDeck.header(pres, a, { kicker: 'CENSUS', title: 'Summary', right: label });
+      const first = 3.2;
+      ReportDeck.table(pres, a, [head, ...rows], { y: 1.2, fontSize: head.length > 4 ? 11 : 14, rowH: 0.4, colW: [first, ...head.slice(1).map(() => (13.33 - 0.8 - first) / (head.length - 1))] });
+      const b = pres.addSlide({ masterName: 'RPT' });
+      ReportDeck.header(pres, b, { kicker: 'CENSUS', title: 'Breakdown', right: label });
+      [['Admissions by mode of injury', s.byMode], ['Operations by subspecialty', s.bySpec], ['Operations by scheme', s.byScheme]].forEach(([t, list], i) => {
+        ReportDeck.table(pres, b, [[t, 'No.'], ...(list.length ? list : [['None', '']]).map(([k, n]) => [k.toUpperCase(), n])], { x: 0.4 + i * 4.24, y: 1.2, w: 4.0, colW: [3.1, 0.9], fontSize: 12 });
+      });
+      ReportDeck.thanks(pres);
+      const blob = await pres.write({ outputType: 'blob' });
+      offerFile(new File([blob], Census.fileName('pptx'), { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+    },
+    csv() {
+      const [from, to] = Census.range();
+      const inR = (d) => !!d && d >= from && d <= to;
+      const list = Census.cases().filter((c) => inR(c.doa) || inR(operatedOn(c)) || inR(c.discharge?.dod) || Object.keys(TRANSFER_DEPTS).some((k) => inR(c[k]?.out)));
+      const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const head = ['UNIT', 'NAME', 'AGE/SEX', 'IP NO', 'WARD', 'MODE', 'DOA', 'DATE OF SURGERY', 'DATE OF DISCHARGE', 'OUTCOME', 'DIAGNOSIS', 'PROCEDURE', 'IMPLANTS', 'SCHEME'];
+      const rows = list.sort((a, b) => String(a.doa).localeCompare(String(b.doa))).map((c) => [unitLabel(c.unit), c.name, ageSex(c), c.ipNo, c.ward, c.mode, fmtDate(c.doa), operatedOn(c) ? fmtDate(operatedOn(c)) : '',
+        c.discharge?.dod ? fmtDate(c.discharge.dod) : '', c.status === 'discharged' ? (DISPOSITIONS[c.discharge?.disposition]?.label || 'Discharge') : statusWord(c), c.diagnosis, c.procedureDone || c.plan, c.implantsUsed || c.implants, c.scheme]);
+      const text = '﻿' + [head, ...rows].map((r) => r.map(q).join(',')).join('\r\n');
+      offerFile(new File([text], Census.fileName('csv'), { type: 'text/csv' }));
+    },
+    mount(el) {
+      el.addEventListener('click', (e) => {
+        const m = e.target.closest('[data-cz-mode]');
+        if (m) { Census.mode = m.dataset.czMode; Census.anchor = todayISO(); render(); return; }
+        const sc = e.target.closest('[data-cz-scope]');
+        if (sc) { Census.scope = sc.dataset.czScope; render(); return; }
+        const st = e.target.closest('[data-cz-step]');
+        if (st) { Census.step(+st.dataset.czStep); render(); }
+      });
+      $('#cz-pdf', el)?.addEventListener('click', () => { try { Census.pdf(); } catch (err) { toast('Could not make the PDF: ' + err.message, 5000); } });
+      $('#cz-ppt', el)?.addEventListener('click', () => Census.ppt().catch((err) => toast('Could not make the PowerPoint: ' + err.message, 5000)));
+      $('#cz-csv', el)?.addEventListener('click', () => Census.csv());
+    },
+  };
+
   // ---- Specialty weekly report (same design for every unit, js/report-deck.js)
   // The week's cases: admitted or operated Monday–Sunday, in order of date.
   function specWeek(list, mon) {
@@ -4972,6 +5159,7 @@ const App = (() => {
     if (h === '#/home') return Home;
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
+    if (h === '#/census') return Census;
     if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
     if (h === '#/scheme') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : Home;
     if (h === '#/cases') return Dashboard;
@@ -4990,7 +5178,7 @@ const App = (() => {
     if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
     if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
     if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
-    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|home)\b/);
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|census|home)\b/);
     return m ? '#/' + m[1] : '#/';
   }
   // The tabs this view has, which one is open, and the PGs' count of new HS updates.
