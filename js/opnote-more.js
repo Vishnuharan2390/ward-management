@@ -17,7 +17,7 @@ const OPN_TPL = {
         opnSel('fusion', 'Fusion', ['POSTEROLATERAL FUSION WITH BONE GRAFT', 'TLIF WITH CAGE AND BONE GRAFT', 'NONE']), opnSel('graft', 'Graft', ['LOCAL BONE GRAFT', 'ILIAC CREST BONE GRAFT', 'LOCAL + ILIAC CREST BONE GRAFT']),
         opnSel('biopsy', 'Tissue sent for HPE / culture / GeneXpert', YESNO)],
       imps: ['PEDICLE SCREW AND ROD SYSTEM', '5.5MM TITANIUM RODS', 'TLIF CAGE'],
-      defImps: [{ name: 'PEDICLE SCREW AND ROD SYSTEM', screws: [{ type: 'PEDICLE SCREWS', n: '' }] }],
+      defImps: [{ name: 'PEDICLE SCREW AND ROD SYSTEM', screws: [] }],
       name: (f) => `POSTERIOR ${f.decomp !== 'NONE' ? `${f.decomp} AND ` : ''}PEDICLE SCREW FIXATION ${f.level}${f.fusion !== 'NONE' ? ` WITH ${f.fusion}` : ''}`,
       steps: (f, x) => [
         `Level ${f.level} confirmed under C-arm. Midline posterior incision made centred over the levels.`,

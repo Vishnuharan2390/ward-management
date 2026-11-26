@@ -1863,3 +1863,14 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
   box-shadow: 0 4px 16px rgba(0,0,0,.3); opacity: 0; transition: opacity .15s; pointer-events: none; }
 #ptr.show { opacity: 1; }
 #ptr.ready { background: #ffd34d; color: #1a1a1a; }
+
+/* OT notes builder: a menu per part of the implant; spine screw rows; surgeons / assistants */
+.opn-sec { margin: .45rem 0 .7rem; padding: .45rem .55rem; border-radius: .6rem; border: 1px dashed var(--line, #444); }
+.opn-sec .opn-lab { font-weight: 700; margin-bottom: .3rem; }
+.opn-sec-add { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .3rem; }
+.opn-spine .opn-lvl input { width: 7.5rem; }
+.staff { display: grid; gap: .35rem; }
+.staff-lab { font-weight: 600; }
+.staff-row { display: flex; gap: .4rem; align-items: center; }
+.staff-row input { flex: 1; }
+.staff > .btn { justify-self: start; }

@@ -871,6 +871,19 @@ const App = (() => {
     </div>`;
   }
 
+  // ---- Operative details: surgeons and assistant surgeons, one box each, + for more. Saved as one comma-joined field.
+  const staffSplit = (v) => String(v || '').split(/\s*,\s*|\s*\n\s*/).map((x) => x.trim()).filter(Boolean);
+  function staffHTML(field, label, value, list) {
+    const names = staffSplit(value);
+    const boxes = (names.length ? names : ['']).map((n, i) => `<div class="staff-row"><input data-staff="${field}" list="${list}" value="${esc(n)}" aria-label="${esc(label)} ${i + 1}">${i ? `<button type="button" class="icon" data-staff-rm="${field}" title="Remove">✕</button>` : ''}</div>`).join('');
+    return `<div class="span2 staff" data-staff-box="${field}"><div class="staff-lab">${esc(label)}s</div>${boxes}
+      <button type="button" class="btn small" data-staff-add="${field}" data-list="${list}">+ ${esc(label)}</button></div>`;
+  }
+  function staffSave(el, id, field) {
+    const v = $$(`[data-staff="${field}"]`, el).map((x) => x.value.trim()).filter(Boolean).join(', ');
+    Store.patch('cases', id, { [field]: v });
+  }
+
   // ---- Rounds: the latest values that are out of range, so nobody has to read through every result.
   function derangedHTML(c) {
     const d = derangedList(c);
@@ -1886,13 +1899,13 @@ const App = (() => {
             <h3>Operative details</h3>
             <div class="op-grid">
               <label>Date of surgery<input type="date" data-bind="surgeryDate" value="${esc(c.surgeryDate || c.otDate || '')}"></label>
-              <label>Surgeon<input data-bind="surgeon" list="dl-surgeons" value="${esc(c.surgeon)}"></label>
               <label class="span2">Procedure done<textarea data-bind="procedureDone" rows="2">${esc(c.procedureDone)}</textarea></label>
-              <label class="span2">Assistant surgeon(s)<input data-bind="assistants" list="dl-pg" value="${esc(c.assistants)}"></label>
+              ${staffHTML('surgeon', 'Surgeon', c.surgeon, 'dl-surgeons')}
+              ${staffHTML('assistants', 'Assistant surgeon', c.assistants, 'dl-pg')}
               <details class="span2 opn-wrap"${c.opBuild ? ' open' : ''}>
-                <summary>Op-note builder — choose from the lists and it writes the operative notes</summary>
-                <div id="opn">${opnHTML(c.opBuild || opnDefaults(c))}</div>
-                <div class="form-actions"><button type="button" class="btn primary" id="opn-gen">Write operative notes</button></div>
+                <summary>OT notes builder — choose from the lists and it writes the OT notes</summary>
+                <div id="opn">${opnHTML(c.opBuild || opnDefaults(c), { otImplants: c.implants })}</div>
+                <div class="form-actions"><button type="button" class="btn primary" id="opn-gen">Write OT notes</button></div>
               </details>
               <label class="span2">Operative notes<textarea data-bind="opNotes" rows="6">${esc(c.opNotes)}</textarea></label>
               <label class="span2">Implants used <span class="hint">picked up from the operative notes — edit if needed</span>
@@ -1970,16 +1983,32 @@ const App = (() => {
           } else if (t.dataset.cmo !== undefined) cmSave(cm, t.value.trim().toUpperCase());
         });
         // Op-note builder: every choice is saved on the case (opBuild) and fills what follows.
+        // Surgeons / assistant surgeons: + adds a box, ✕ removes one; every change saves the whole list.
+        el.addEventListener('click', (e) => {
+          const add = e.target.closest('[data-staff-add]');
+          if (add) {
+            const f = add.dataset.staffAdd;
+            add.insertAdjacentHTML('beforebegin', `<div class="staff-row"><input data-staff="${f}" list="${add.dataset.list}" aria-label="${f === 'surgeon' ? 'Surgeon' : 'Assistant surgeon'}"><button type="button" class="icon" data-staff-rm="${f}" title="Remove">✕</button></div>`);
+            add.previousElementSibling.querySelector('input').focus();
+            return;
+          }
+          const rm = e.target.closest('[data-staff-rm]');
+          if (rm) {
+            rm.closest('.staff-row').remove();
+            staffSave(el, id, rm.dataset.staffRm);
+          }
+        });
+        el.addEventListener('change', (e) => { if (e.target.dataset?.staff) staffSave(el, id, e.target.dataset.staff); });
         const opnBox = $('#opn', el);
         const opnState = () => JSON.parse(JSON.stringify(opnNormalize(Store.cases[id].opBuild) || opnDefaults({ id, ...Store.cases[id] })));
-        const opnSave = (b) => { opnBox.innerHTML = opnHTML(b); Store.patch('cases', id, { opBuild: b }); };
+        const opnSave = (b) => { opnBox.innerHTML = opnHTML(b, { otImplants: Store.cases[id].implants }); Store.patch('cases', id, { opBuild: b }); };
         if (opnBox) {
           opnBox.addEventListener('change', (e) => {
             const b = opnState();
             if (opnApplyChange(b, e.target)) opnSave(b);
           });
           opnBox.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-add-proc],[data-rm-proc],[data-add-imp],[data-rm-imp],[data-add-scr],[data-sug-scr],[data-rm-scr]');
+            const btn = e.target.closest('[data-add-proc],[data-rm-proc],[data-add-imp],[data-add-imp-custom],[data-rm-imp],[data-add-scr],[data-add-scr-at],[data-sug-scr],[data-rm-scr]');
             if (!btn) return;
             const b = opnState();
             if (opnApplyClick(b, btn, Store.cases[id])) opnSave(b);
@@ -1996,9 +2025,12 @@ const App = (() => {
             const cur = Store.cases[id];
             const ch = {};
             if (!hasText(cur.procedureDone)) ch.procedureDone = opProcedureName(b);
+            // Implants used: from the builder (the notes no longer carry an IMPLANTS line), unless typed by hand
+            const used = (opnNormalize(b)?.procs || []).map(opnProc).filter(Boolean).flatMap((r) => r.implants).join(', ').toUpperCase();
+            if (used && (!hasText(cur.implantsUsed) || cur.implantsUsed === cur.implantsAuto)) Object.assign(ch, { implantsUsed: used, implantsAuto: used });
             if (Object.keys(ch).length) Store.patch('cases', id, ch);
             ta.scrollIntoView({ block: 'start', behavior: 'smooth' });
-            toast('Operative notes written — read through and edit as needed', 4000);
+            toast('OT notes written — read through and edit as needed', 4000);
           };
         }
         const tp = $('#to-postop', el);

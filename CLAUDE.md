@@ -81,9 +81,15 @@
 - e-case sheet head: textarea data-bind="history" (c.history). The discharge summary H/O injury / illness box starts from it
   unless the discharge draft already has its own text.
 
-## Op-note builder screws
-- Implants start with NO screw rows (opnDefScrews returns []). The usual ones (opnSugScrews: nail bolts, PFN neck screws, DHS…)
-  are one-tap "+ …" chips (data-sug-scr) beside "+ Add screw / wire"; a chip disappears once that screw is added.
+## OT notes builder (js/opnote.js, js/opnote-more.js; case page → Operative details)
+- Implant list: "From the OT list" (opnOtImplants(c.implants) via OPN_OT_WORDS) → usual for the fracture → others → Custom implant.
+  opnDefaults preselects the OT list's implant. "+ Custom implant" button too.
+- No screw rows until asked. opnScrewSections(imp) gives each kind its menus: nail = proximal then distal locking; plate/MIPO =
+  proximal / distal to the fracture + lag screws; PFN = lag + anti-rotation (PFNA helical blade) then distal bolts; DHS = lag + shaft.
+  Other kinds: free rows. Spine template procedures: rows with type, level(s), side, number, size.
+- Wording: opnScrewSay → "2 X 4.9MM LOCKING BOLTS OF SIZE 34MM EACH WERE USED FOR PROXIMAL LOCKING…" (singular when 1).
+- The note has NO diagnosis / procedure / implants header (those are the boxes above); "Write OT notes" also fills Implants used.
+- Surgeons and assistant surgeons: one box each + "+ Surgeon" / "+ Assistant surgeon" (staffHTML), saved comma-joined in surgeon / assistants.
 
 ## Back button + pull to refresh
 - js/nav-gestures.js: ‹ #back-btn in the title bar (history.back through in-app pages, sessionStorage wm.navStack; hidden on the
