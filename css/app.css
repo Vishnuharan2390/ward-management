@@ -1845,11 +1845,6 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .mic.mic-in { right: 34px; }
 .mic-host > textarea { padding-right: 2.8rem !important; }
 
-/* Post-op ward: keep only these */
-.ko-list { margin: .3rem 0 .8rem; padding-left: 1.1rem; }
-.ko-list li { margin: .15rem 0; }
-.ko-list.go b { color: var(--red, #c62828); }
-.ko-miss { color: var(--red, #c62828); }
 
 /* e-case sheet: history of injury / illness */
 .case-hx { display: grid; gap: .3rem; margin: .7rem 0 .2rem; font-weight: 600; }
