@@ -143,3 +143,11 @@
 - REBUILD[type](args) replays the same generator (rebuilding=true stops a second record). Pictures come from the frozen image ids.
   Existing rules (units/{unit}/{coll}) already cover records — no rules change.
 - Photos: compressImage default 1280 px, JPEG 75% (was 1600 / 80%).
+
+## Photos in Firebase Storage (prepared, OFF until an owner switches it on)
+- Settings → Photo storage (owners): bucket (default <projectId>.firebasestorage.app) → Test (upload + read back + delete) → Switch on
+  for all units (meta.photoStore = {on, bucket} in every unit) → Move existing photos (per unit, resumable: Store.movePhotos).
+- On: Store.addImage uploads to units/<unit>/images/<case>/<id>.jpg and the images doc keeps {url, path} (no data); falls back to the
+  database if the upload fails. fetchRemote reads data or fetches url. deleteImage removes the file too.
+- storage.rules (owner publishes: Storage → Rules; cross-service firestore.exists on the team list) + tools/storage-cors.json (one-time
+  CORS on the bucket so the app can read photos back). Tested: rulestest/storage.test.mjs (13) on the emulator.

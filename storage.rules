@@ -1,0 +1,34 @@
+rules_version = '2';
+
+// Callus — photos (X-rays, MRI, wound pictures) as files in Firebase Storage, one folder per unit:
+//   units/ortho-unit-N/images/<case id>/<photo id>.jpg
+// Only that unit's team (and the owners) can add, read or delete its photos; the team list is checked in
+// the database (same rules as firestore.rules). The app opens a photo through the private link saved in
+// the database record of that photo — and only people allowed to read that record (the unit's team, and a
+// specialty unit for its specialty's cases) ever see the link.
+// To publish: Firebase console → Storage → Rules → paste this whole file → Publish.
+// (The first time, the console asks to let Storage rules read the database — allow it.)
+service firebase.storage {
+  match /b/{bucket}/o {
+    function owners() {
+      return [
+        'vishnuapple9.1@gmail.com'
+      ];
+    }
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function me() {
+      return request.auth.token.email.lower();
+    }
+    function isMember(unit) {
+      return signedIn() && (me() in owners() || firestore.exists(/databases/(default)/documents/units/$(unit)/members/$(me())));
+    }
+
+    match /units/{unit}/images/{caseId}/{file} {
+      allow read, delete: if isMember(unit);
+      // pictures only, at most 5 MB each
+      allow create, update: if isMember(unit) && request.resource.size < 5 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -145,8 +145,86 @@ const Store = (() => {
   // From the server, waiting at most `ms` (a bad signal can otherwise hang for a long time).
   const imgRef = (id, unit) => (unit && unit !== fb.unit ? fb.fsM.doc(fb.db, 'units', unit, 'images', id) : ref('images', id));
   async function fetchRemote(id, ms = 20000, unit) {
-    const get = fb.fsM.getDoc(imgRef(id, unit)).then((d) => d.data()?.data).catch(() => null);
+    const get = fb.fsM.getDoc(imgRef(id, unit)).then((d) => {
+      const rec = d.data();
+      if (rec?.data) return rec.data;
+      return rec?.url ? urlToData(rec.url) : null; // moved to Firebase Storage
+    }).catch(() => null);
     return Promise.race([get, new Promise((res) => setTimeout(() => res(null), ms))]);
+  }
+
+  // ---- Photos in Firebase Storage (switched on per unit by an owner: meta.photoStore = { on, bucket }) ----
+  // The database keeps a small record { id, caseId, kind, url, path, … }; the picture itself is a file in Storage.
+  const photoStore = () => { const ps = state.meta.main?.photoStore; return fb && ps?.on && ps.bucket ? ps : null; };
+  let storageMods = null;
+  async function storageFor(bucket) {
+    storageMods ||= await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js');
+    return { st: storageMods.getStorage(fb.app, `gs://${String(bucket).replace(/^gs:\/\//, '')}`), sM: storageMods };
+  }
+  function dataToBlob(dataUrl) {
+    const [head, b64] = String(dataUrl).split(',');
+    const type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+    const bin = atob(b64);
+    const u = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+    return new Blob([u], { type });
+  }
+  async function urlToData(url) {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`photo download failed (${r.status})`);
+    const blob = await r.blob();
+    return new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(blob); });
+  }
+  const photoPath = (unit, caseId, id) => `units/${unit}/images/${caseId}/${id}.jpg`;
+  async function uploadPhoto(bucket, unit, caseId, id, dataUrl) {
+    const { st, sM } = await storageFor(bucket);
+    const path = photoPath(unit, caseId, id);
+    const r = sM.ref(st, path);
+    await sM.uploadBytes(r, dataToBlob(dataUrl), { contentType: 'image/jpeg', cacheControl: 'private, max-age=31536000' });
+    return { path, url: await sM.getDownloadURL(r) };
+  }
+  // Settings → Photo storage → Test: upload a tiny picture, read it back through its link, delete it.
+  async function testPhotoStore(bucket) {
+    if (!fb) throw new Error('Only in shared mode');
+    const c = document.createElement('canvas');
+    c.width = 8; c.height = 8;
+    const dataUrl = c.toDataURL('image/jpeg', 0.5);
+    const { st, sM } = await storageFor(bucket);
+    const r = sM.ref(st, `units/${fb.unit}/images/_test/${uid()}.jpg`);
+    try { await sM.uploadBytes(r, dataToBlob(dataUrl), { contentType: 'image/jpeg' }); } catch (e) { throw new Error(`upload refused (${e.code || e.message}) — is Storage set up and are its rules published?`); }
+    let back;
+    try { back = await urlToData(await sM.getDownloadURL(r)); } catch (e) { throw new Error(`uploaded, but the app can't read it back (${e.message}) — the CORS step hasn't been done yet`); } finally { sM.deleteObject(r).catch(() => {}); }
+    if (!String(back).startsWith('data:image')) throw new Error('read back something that is not a picture');
+    return true;
+  }
+  // Owner: switch photo storage on / off for every unit (each unit's settings)
+  async function setPhotoStore(ps) {
+    if (!fb) return;
+    for (const u of UNIT_KEYS) await fb.fsM.setDoc(fb.fsM.doc(fb.db, 'units', u, 'meta', 'main'), { photoStore: ps }, { merge: true });
+  }
+  // Move one unit's photos out of the database into Storage. Resumable: photos already moved are skipped.
+  async function movePhotos(unit, bucket, onProgress) {
+    if (!fb) throw new Error('Only in shared mode');
+    const caseDocs = unit === fb.unit ? Object.entries(state.cases) : [];
+    if (unit !== fb.unit) (await fb.fsM.getDocs(fb.fsM.collection(fb.db, 'units', unit, 'cases'))).forEach((d) => caseDocs.push([d.id, d.data()]));
+    const todo = caseDocs.flatMap(([cid, c]) => Object.keys(c.images || {}).map((iid) => [cid, iid]));
+    let moved = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const [i, [cid, iid]] of todo.entries()) {
+      try {
+        const dref = fb.fsM.doc(fb.db, 'units', unit, 'images', iid);
+        const snap = await fb.fsM.getDoc(dref);
+        const rec = snap.data();
+        if (!rec || !rec.data) { skipped++; } else {
+          const { path, url } = await uploadPhoto(bucket, unit, rec.caseId || cid, iid, rec.data);
+          await fb.fsM.updateDoc(dref, { url, path, data: fb.fsM.deleteField() });
+          moved++;
+        }
+      } catch (e) { failed++; console.warn('move photo', iid, e); }
+      onProgress?.({ done: i + 1, total: todo.length, moved, skipped, failed });
+    }
+    return { total: todo.length, moved, skipped, failed };
   }
 
   // ---- firebase backend ----
@@ -168,7 +246,7 @@ const Store = (() => {
     } catch {
       db = fsM.getFirestore(app);
     }
-    fb = { authM, fsM, auth: authM.getAuth(app), db, unit: CFG.unitId || 'ortho-unit-1' };
+    fb = { app, authM, fsM, auth: authM.getAuth(app), db, unit: CFG.unitId || 'ortho-unit-1' };
     if (CFG.emulators) {
       // Local test setup only (firebase emulators:start).
       authM.connectAuthEmulator(fb.auth, 'http://127.0.0.1:9099', { disableWarnings: true });
@@ -407,8 +485,15 @@ const Store = (() => {
   // ---- images (stored apart from the case so lists stay light) ----
   async function addImage(caseId, kind, dataUrl, caption = '') {
     const id = uid();
-    const rec = { id, caseId, kind, data: dataUrl, caption, at: Date.now(), by: who() };
+    let rec = { id, caseId, kind, data: dataUrl, caption, at: Date.now(), by: who() };
     if (fb) {
+      const ps = photoStore();
+      if (ps) {
+        try {
+          const { path, url } = await uploadPhoto(ps.bucket, fb.unit, caseId, id, dataUrl);
+          rec = { id, caseId, kind, url, path, caption, at: rec.at, by: rec.by };
+        } catch (e) { console.warn('photo storage upload failed — kept in the database instead', e); }
+      }
       await fb.fsM.setDoc(ref('images', id), rec);
       keep(id, dataUrl);
     } else await idbDo('put', rec);
@@ -469,6 +554,8 @@ const Store = (() => {
   }
   async function deleteImage(caseId, id) {
     if (fb) {
+      const path = await fb.fsM.getDoc(ref('images', id)).then((d) => d.data()?.path).catch(() => null);
+      if (path) storageFor(photoStore()?.bucket || state.meta.main?.photoStore?.bucket || '').then(({ st, sM }) => sM.deleteObject(sM.ref(st, path))).catch(() => {});
       await fb.fsM.deleteDoc(ref('images', id)).catch(remoteFail);
       cacheDo('delete', id).catch(() => {});
       savedIds?.delete(id);
@@ -708,6 +795,7 @@ const Store = (() => {
     idToken: () => (fb?.auth.currentUser ? fb.auth.currentUser.getIdToken() : Promise.resolve(null)),
     create, patch, remove,
     addImage, getImage, deleteImage,
+    get photoStore() { return photoStore(); }, testPhotoStore, setPhotoStore, movePhotos,
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),

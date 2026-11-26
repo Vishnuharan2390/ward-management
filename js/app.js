@@ -4136,6 +4136,62 @@ const App = (() => {
       </div>`;
   }
 
+  // ---- Settings → Photo storage (owners): photos as files in Firebase Storage instead of inside the database.
+  // Off until switched on here, after the Blaze upgrade + Storage set-up + rules + CORS (see storage.rules).
+  const PS_DEFAULT_BUCKET = `${window.WARD_CONFIG?.firebase?.projectId || ''}.firebasestorage.app`;
+  const psState = { busy: '', msg: '', ok: null };
+  function photoStoreCard() {
+    const ps = Store.meta.photoStore || {};
+    const on = !!(ps.on && ps.bucket);
+    return `<div class="card" id="photo-store">
+      <h3>Photo storage <span class="tag ${on ? 'ok' : ''}">${on ? 'Firebase Storage — on' : 'In the database (free 1 GB)'}</span></h3>
+      <p class="muted small">Photos are kept inside the database now, which holds 1 GB on the free plan. After the Blaze upgrade, switch them to
+        Firebase Storage: cheaper, no 1 GB limit. Do the set-up first (Storage → Get started, publish the Storage rules, the CORS step), then test.</p>
+      <label>Storage bucket<input id="ps-bucket" value="${esc(ps.bucket || PS_DEFAULT_BUCKET)}" autocomplete="off" data-nocaps></label>
+      <div class="actions">
+        <button class="btn" id="ps-test" ${psState.busy ? 'disabled' : ''}>1. Test connection</button>
+        ${on ? '<button class="btn" id="ps-off">Switch off</button>' : `<button class="btn primary" id="ps-on" ${psState.ok ? '' : 'disabled'}>2. Switch on for all units</button>`}
+        <button class="btn" id="ps-move" ${on && !psState.busy ? '' : 'disabled'}>3. Move existing photos (Unit ${esc(Store.meta.unitId)})</button>
+      </div>
+      ${psState.msg ? `<p class="small ${psState.ok === false ? 'warn-text' : 'muted'}" id="ps-msg">${esc(psState.msg)}</p>` : ''}
+      <p class="muted small">Moving: open each unit (Settings → Unit) and tap step 3 there. It can be stopped and run again — photos already moved are skipped.
+        Phones keep showing photos throughout; new photos go to Storage as soon as it is on.</p>
+    </div>`;
+  }
+  function photoStoreMount(el) {
+    const box = $('#photo-store', el);
+    if (!box) return;
+    const bucket = () => $('#ps-bucket', box).value.trim().replace(/^gs:\/\//, '');
+    const say = (msg, ok) => { psState.msg = msg; psState.ok = ok; render(); };
+    $('#ps-test', box).onclick = async () => {
+      psState.busy = 'test';
+      say('Testing — uploading a tiny picture and reading it back…', null);
+      try { await Store.testPhotoStore(bucket()); psState.busy = ''; say('✓ Works: upload and read-back both fine. You can switch it on.', true); } catch (e) { psState.busy = ''; say('✗ ' + e.message, false); }
+    };
+    const on = $('#ps-on', box);
+    if (on) on.onclick = async () => {
+      if (!confirm('Switch photos to Firebase Storage for all six units?\n\nNew photos will be saved there from now on. Existing photos keep working; move them with step 3.')) return;
+      try { await Store.setPhotoStore({ on: true, bucket: bucket(), at: Date.now(), by: Store.who() }); say('✓ On for all units. New photos go to Storage. Now move the existing ones (step 3), unit by unit.', true); } catch (e) { say('✗ Could not switch on: ' + (e.code || e.message), false); }
+    };
+    const off = $('#ps-off', box);
+    if (off) off.onclick = async () => {
+      if (!confirm('Switch off? New photos go back into the database. Photos already in Storage keep working.')) return;
+      try { await Store.setPhotoStore({ on: false, bucket: bucket(), at: Date.now(), by: Store.who() }); say('Switched off.', null); } catch (e) { say('✗ ' + (e.code || e.message), false); }
+    };
+    $('#ps-move', box).onclick = async () => {
+      const ps = Store.photoStore;
+      if (!ps) return;
+      if (!confirm(`Move Unit ${Store.meta.unitId}'s photos out of the database into Storage?\n\nKeep the app open until it finishes. It can be run again if it stops.`)) return;
+      psState.busy = 'move';
+      say('Starting…', null);
+      try {
+        const r = await Store.movePhotos(Store.unitKey, ps.bucket, (x) => { const m = $('#ps-msg'); if (m) m.textContent = `Moving… ${x.done} of ${x.total} (moved ${x.moved}, already done ${x.skipped}${x.failed ? `, failed ${x.failed}` : ''})`; });
+        psState.busy = '';
+        say(`✓ Unit ${Store.meta.unitId}: ${r.moved} moved, ${r.skipped} already in Storage${r.failed ? `, ${r.failed} failed — run it again` : ''}.`, !r.failed);
+      } catch (e) { psState.busy = ''; say('✗ ' + (e.code || e.message), false); }
+    };
+  }
+
   const Settings = {
     live: true,
     render() {
@@ -4214,6 +4270,8 @@ const App = (() => {
                  <p class="muted small">Each person can be on one unit's team only. Someone on another unit's team has to be removed there first.</p>` : '<p class="muted small">Ask your unit\'s admin to add people.</p>'}`}
         </div>
 
+        ${Store.mode === 'firebase' && Store.isOwner() ? photoStoreCard() : ''}
+
         <div class="card">
           <h3>Backup</h3>
           <div class="actions">
@@ -4223,6 +4281,7 @@ const App = (() => {
         </div>`;
     },
     mount(el) {
+      photoStoreMount(el);
       $('#prof', el).onchange = (e) => Store.setProfile({ [e.target.name]: e.target.value.trim() });
       $('#look', el).addEventListener('click', (e) => {
         const k = e.target.closest('[data-ui-pick]')?.dataset.uiPick;
