@@ -1850,3 +1850,7 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .ko-list li { margin: .15rem 0; }
 .ko-list.go b { color: var(--red, #c62828); }
 .ko-miss { color: var(--red, #c62828); }
+
+/* e-case sheet: history of injury / illness */
+.case-hx { display: grid; gap: .3rem; margin: .7rem 0 .2rem; font-weight: 600; }
+.case-hx textarea { width: 100%; font-weight: 400; }

@@ -80,3 +80,7 @@
 ## Post-op ward: Keep only these
 - Post-op ward toolbar "Keep only these…" (openKeepOnly in js/app.js): pasted names (one per line; all words of an entry must be
   in the case name) stay; every other post-op ward case is disposed as discharged (disposition discharge, chosen DOD) after a preview + confirm.
+
+## History of injury / illness
+- e-case sheet head: textarea data-bind="history" (c.history). The discharge summary H/O injury / illness box starts from it
+  unless the discharge draft already has its own text.

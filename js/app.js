@@ -1866,6 +1866,8 @@ const App = (() => {
               ${c.comorbid ? `<dt>Comorbid</dt><dd>${esc(c.comorbid)}</dd>` : ''}
               ${c.mode ? `<dt>Mode</dt><dd>${esc(c.mode)}</dd>` : ''}
             </dl>
+            <label class="case-hx">History of injury / illness <span class="muted small">— goes into the discharge summary</span>
+              <textarea data-bind="history" rows="${Math.max(3, String(c.history || '').split('\n').length + 1)}" placeholder="H/O RTA / fall … pain, swelling, inability to bear weight …">${esc(c.history || '')}</textarea></label>
             <div class="actions">
               <a class="btn" href="#/case/${id}/edit">Edit details</a>
               ${isActive(c) ? '<button class="btn primary" id="to-postop">Transfer to post-op ward</button>' : ''}
@@ -3464,6 +3466,8 @@ const App = (() => {
           ...(c.discharge || {}),
         };
         if (d.disposition === 'lama') d.disposition = 'ama';
+        // H/O injury / illness: taken from the e-case sheet unless the discharge summary already has its own
+        if (!hasText(d.history) && hasText(c.history)) d.history = c.history;
         if (!d.course) d.course = courseTemplate(c, d);
         const sp = isSpinePelvis(c);
         const drugBtns = `<div class="span2 drug-btns">
