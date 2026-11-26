@@ -1978,7 +1978,7 @@ const App = (() => {
             if (opnApplyChange(b, e.target)) opnSave(b);
           });
           opnBox.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-add-proc],[data-rm-proc],[data-add-imp],[data-rm-imp],[data-add-scr],[data-rm-scr]');
+            const btn = e.target.closest('[data-add-proc],[data-rm-proc],[data-add-imp],[data-rm-imp],[data-add-scr],[data-sug-scr],[data-rm-scr]');
             if (!btn) return;
             const b = opnState();
             if (opnApplyClick(b, btn, Store.cases[id])) opnSave(b);

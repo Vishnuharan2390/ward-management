@@ -1849,3 +1849,5 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 /* e-case sheet: history of injury / illness */
 .case-hx { display: grid; gap: .3rem; margin: .7rem 0 .2rem; font-weight: 600; }
 .case-hx textarea { width: 100%; font-weight: 400; }
+
+.opn-sug { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin-top: .3rem; }

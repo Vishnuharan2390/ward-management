@@ -656,8 +656,10 @@ function opnDefaults(c) {
   return { v: 2, cat: p.cat, anaes, procs: [p] };
 }
 
-// Screw rows an implant starts with: nails get proximal + distal bolts, PFN / DHS neck screws + distal.
-function opnDefScrews(site, k) {
+// Screws / wires an implant usually takes: nails proximal + distal bolts, PFN / DHS neck screws + distal.
+// Offered as one-tap "+ …" buttons only — an implant starts with no screw rows (added when asked for).
+const opnDefScrews = () => [];
+function opnSugScrews(site, k) {
   const kind = OPN_IMPLANTS[k]?.k;
   const sc = site?.sc || [];
   const bolt = (sc.find((t) => /BOLT/.test(t)) || '4.9MM LOCKING BOLTS').replace('DISTAL ', '');
@@ -732,7 +734,6 @@ function opnApplyChange(B, t) {
   if (!imp) return false;
   if (d.if) {
     imp[d.if] = t.value;
-    if (d.if === 'implant' && t.value && t.value !== 'custom' && !imp.screws.some((s) => s.n || s.len)) imp.screws = opnDefScrews(opnSite(p), t.value);
     return true;
   }
   if (d.sf) {
@@ -757,6 +758,11 @@ function opnApplyClick(B, el, c) {
   const imp = p.implants[+d.i];
   if (!imp) return false;
   if (d.addScr !== undefined) { imp.screws.push({ type: '', n: '', len: '', at: '' }); return true; }
+  if (d.sugScr !== undefined) {
+    const sg = opnSugScrews(opnSite(p), imp.implant)[+d.sugScr];
+    if (sg) imp.screws.push({ ...sg });
+    return true;
+  }
   if (d.rmScr !== undefined) { imp.screws.splice(+d.s, 1); return true; }
   return false;
 }
@@ -841,7 +847,9 @@ function opnHTML(raw) {
             <label class="span2">Implant<select ${ia} data-if="implant">${impOptions(imp.implant || '')}</select></label>
             ${imp.implant === 'custom' ? `<label class="span2">Custom implant<input ${ia} data-if="implantCustom" value="${esc(imp.implantCustom || '')}"></label>` : ''}
             <label class="span2">Size / details (e.g. 8 HOLED, 9 X 250MM)<input ${ia} data-if="size" value="${esc(imp.size || '')}"></label>
-            <div class="span2"><div class="opn-lab">Screws / wires for this implant</div>${screws}<button type="button" class="btn small" ${ia} data-add-scr>+ Add screw / wire</button></div>
+            <div class="span2"><div class="opn-lab">Screws / wires for this implant</div>${screws}
+              <div class="opn-sug">${opnSugScrews(site, imp.implant).map((sg, k) => (imp.screws.some((x) => x.type === sg.type && (x.at || '') === (sg.at || '')) ? ''
+                : `<button type="button" class="chip" ${ia} data-sug-scr="${k}">+ ${esc(sg.type)}${sg.at ? ` (${esc(sg.at.toLowerCase())})` : ''}</button>`)).join('')}<button type="button" class="btn small" ${ia} data-add-scr>+ Add screw / wire</button></div></div>
           </div></div>`;
     };
     return `<div class="opn-proc">

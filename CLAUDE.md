@@ -80,3 +80,7 @@
 ## History of injury / illness
 - e-case sheet head: textarea data-bind="history" (c.history). The discharge summary H/O injury / illness box starts from it
   unless the discharge draft already has its own text.
+
+## Op-note builder screws
+- Implants start with NO screw rows (opnDefScrews returns []). The usual ones (opnSugScrews: nail bolts, PFN neck screws, DHS…)
+  are one-tap "+ …" chips (data-sug-scr) beside "+ Add screw / wire"; a chip disappears once that screw is added.
