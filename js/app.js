@@ -734,6 +734,70 @@ const App = (() => {
   // everyone else in admission order. Bed numbers aren't kept. The e-case sheet and OT list keep
   // their own (DOA) order.
   const wardOrderKey = (W) => 'wardOrder_' + W.kind;
+  // ---- Post-op ward: paste the names of the patients still in the ward; every other post-op case is
+  // disposed as discharged (after a check of who stays and who goes).
+  function openKeepOnly() {
+    const m = $('#modal');
+    const norm = (s) => String(s || '').toUpperCase().replace(/[^A-Z ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    const toks = (s) => norm(s).split(' ').filter((t) => t.length > 1);
+    const matches = (name, entry) => {
+      const a = norm(name);
+      const b = norm(entry);
+      if (!a || !b) return false;
+      if (a === b || a.replace(/ /g, '') === b.replace(/ /g, '')) return true;
+      const ta = toks(name);
+      const tb = toks(entry);
+      return tb.length > 0 && tb.every((t) => ta.includes(t)); // "MURUGAN" finds "MURUGAN K"
+    };
+    let entries = [];
+    const draw = () => {
+      const all = postWardCases();
+      const keep = new Set();
+      const found = entries.map((en) => {
+        const hit = all.filter((c) => matches(c.name, en));
+        hit.forEach((c) => keep.add(c.id));
+        return { en, hit };
+      });
+      const go = all.filter((c) => !keep.has(c.id));
+      const row = (c) => `<li><b>${esc(c.name)}</b> <span class="muted small">${esc([ageSex(c), c.ipNo && 'IP ' + c.ipNo, c.surgeryDate && 'operated ' + fmtDate(c.surgeryDate)].filter(Boolean).join(' · '))}</span></li>`;
+      const res = $('#ko-res', m);
+      if (!entries.length) { res.innerHTML = ''; return; }
+      res.innerHTML = `
+        <h4>Stay in the post-op ward (${keep.size})</h4>
+        <ul class="ko-list ok">${all.filter((c) => keep.has(c.id)).map(row).join('') || '<li class="muted">None</li>'}</ul>
+        ${found.some((x) => !x.hit.length) ? `<p class="ko-miss">Not found in the post-op ward: <b>${found.filter((x) => !x.hit.length).map((x) => esc(x.en)).join(', ')}</b> — check the spelling (or the case is in another ward).</p>` : ''}
+        ${found.some((x) => x.hit.length > 1) ? `<p class="muted small">More than one case matches: ${found.filter((x) => x.hit.length > 1).map((x) => `${esc(x.en)} (${x.hit.length})`).join(', ')} — all of them stay.</p>` : ''}
+        <h4>Will be discharged (${go.length})</h4>
+        <ul class="ko-list go">${go.map(row).join('') || '<li class="muted">Nobody</li>'}</ul>
+        <label>Date of discharge<input type="date" id="ko-dod" value="${todayISO()}"></label>
+        <div class="form-actions"><button type="button" class="btn primary" id="ko-go" ${go.length ? '' : 'disabled'}>Discharge ${go.length} case${go.length === 1 ? '' : 's'}</button></div>`;
+      const btn = $('#ko-go', m);
+      if (btn) btn.onclick = () => {
+        if (!confirm(`Dispose ${go.length} case${go.length === 1 ? '' : 's'} as discharged?\n\n${go.map((c) => c.name).join(', ')}`)) return;
+        const dod = $('#ko-dod', m).value || todayISO();
+        for (const c of go) Store.patch('cases', c.id, { status: 'discharged', discharge: { ...(c.discharge || {}), disposition: 'discharge', dod } });
+        toast(`${go.length} case${go.length === 1 ? '' : 's'} discharged · ${keep.size} still in the post-op ward`, 5000);
+        close();
+      };
+    };
+    m.innerHTML = `
+      <div class="sheet card form" id="ko-modal">
+        <div class="row-between"><h3>Keep only these in the post-op ward</h3><button type="button" class="icon" data-close>✕</button></div>
+        <p class="muted small">Paste or type the names of the patients still in the ward, one per line. Everyone else in the post-op ward is disposed as discharged — you see the list first.</p>
+        <textarea id="ko-names" rows="8" data-nocaps placeholder="KARUPPURAJA&#10;MADHURAJ&#10;…"></textarea>
+        <div class="form-actions"><button type="button" class="btn" id="ko-check">Check</button></div>
+        <div id="ko-res"></div>
+      </div>`;
+    m.hidden = false;
+    m.classList.add('sheet-wrap');
+    const close = () => { m.hidden = true; m.classList.remove('sheet-wrap'); m.innerHTML = ''; };
+    m.onclick = (e) => { if (e.target === m || e.target.closest('[data-close]')) close(); };
+    $('#ko-check', m).onclick = () => {
+      entries = $('#ko-names', m).value.split(/[\n,;]+/).map((x) => x.trim()).filter(Boolean);
+      draw();
+    };
+  }
+
   function wardCases(W) {
     const list = W.kind === 'post' ? postWardCases() : activeCases();
     const pos = new Map((Store.meta[wardOrderKey(W)] || []).map((id, i) => [id, i]));
@@ -1124,6 +1188,7 @@ const App = (() => {
           <h2>${post ? 'Post-op ward' : 'Pre-op ward'} <span class="muted small">${fmtDate(todayISO())}</span></h2>
           <button class="btn primary" data-layout="2">▶ Rounds mode</button>
           <button class="btn" id="print-ward">Print / PDF</button>
+          ${post ? '<button class="btn" id="keep-only">Keep only these…</button>' : ''}
         </div>
         <div class="row wa-row">
           <button class="btn small wa" id="wa-ward">WhatsApp: ward status (PDF)</button>
@@ -1174,6 +1239,8 @@ const App = (() => {
         document.addEventListener('keydown', onKey);
         W.offEsc = () => document.removeEventListener('keydown', onKey);
       }
+      const ko = $('#keep-only', el);
+      if (ko) ko.onclick = () => openKeepOnly();
       const pw = $('#print-ward', el);
       // Phones: the notebook as a PDF file (window.print is unreliable there).
       if (pw) pw.onclick = () => (PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'));

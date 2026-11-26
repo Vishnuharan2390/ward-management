@@ -76,3 +76,7 @@
 ## Dictation
 - js/voice.js (browser speech recognition, en-IN). Switched on only in the discharge summary: Voice.attach(#dc-form, { inputs: true })
   in Discharge().mount. 🎤 bottom-right of big boxes; inside one-line / short boxes left of the clear × (.mic-in).
+
+## Post-op ward: Keep only these
+- Post-op ward toolbar "Keep only these…" (openKeepOnly in js/app.js): pasted names (one per line; all words of an entry must be
+  in the case name) stay; every other post-op ward case is disposed as discharged (disposition discharge, chosen DOD) after a preview + confirm.
