@@ -88,3 +88,7 @@
 ## Back button + pull to refresh
 - js/nav-gestures.js: ‹ #back-btn in the title bar (history.back through in-app pages, sessionStorage wm.navStack; hidden on the
   start page with nothing behind it). Pull down from the top of a page (> 80px) reloads it; not in rounds mode, modals or text boxes.
+
+## Opening on the last ward
+- Opening the app (no hash / #/home) sets Home.fromStart; Home then jumps to localStorage wm.lastWard.<unitKey> (#/ward or #/postward,
+  saved whenever either is shown). Owners are not jumped (they pick a unit first). First open, or nothing saved: "Which ward?".

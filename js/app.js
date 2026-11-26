@@ -754,6 +754,7 @@ const App = (() => {
     slots.forEach((slot, k) => { full[slot] = shown[k]; });
     Store.setMeta({ [wardOrderKey(W)]: full });
   }
+  const lastWardKey = () => `wm.lastWard.${Store.unitKey || 'local'}`;
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
 
@@ -4743,7 +4744,17 @@ const App = (() => {
   const Home = {
     live: true,
     unitPicked: false, // owners: chosen on this opening of the app
+    fromStart: false, // the app was just opened (not the start page tapped later)
     render() {
+      // Opening the app: straight to the ward this phone used last (everyone but the owners, who pick a unit first).
+      if (Home.fromStart && Store.unitKnown && !(Store.mode === 'firebase' && Store.isOwner())) {
+        Home.fromStart = false;
+        const last = lsGet(lastWardKey());
+        if (/^#\/(ward|postward)$/.test(last || '')) {
+          setTimeout(() => { location.hash = last; }, 0); // a real step, so ‹ Back returns to the start page
+          return '<div class="empty">Opening…</div>';
+        }
+      }
       if (Store.mode === 'firebase' && Store.isOwner() && !Home.unitPicked) {
         return `
         <div class="home">
@@ -4893,6 +4904,7 @@ const App = (() => {
     if (!same) current = { hash: location.hash, view: resolve(), role };
     const v = current.view;
     const bs = $('.brand-sub');
+    if (/^#\/(ward|postward)$/.test(location.hash) && Store.unitKnown) lsSet(lastWardKey(), location.hash); // opened next time
     const choosingUnit = current.view === Home && Store.mode === 'firebase' && Store.isOwner() && !Home.unitPicked;
     if (bs) bs.textContent = Store.unitKnown && current.view !== Gate && !choosingUnit ? `· Ortho Unit ${Store.meta.unitId}` : '';
     // Swap in a fresh element so delegated listeners from the last render don't pile up.
@@ -5141,7 +5153,7 @@ const App = (() => {
     App.el = $('#view');
     // Opening the app: the start page, which asks which ward.
     // (only when opened fresh — the home-screen icon opens the bare address; a reload keeps its page)
-    if (!location.hash || location.hash === '#') location.replace('#/home');
+    if (!location.hash || location.hash === '#' || location.hash === '#/home') { Home.fromStart = true; location.replace('#/home'); }
     Store.subscribe(onStoreChange);
     window.addEventListener('hashchange', () => {
       current = null;
