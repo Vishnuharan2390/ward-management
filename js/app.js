@@ -415,15 +415,14 @@ const App = (() => {
     return list.map((c, i) => {
       const r = readiness(c);
       const pend = pendingList(c);
-      const d = daysSince(c.doa);
       return `
         <div class="case-row" data-cid="${c.id}">
         <div class="cc-move"><button class="icon" data-cmove="-1" ${i ? '' : 'disabled'} aria-label="Move up" title="Move up">↑</button><button class="icon" data-cmove="1" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Move down" title="Move down">↓</button></div>
         <a class="card case-card" href="#/case/${c.id}">
           <div class="row-between">
             <div>
-              <div class="cc-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span></div>
-              <div class="muted small">IP ${esc(c.ipNo || '—')}${c.ward ? ' · Ward ' + esc(c.ward) : ''} · DOA ${esc(fmtDate(c.doa))}${d != null ? ` (D${d})` : ''}${c.scheme ? ' · ' + esc(c.scheme) : ''}</div>
+              <div class="cc-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span> ${dayTag(c)}</div>
+              <div class="muted small">IP ${esc(c.ipNo || '—')}${c.ward ? ' · Ward ' + esc(c.ward) : ''} · DOA ${esc(fmtDate(c.doa))}${c.scheme ? ' · ' + esc(c.scheme) : ''}</div>
             </div>
             ${statusBadge(c.status)}
           </div>
@@ -730,6 +729,14 @@ const App = (() => {
   const isIncoming = () => false;
   const postWardCases = () => inOrder(caseList().filter((c) => c.status === 'postop' && !isIncoming(c)));
   const podOf = (c) => { const d = c.surgeryDate || c.otDate; return d ? daysSince(d) : null; };
+  // Beside the name: pre-op "D10" (days since admission), post-op "POD 3"
+  const isPostop = (c) => c.status === 'postop';
+  function dayTag(c) {
+    if (isPostop(c)) { const p = podOf(c); return p != null ? `<span class="day-tag pod">POD ${p}</span>` : ''; }
+    if (c.status === 'discharged') return '';
+    const d = c.doa ? daysSince(c.doa) : null;
+    return d != null ? `<span class="day-tag">D${d}</span>` : '';
+  }
   // Ward order (shared with the team, per ward): the bed list arranged on the ward page first, then
   // everyone else in admission order. Bed numbers aren't kept. The e-case sheet and OT list keep
   // their own (DOA) order.
@@ -847,8 +854,8 @@ const App = (() => {
       ${nav('top')}
       <div class="card rd-card${W.flip ? ` flip-${W.flip > 0 ? 'next' : 'prev'}` : ''}">
         <div class="rd-head">
-          <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''}</div>
-            <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa), post && podOf(c) != null && 'POD ' + podOf(c)].filter(Boolean).join(' · '))}</div></div>
+          <div class="rd-who"><div class="rd-name">${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span> ${dayTag(c)}${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''}</div>
+            <div class="muted small">${esc([c.ipNo && 'IP ' + c.ipNo, c.ward && 'Ward ' + c.ward, c.doa && 'DOA ' + fmtDate(c.doa)].filter(Boolean).join(' · '))}</div></div>
           <div class="rd-head-acts">
             <a class="btn small" href="#/case/${c.id}">e-Case sheet</a>
             ${caseImages(c.id).length ? `<button type="button" class="btn small" data-rd-imgs="${c.id}">🖼 Images (${caseImages(c.id).length})</button>` : '<span class="muted small">No images</span>'}
@@ -1081,9 +1088,9 @@ const App = (() => {
           <tbody>
             ${list.map((c, i) => `<tr class="${c.status === 'posted' ? 'is-posted' : ''}" data-go="${c.id}" data-nbcase="${c.id}" data-q="${esc([c.name, c.ipNo, c.ward, c.diagnosis, c.plan].join(' ').toUpperCase())}">
               <td class="nb-sno"><button class="drag-handle" data-drag aria-label="Drag to reorder" title="Drag to reorder">⠿</button><span class="nb-num">${i + 1}</span></td>
-              <td class="nb-name"><b>${esc(c.name)}</b>${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''} ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
+              <td class="nb-name"><b>${esc(c.name)}</b> ${dayTag(c)}${c.status === 'posted' ? ' <span class="posted-mark">(POSTED)</span>' : ''} ${imgIcon(c)}<div class="muted small">${esc([ageSex(c), c.ipNo, c.ward].filter(Boolean).join(' · '))}</div></td>
               <td class="nb-dx">${esc(c.diagnosis)}${post
-                ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}${podOf(c) != null ? `<span class="tag task">POD ${podOf(c)}</span>` : ''}`
+                ? `${c.procedureDone || c.plan ? `<div class="muted small">✓ ${esc(c.procedureDone || c.plan)}</div>` : ''}`
                 : `${c.plan ? `<div class="muted small">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}</td>
               <td class="nb-todo-cell">
                 <label class="nb-lab">Investigation<textarea data-nb="inv" rows="${lines(invTodoText(c))}">${esc(invTodoText(c))}</textarea></label>
@@ -1110,7 +1117,7 @@ const App = (() => {
           </thead>
           <tbody>
             ${list.map((c) => `<tr data-go="${c.id}">
-              <td><b>${esc(c.name)}</b><div class="muted small">${esc(metaLine(c))}</div></td>
+              <td><b>${esc(c.name)}</b> ${dayTag(c)}<div class="muted small">${esc(metaLine(c))}</div></td>
               <td>${esc(c.diagnosis)}<div class="muted small">▸ ${esc(c.plan)}</div></td>
               ${ALL_PARAMS.map((p) => paramCell(c, p)).join('')}
               <td>${customParams(c).map((p) => {
@@ -1794,7 +1801,6 @@ const App = (() => {
         const c = Store.cases[id];
         if (!c) return notFound();
         const r = readiness(c);
-        const d = daysSince(c.doa);
         const images = caseImages(id);
         const opinions = listOf(c.opinions);
         const tasks = listOf(c.tasks);
@@ -1802,8 +1808,8 @@ const App = (() => {
           <div class="card case-head">
             <div class="row-between">
               <div>
-                <h2>${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span></h2>
-                <div class="muted">IP ${esc(c.ipNo || '—')}${c.ward ? ' · Ward ' + esc(c.ward) : ''} · DOA ${esc(fmtDate(c.doa))}${d != null ? ` (day ${d})` : ''}</div>
+                <h2>${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span> ${dayTag(c)}</h2>
+                <div class="muted">IP ${esc(c.ipNo || '—')}${c.ward ? ' · Ward ' + esc(c.ward) : ''} · DOA ${esc(fmtDate(c.doa))}</div>
               </div>
               <select id="case-status" class="badge-select st-${esc(c.status || 'preop')}" aria-label="Case status">${opts(Object.entries(CASE_STATUS), c.status || 'preop')}</select>
             </div>

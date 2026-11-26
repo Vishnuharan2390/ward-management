@@ -122,3 +122,7 @@
 - Specialty report = the week's cases admitted OR operated (specWeek); per case: History & examination (c.history, mode, comorbid, DOA) ·
   Imaging (custom params named MRI/CT/USG/X-ray… with their latest report) · Diagnosis & plan (+ treatment if not operated), and a
   strip with procedure / implants / DOS if operated; then MRI, CT, pre-op, post-op pictures two per slide.
+
+## Day badges
+- dayTag(c) in js/app.js beside every patient name (notebook, detailed, rounds, case list, case sheet): pre-op "D10" = daysSince(DOA),
+  post-op "POD 3" = daysSince(surgeryDate || otDate). Blue pill for D, yellow for POD.

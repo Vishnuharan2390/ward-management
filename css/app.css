@@ -1886,3 +1886,8 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .ta-ctl { grid-template-columns: 1fr 4fr 1fr 1.3fr 1.6fr; }
 .ta-ctl button { font-size: .95rem; }
 .ta-ctl .ta-done { background: #ffd34d; color: #1a1a1a; }
+
+/* D10 (days since admission) / POD 3 beside a patient's name */
+.day-tag { display: inline-block; vertical-align: middle; margin-left: .3rem; padding: .05rem .45rem; border-radius: 999px; font-size: .72em; font-weight: 700;
+  letter-spacing: .02em; background: #dbe7ff; color: #13294b; white-space: nowrap; }
+.day-tag.pod { background: #ffe9a8; color: #5a3d00; }
