@@ -4576,32 +4576,23 @@ const App = (() => {
     // end the consolidation table of all the units.
     async pptx() {
       const rows = SchemeTab.summary();
-      const pres = new window.PptxGenJS();
-      pres.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
-      const NAVY = '13294B';
+      await ReportDeck.loadLogo();
+      const pres = ReportDeck.create(); // the house design shared by every unit's report
+      const NAVY = ReportDeck.C.navy;
       const range = SchemeTab.title(rows).replace(/^.*–\s*/, '');
       const U = (v) => String(v ?? '').toUpperCase();
-      const head = (slide, text, sub) => {
-        slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: NAVY } });
-        slide.addText(text, { x: 0.4, y: 0.1, w: 10, h: 0.7, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Calibri' });
-        if (sub) slide.addText(sub, { x: 8.4, y: 0.1, w: 4.55, h: 0.7, fontSize: 14, color: 'FFFFFF', align: 'right', fontFace: 'Calibri' });
-      };
+      const head = (slide, text, sub) => ReportDeck.header(pres, slide, { kicker: 'SCHEME REPORT', title: text, right: sub });
+      const addSlide = () => pres.addSlide({ masterName: 'RPT' });
       const th = (t) => ({ text: t, options: { bold: true, color: 'FFFFFF', fill: { color: NAVY }, align: 'center', valign: 'middle' } });
       const statusOf = (c) => {
         const now = c.now || c.scheme || '';
         if (c.scheme === 'VALIDATION' && now === 'APPROVED') return 'VALIDATION → APPROVED';
         return now || '—';
       };
-      // title
-      const t = pres.addSlide();
-      t.background = { color: NAVY };
-      t.addText('SCHEME REPORT', { x: 0.5, y: 2.2, w: 12.33, h: 1, fontSize: 44, bold: true, color: 'FFFFFF', align: 'center' });
-      t.addText('OPERATED CASES SCHEME STATUS — UNIT WISE', { x: 0.5, y: 3.2, w: 12.33, h: 0.6, fontSize: 20, color: 'FFD34D', align: 'center' });
-      t.addText(range, { x: 0.5, y: 3.9, w: 12.33, h: 0.6, fontSize: 20, color: 'FFFFFF', align: 'center' });
-      t.addText('Department of Orthopaedic Surgery & Traumatology\nGovt. Rajaji Hospital & Madurai Medical College', { x: 0.5, y: 5.6, w: 12.33, h: 0.9, fontSize: 14, color: 'DDDDDD', align: 'center' });
+      ReportDeck.cover(pres, { title: 'Scheme report', sub: 'OPERATED CASES SCHEME STATUS — UNIT WISE', lines: [range, 'ALL SIX UNITS'] });
       // unit by unit
       for (const r of rows) {
-        const sl = pres.addSlide();
+        const sl = addSlide();
         head(sl, `UNIT ${r.label}`, range);
         if (!r.lists) {
           sl.addText(`No OT list from Unit ${r.label} this week.`, { x: 0.5, y: 3.2, w: 12.33, h: 0.8, fontSize: 22, color: '666666', align: 'center' });
@@ -4610,24 +4601,24 @@ const App = (() => {
         const figs = [['TOTAL OPERATED', r.total], ['SCHEME APPLIED', r.applied], ['APPROVED', r.approved], ['VALIDATION ON DAY OF SURGERY', r.valDos], ['VALIDATION LATER APPROVED', r.valLater], ['DENIED', r.denied], ['NO SCHEME', r.noScheme.length]];
         figs.forEach(([label, n], i) => {
           const x = 0.4 + i * 1.79;
-          sl.addShape(pres.ShapeType.roundRect, { x, y: 1.1, w: 1.69, h: 1.15, fill: { color: i === 0 ? NAVY : 'EEF1F6' }, rectRadius: 0.08, line: { color: 'C9D1DE' } });
-          sl.addText(String(n), { x, y: 1.12, w: 1.69, h: 0.6, fontSize: 26, bold: true, align: 'center', color: i === 0 ? 'FFFFFF' : NAVY });
-          sl.addText(label, { x: x + 0.05, y: 1.7, w: 1.59, h: 0.5, fontSize: 9, align: 'center', color: i === 0 ? 'FFFFFF' : '333333' });
+          sl.addShape(pres.ShapeType.roundRect, { x, y: 1.15, w: 1.69, h: 1.15, fill: { color: i === 0 ? NAVY : 'EEF1F6' }, rectRadius: 0.08, line: { color: 'C9D1DE' } });
+          sl.addText(String(n), { x, y: 1.17, w: 1.69, h: 0.6, fontSize: 26, bold: true, align: 'center', color: i === 0 ? 'FFFFFF' : NAVY });
+          sl.addText(label, { x: x + 0.05, y: 1.75, w: 1.59, h: 0.5, fontSize: 9, align: 'center', color: i === 0 ? 'FFFFFF' : '333333' });
         });
         const body = r.cases.map((c, i) => [String(i + 1), `${U(c.name)}${c.ageSex ? ` ${c.ageSex}` : ''}`, U(c.ipNo), U(c.diagnosis), U(c.procedure), fmtDate(c.date), U(c.scheme) || '—', statusOf(c), U(c.reason)]);
         const hdr = ['S.NO', 'NAME / AGE-SEX', 'IP NO', 'DIAGNOSIS', 'PROCEDURE', 'OT DATE', 'SCHEME ON OT DAY', 'STATUS NOW', 'REASON (NO SCHEME / DENIED)'].map(th);
         const tbl = (slide, part, y) => slide.addTable([hdr, ...part], { x: 0.4, y, w: 12.53, colW: [0.5, 1.7, 0.85, 2.4, 2.2, 0.95, 1.2, 1.33, 1.4],
           fontSize: 9, fontFace: 'Calibri', valign: 'middle', border: { type: 'solid', pt: 0.5, color: '9AA5B8' } });
         // 9 cases under the figures, then 13 a slide on "(contd.)" slides
-        tbl(sl, body.slice(0, 9), 2.45);
+        tbl(sl, body.slice(0, 9), 2.5);
         for (let k = 9; k < body.length; k += 13) {
-          const more = pres.addSlide();
+          const more = addSlide();
           head(more, `UNIT ${r.label} (contd.)`, range);
-          tbl(more, body.slice(k, k + 13), 1.1);
+          tbl(more, body.slice(k, k + 13), 1.2);
         }
       }
       // consolidation of all the units
-      const c = pres.addSlide();
+      const c = addSlide();
       head(c, 'CONSOLIDATION — ALL UNITS', range);
       const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
       const line = (r) => [r.label, r.total, r.applied, r.approved, r.valDos, r.valLater, r.denied, r.noScheme.length].map(String);
@@ -4639,7 +4630,8 @@ const App = (() => {
       ], { x: 0.6, y: 1.3, w: 12.13, colW: [1.2, 1.6, 1.6, 1.4, 1.7, 1.7, 1.3, 1.63], fontSize: 14, fontFace: 'Calibri', valign: 'middle', rowH: 0.55,
         border: { type: 'solid', pt: 0.75, color: '5A6680' } });
       const missing = rows.filter((r) => !r.lists).map((r) => r.label);
-      if (missing.length) c.addText(`No OT list this week from Unit ${missing.join(', ')}.`, { x: 0.6, y: 6.7, w: 12, h: 0.4, fontSize: 11, color: '666666', italic: true });
+      if (missing.length) c.addText(`No OT list this week from Unit ${missing.join(', ')}.`, { x: 0.6, y: 6.55, w: 12, h: 0.35, fontSize: 11, color: '666666', italic: true });
+      ReportDeck.thanks(pres);
       const blob = await pres.write({ outputType: 'blob' });
       offerFile(new File([blob], SchemeTab.fileName('pptx'), { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
     },
@@ -4725,6 +4717,67 @@ const App = (() => {
   const addDays = (iso, n) => { const d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const operatedOn = (c) => c.surgeryDate || (['postop', 'discharged'].includes(c.status) || TRANSFER_DEPTS[c.status] ? c.otDate || '' : '');
   const statusWord = (c) => (c.status === 'postop' ? 'Post-op' : c.status === 'posted' ? 'Posted' : c.status === 'discharged' ? 'Discharged' : TRANSFER_DEPTS[c.status] ? TRANSFER_DEPTS[c.status].folder : 'Pre-op');
+  // ---- Specialty weekly report (same design for every unit, js/report-deck.js)
+  // The week's cases: admitted or operated Monday–Sunday, in order of date.
+  function specWeek(list, mon) {
+    const sun = addDays(mon, 6);
+    const inWk = (d) => d && d >= mon && d <= sun;
+    const when = (c) => (inWk(operatedOn(c)) ? operatedOn(c) : c.doa || '');
+    return list.filter((c) => inWk(operatedOn(c)) || inWk(c.doa)).sort((a, b) => when(a).localeCompare(when(b)) || String(a.name).localeCompare(String(b.name)));
+  }
+  const IMAGING_RE = /\bMRI\b|\bCT\b|\bUSG\b|ULTRASOUND|X-?RAY|\bNCS\b|\bEMG\b|SCAN|DOPPLER|\bPET\b|ARTHROGRAM/i;
+  async function specReport(spec, mon, list) {
+    const S = SPECIALTIES[spec];
+    const sun = addDays(mon, 6);
+    const cases = specWeek(list, mon);
+    const KINDS = [['mri', 'MRI'], ['ct', 'CT'], ['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY']];
+    const imgsOf = (c, kind) => Object.entries(c.images || {}).filter(([, i]) => i.kind === kind).sort((a, b) => (a[1].at || 0) - (b[1].at || 0)).map(([iid]) => iid);
+    await ReportDeck.loadLogo();
+    const pres = ReportDeck.create();
+    const unit = unitOf(Store.meta.unitId);
+    ReportDeck.cover(pres, {
+      title: S.report || `${S.label} report`,
+      sub: `${fmtDate(mon)} – ${fmtDate(sun)}`,
+      lines: [unit.chief ? `${stripProf(unit.chief).replace(/^(?!PROF)/i, 'PROF. ')}` : '', `ORTHO UNIT ${Store.meta.unitId} · ${cases.length} CASE${cases.length === 1 ? '' : 'S'} FROM ALL UNITS`],
+    });
+    let missing = 0;
+    for (const [i, c] of cases.entries()) {
+      const imaging = customParams(c).filter((p) => IMAGING_RE.test(p.label)).map((p) => ({ p, l: latest(c, p.k) })).filter((x) => x.l)
+        .map(({ p, l }) => ({ label: `${p.label}${l.date ? ` (${fmtDate(l.date)})` : ''}`, text: l.value }));
+      const op = operatedOn(c);
+      ReportDeck.caseSlide(pres, {
+        n: i + 1, name: c.name, ageSex: ageSex(c), unit: unitLabel(c.unit), ip: c.ipNo,
+        history: [
+          { label: 'History', text: c.history },
+          { label: 'Mode of injury', text: c.mode },
+          { label: 'Known case of', text: c.comorbid },
+          { label: 'Admitted', text: c.doa ? fmtDate(c.doa) : '' },
+        ],
+        imaging: imaging.length ? imaging : [{ label: '', text: 'NO IMAGING REPORT ENTERED' }],
+        plan: [
+          { label: 'Diagnosis', text: c.diagnosis, strong: true },
+          { label: op ? 'Plan' : 'Plan', text: c.plan },
+          { label: 'Treatment', text: !op ? c.treatment : '' },
+        ],
+        done: op ? [{ label: 'Procedure done', text: c.procedureDone || c.plan }, { label: 'Implants used', text: c.implantsUsed || c.implants }, { label: 'Date of surgery', text: fmtDate(op) }] : [],
+      });
+      for (const [kind, label] of KINDS) {
+        const images = [];
+        for (const iid of imgsOf(c, kind)) {
+          const data = await Store.getImage(iid, c.unit || undefined);
+          if (!data) { missing++; continue; }
+          const img = await new Promise((res) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = data; });
+          if (img) images.push({ data, w: img.naturalWidth, h: img.naturalHeight });
+        }
+        if (images.length) ReportDeck.imageSlides(pres, { kicker: `CASE ${i + 1} · ${label}`, title: `${ReportDeck.U(c.name)}  ${ageSex(c)}`, chip: unitLabel(c.unit), images });
+      }
+    }
+    ReportDeck.thanks(pres);
+    const blob = await pres.write({ outputType: 'blob' });
+    const name = `${(S.report || S.label).toUpperCase()} ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(sun).replace(/\//g, '-')}.pptx`;
+    return { file: new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }), missing };
+  }
+
   const SpecTab = {
     live: false,
     data: null,
@@ -4755,7 +4808,7 @@ const App = (() => {
       const mon = SpecTab.week;
       const sun = addDays(mon, 6);
       const inWards = list.filter((c) => c.status !== 'discharged').sort((a, b) => String(a.doa || '').localeCompare(String(b.doa || '')));
-      const done = list.filter((c) => { const d = operatedOn(c); return d && d >= mon && d <= sun; }).sort((a, b) => operatedOn(a).localeCompare(operatedOn(b)));
+      const done = specWeek(list, mon);
       const row = (c, week) => {
         const pre = (c.images ? Object.values(c.images) : []).filter((i) => i.kind === 'xray').length;
         const post = (c.images ? Object.values(c.images) : []).filter((i) => i.kind === 'poxray').length;
@@ -4763,7 +4816,7 @@ const App = (() => {
           <span class="tag">${esc(unitLabel(c.unit))}</span>
           <div class="spec-main"><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}</span>
             <div class="small">${esc(c.diagnosis || '')}</div>
-            <div class="muted small">${esc([c.procedureDone ? '✓ ' + c.procedureDone : c.plan ? '▸ ' + c.plan : '', week ? 'DOS ' + fmtDate(operatedOn(c)) : statusWord(c), !week && c.doa ? 'DOA ' + fmtDate(c.doa) : ''].filter(Boolean).join(' · '))}</div>
+            <div class="muted small">${esc([c.procedureDone ? '✓ ' + c.procedureDone : c.plan ? '▸ ' + c.plan : '', week && operatedOn(c) ? 'DOS ' + fmtDate(operatedOn(c)) : statusWord(c), c.doa ? 'DOA ' + fmtDate(c.doa) : ''].filter(Boolean).join(' · '))}</div>
             ${week ? `<div class="small ${pre && post ? 'muted' : 'warn-text'}">${pre ? `✓ pre-op X-ray (${pre})` : '✗ no pre-op X-ray'} · ${post ? `✓ post-op X-ray (${post})` : '✗ no post-op X-ray'}${hasText(c.implantsUsed || c.implants) ? '' : ' · no implants written'}</div>` : ''}
           </div>
           ${c.unit === Store.unitKey || !c.unit ? `<a class="btn small" href="#/case/${esc(c.id)}">Open</a>` : ''}
@@ -4779,7 +4832,7 @@ const App = (() => {
           <div class="week-pick"><button class="btn small" data-wk="-7" aria-label="Week before">‹</button>
             <b>${esc(fmtDate(mon))} – ${esc(fmtDate(sun))}</b>
             <button class="btn small" data-wk="7" aria-label="Week after" ${addDays(mon, 7) > todayISO() ? 'disabled' : ''}>›</button></div>
-          <p class="muted small">${done.length} ${S.label.toLowerCase()} case${done.length === 1 ? '' : 's'} operated in all units that week. One slide per case — name, age, sex, unit, diagnosis, procedure, implants — then the pre-op and post-op radiographs.</p>
+          <p class="muted small">${done.length} ${S.label.toLowerCase()} case${done.length === 1 ? '' : 's'} admitted or operated in all units that week. One slide per case — history, imaging reports, diagnosis &amp; plan (procedure and implants if operated) — then its MRI, CT and X-ray pictures.</p>
           ${done.map((c) => row(c, true)).join('')}
           <div class="form-actions"><button class="btn primary" id="spec-ppt" ${done.length ? '' : 'disabled'}>Download PowerPoint</button></div>
         </div>
@@ -4796,49 +4849,12 @@ const App = (() => {
       });
       const btn = $('#spec-ppt', el);
       if (btn) btn.onclick = async () => {
-        const S = SPECIALTIES[SpecTab.spec()];
-        const mon = SpecTab.week;
-        const sun = addDays(mon, 6);
-        const done = (SpecTab.data || []).filter((c) => { const d = operatedOn(c); return d && d >= mon && d <= sun; }).sort((a, b) => operatedOn(a).localeCompare(operatedOn(b)));
-        const imgsOf = (c, kind) => Object.entries(c.images || {}).filter(([, i]) => i.kind === kind).sort((a, b) => (a[1].at || 0) - (b[1].at || 0)).map(([iid]) => iid);
-        const st = {
-          noCover: true,
-          unit: Store.meta.unitId,
-          date: sun,
-          cons: {},
-          cases: done.map((c) => ({
-            id: `${c.unit}:${c.id}`,
-            title: `${S.label.toUpperCase()} CASES ${fmtDate(mon)} – ${fmtDate(sun)}`,
-            status: '',
-            rows: [
-              { k: 'NAME', v: DeckEngine.up(c.name), kb: true, vb: true },
-              { k: 'AGE / SEX', v: DeckEngine.up(ageSex(c)), vb: true },
-              { k: 'UNIT', v: unitLabel(c.unit) },
-              { k: 'DIAGNOSIS', v: DeckEngine.up(c.diagnosis), vb: true, diag: true },
-              { k: 'PROCEDURE DONE', v: DeckEngine.up(c.procedureDone || c.plan) },
-              { k: 'IMPLANTS USED', v: DeckEngine.up(c.implantsUsed || c.implants || '—') },
-              { k: 'DATE OF SURGERY', v: fmtDate(operatedOn(c)) },
-            ],
-            slides: [['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY']].map(([k, label]) => ({ id: `${c.unit}:${c.id}:${k}`, label, images: imgsOf(c, k) })).filter((x) => x.images.length),
-          })),
-        };
         btn.disabled = true;
         btn.textContent = 'Building…';
         try {
-          const imgs = {};
-          let missing = 0;
-          for (const c of done) {
-            for (const iid of [...imgsOf(c, 'xray'), ...imgsOf(c, 'poxray')]) {
-              const data = await Store.getImage(iid, c.unit || undefined);
-              if (!data) { missing++; continue; }
-              const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = data; });
-              if (img) imgs[iid] = { data, w: img.naturalWidth, h: img.naturalHeight, url: data };
-            }
-          }
-          const pres = DeckEngine.buildPptx(window.PptxGenJS, st, imgs);
-          const blob = await pres.write({ outputType: 'blob' });
-          offerFile(new File([blob], `${S.label.toUpperCase()} CASES ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(sun).replace(/\//g, '-')}.pptx`, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
-          if (missing) toast(`${missing} radiograph(s) couldn't be loaded (no network?) — the rest are in.`, 5000);
+          const { file, missing } = await specReport(SpecTab.spec(), SpecTab.week, SpecTab.data || []);
+          offerFile(file);
+          if (missing) toast(`${missing} picture(s) couldn't be loaded (no network?) — the rest are in.`, 5000);
         } catch (err) {
           console.error(err);
           toast('Could not build the PowerPoint: ' + err.message, 5000);

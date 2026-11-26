@@ -452,15 +452,15 @@ function allTodos(c) {
 // ---- Unit specialties: each specialty unit sees its cases from all six units (tab + weekly report).
 // `on`: which text decides — the plan / procedure for operations, everything for the rest.
 const SPECIALTIES = {
-  arthroplasty: { unit: 'I', label: 'Arthroplasty', on: 'plan',
+  arthroplasty: { report: 'ARTHROPLASTY REPORT', unit: 'I', label: 'Arthroplasty', on: 'plan',
     re: /HEMI\s?-?\s?ARTHROPLASTY|BIPOLAR|AUSTIN MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTHA\b|TOTAL HIP|\bTKR\b|\bTKA\b|TOTAL KNEE|ARTHROPLASTY|\bUKR\b|\bUKA\b|UNICONDYLAR KNEE|REVISION (THR|TKR|HIP|KNEE)/ },
-  arthroscopy: { unit: 'II', label: 'Arthroscopy', on: 'all',
+  arthroscopy: { report: 'SPORTS INJURY CLINIC REPORT', unit: 'II', label: 'Arthroscopy', on: 'all',
     re: /ARTHROSCOP|\bSCOPY\b|\bACL\b|\bPCL\b|CRUCIATE|MENISC|BANKART|LATARJET|ROTATOR CUFF|\bMPFL\b|\bSLAP\b|LIGAMENT RECONSTRUCTION/ },
-  tumour: { unit: 'III', label: 'Tumour', on: 'all',
+  tumour: { report: 'ORTHO-ONCOLOGY (TUMOUR) REPORT', unit: 'III', label: 'Tumour', on: 'all',
     re: /TUMOU?R|\bGCT\b|GIANT CELL|SARCOMA|CHONDROMA|EXOSTOSIS|BONE CYST|\bABC\b|\bUBC\b|METASTA|MYELOMA|OSTEOID OSTEOMA|CHONDROBLASTOMA|EWING|LIPOMA|NEOPLASM|LYTIC LESION|SPACE OCCUPYING|MEGAPROSTHESIS|EN ?BLOC|WIDE EXCISION/ },
-  spine: { unit: 'IV', label: 'Spine', on: 'all',
+  spine: { report: 'SPINE REPORT', unit: 'IV', label: 'Spine', on: 'all',
     re: /\bSPINE\b|\bSPINAL\b|VERTEBRA|\b[CDTL]\s?\d{1,2}\b|DORSOLUMBAR|THORACOLUMBAR|\bDORSAL\b|\bLUMBAR\b|BURST|PEDICLE|LAMINECTOMY|DISCECTOMY|\bPSF\b|\bTLIF\b|\bPLIF\b|\bACDF\b|SPONDYL|\bPOTT|PARAPLEGI|QUADRIPLEGI|QUADRIPARESIS|PARAPARESIS|\bIVDP\b|\bPIVD\b|CANAL STENOSIS|LISTHESIS|CORD INJURY/ },
-  paediatrics: { unit: 'V', label: 'Paediatric', on: 'all', age: 15,
+  paediatrics: { report: 'PAEDIATRIC ORTHOPAEDICS REPORT', unit: 'V', label: 'Paediatric', on: 'all', age: 15,
     re: /\bCTEV\b|CLUB ?FOOT|\bDDH\b|PERTHES|\bSCFE\b|CEREBRAL PALSY|PAEDIATRIC|PEDIATRIC/ },
 };
 // Unit VI (foot & ankle — a name only; no specialty tab) compiles the weekly scheme report from every unit's OT lists (#/scheme).

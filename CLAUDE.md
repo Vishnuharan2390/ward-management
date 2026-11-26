@@ -114,3 +114,11 @@
   arthroscopy graft failure. Breathlessness is மூச்சுத்திணறல் (never நெஞ்சுத்திணறல்).
 - Scheme report PowerPoint (SchemeTab.pptx, pptxgen LAYOUT_WIDE): title → one slide per unit (7 figure tiles + case table, 9 cases, then
   "(contd.)" slides of 13) → last slide CONSOLIDATION — ALL UNITS (same columns as the Word/PDF table, NO SCHEME as a count).
+
+## Report PowerPoints: one design (js/report-deck.js, ReportDeck)
+- Navy cover with the tree icon (title, week, professor, unit) → content slides on master "RPT" (navy header band with kicker/title/
+  unit chip, footer with department + slide number) → "THANK YOU SIR". Used by every unit's specialty report (specReport in js/app.js,
+  title from SPECIALTIES[].report, e.g. Unit II "SPORTS INJURY CLINIC REPORT") and the scheme report.
+- Specialty report = the week's cases admitted OR operated (specWeek); per case: History & examination (c.history, mode, comorbid, DOA) ·
+  Imaging (custom params named MRI/CT/USG/X-ray… with their latest report) · Diagnosis & plan (+ treatment if not operated), and a
+  strip with procedure / implants / DOS if operated; then MRI, CT, pre-op, post-op pictures two per slide.
