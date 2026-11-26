@@ -12,14 +12,14 @@ const CONSENT_LIMB_RISKS = (limb, limbTo, limbAcc) => [
   'அனைத்து முன்னெச்சரிக்கை நடவடிக்கைகளுடன் இவ்வறுவை சிகிச்சை செய்யப்பட்டாலும், மேற்குறிப்பிட்ட ஏதேனும் ஒன்று ஏற்படுமாயின் அதற்கு மருத்துவரோ மருத்துவமனை நிர்வாகமோ பொறுப்பல்ல என்பதை ஒப்புக்கொள்கிறேன்.',
 ];
 const CONSENT_SPINE_TAIL = (bone) => [
-  'மேலும், படுத்த படுக்கையாக இருப்பதால் படுக்கைப் புண் வருவதற்கு வாய்ப்புள்ளது என அறிவேன். மேலும் காலில் உள்ள இரத்த நாளங்களில் இரத்தம் கட்டிப் போகலாம் என அறிவேன். அந்தக் கட்டி உடைந்து நுரையீரலில் உள்ள இரத்தக் குழாயை அடைத்து நெஞ்சுத்திணறல், மாரடைப்பு ஏற்படலாம் என அறிவேன்.',
+  'மேலும், படுத்த படுக்கையாக இருப்பதால் படுக்கைப் புண் வருவதற்கு வாய்ப்புள்ளது என அறிவேன். மேலும் காலில் உள்ள இரத்த நாளங்களில் இரத்தம் கட்டிப் போகலாம் என அறிவேன். அந்தக் கட்டி உடைந்து நுரையீரலில் உள்ள இரத்தக் குழாயை அடைத்து மூச்சுத்திணறல், மாரடைப்பு ஏற்படலாம் என அறிவேன்.',
   `மேலும், அறுவை சிகிச்சையின் போது {SCREW} செலுத்தும் போது எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். மேலும் எலும்பில் பொருத்திய உலோகம் வளைந்து உடையவும், விலகவும் வாய்ப்புள்ளது என அறிவேன். தேவைப்பட்டால் மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`,
   'அறுவை சிகிச்சையின் போது உயிர்பிரிய வாய்ப்புள்ளது என அறிவேன்.',
   'மேலும், புண் சீழ்பிடித்தல், இரத்தத்தில் கிருமி தொற்று ஏற்படுதல், எலும்புகள் சீழ்பிடித்தல் போன்றவை ஏற்படலாம் என அறிவேன்.',
   'ஆயினும் இவ்வறுவை சிகிச்சை எனது பூரண நலன் கருதி செய்யப்படுவதால், மேற்கூறிய பின்விளைவுகள் ஏற்படுமாயின் அதற்கு மருத்துவரோ, மருத்துவமனை ஊழியரோ, நிர்வாகமோ பொறுப்பல்ல என ஒப்புக்கொள்கிறேன்.',
 ];
 const CONSENT_BLOOD_SPINE = 'மேலும், இரத்த நாளங்கள் சேதம் அடைந்து அதிக இரத்தம் இழந்து உயிரிழக்க வாய்ப்புள்ளது என அறிவேன். அதற்கு இரத்தம் ஏற்றும் நிலை வரலாம் என அறிவேன். அவ்வாறு ஏற்றும் இரத்தத்திற்கு ஒவ்வாமை ஏற்பட்டு உயிரிழக்க வாய்ப்புள்ளது என அறிவேன்.';
-const CONSENT_ANAES_SPINE = 'மேலும், மயக்க மருந்து ஒவ்வாமையால் நெஞ்சுத்திணறல், மாரடைப்பு, மேஜையில் மரணம் போன்றவை ஏற்படலாம் என அறிவேன். தேவைப்பட்டால் செயற்கை சுவாசத்தில் இருக்கும் நிலை வரலாம் என அறிவேன்.';
+const CONSENT_ANAES_SPINE = 'மேலும், மயக்க மருந்து ஒவ்வாமையால் மூச்சுத்திணறல், மாரடைப்பு, மேஜையில் மரணம் போன்றவை ஏற்படலாம் என அறிவேன். தேவைப்பட்டால் செயற்கை சுவாசத்தில் இருக்கும் நிலை வரலாம் என அறிவேன்.';
 const CONSENT_LIMB_OPEN = (limb) => `{NAME} ஆகிய எனக்கு அடிபட்டு அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எனது ${limb} எலும்பு முறிவு ஏற்பட்டுள்ளது என்று கூறினர். அதற்கு {PROC} கொண்டு அறுவை சிகிச்சை செய்து சரிசெய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.`;
 
 const CONSENT_TPLS = {
@@ -154,14 +154,51 @@ const CONSENT_EXTRA = {
   arthroplasty: 'மேலும், உலோகத்தினால் ஆன செயற்கை மூட்டு பொருத்திய பின்னர் காலின் நீளம் குறைந்தோ அல்லது கூடியோ (கால் நீள வேறுபாடு) போக வாய்ப்புள்ளது என அறிவேன். செயற்கை மூட்டு இடம் விலகுதல் (Dislocation), தளர்ந்து போதல் (Loosening), மூட்டு இறுக்கம், செயற்கை மூட்டைச் சுற்றியுள்ள எலும்பு உடைதல் போன்றவை ஏற்படலாம் என அறிவேன். கிருமி தொற்று ஏற்பட்டால் செயற்கை மூட்டை அகற்றி மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.',
   spine: (limbs) => `மேலும், தண்டுவடத்தைச் சுற்றியுள்ள சவ்வு (Dura) கிழிந்து தண்டுவட நீர் (CSF) கசிவு ஏற்படலாம் என்றும், அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை தேவைப்படலாம் என்றும் அறிவேன். மேலும் தண்டுவடம் அல்லது நரம்பு வேர்களுக்குக் காயம் ஏற்பட்டு ${limbs} செயல் இழப்பு மேலும் அதிகரிக்கவோ, புதிதாக ஏற்படவோ வாய்ப்புள்ளது என அறிவேன்.`,
 };
+// More procedure-specific risks (first two that apply, so the form stays on one page).
+const CONSENT_MORE = [
+  ['open', /COMPOUND|OPEN\s+(GRADE|FRACTURE|INJURY)|GRADE\s*(I{1,3}|[123])\s*[ABC]?\b|GUSTILO|DEBRIDEMENT/, (limbAcc) => `மேலும், திறந்த காயத்துடன் கூடிய எலும்பு முறிவு என்பதால் கிருமி தொற்று ஏற்படும் வாய்ப்பு அதிகம் என்றும், புண்ணைச் சுத்தம் செய்ய பலமுறை அறுவை சிகிச்சை (Debridement), தோல் ஒட்டுதல் (Skin graft / Flap) தேவைப்படலாம் என்றும், மிகத் தீவிரமான நிலையில் ${limbAcc} துண்டித்து அகற்றும் நிலை வரலாம் என்றும் அறிவேன்.`],
+  ['child', null, (limb) => `மேலும், எலும்பு வளர்ச்சிப் பகுதி (Growth plate) பாதிக்கப்பட்டு, வளர்ச்சியின் போது ${limb} நீளம் குறைதல் அல்லது வளைதல் (Deformity) ஏற்படலாம் என்றும், பொருத்திய கம்பிகளை அகற்ற மறு அறுவை சிகிச்சை தேவைப்படும் என்றும் அறிவேன்.`],
+  ['hip', /NECK\s+(OF\s+)?(THE\s+)?FEMUR|\bNOF\b|TROCHANTER|\bHIP\b/, (nof) => `மேலும், இடுப்பு எலும்பு முறிவினால் நீண்ட நாட்கள் படுக்கையில் இருப்பதால் காலில் இரத்தம் கட்டுதல் (DVT), நுரையீரலில் இரத்தக் கட்டி அடைப்பு, நிமோனியா, படுக்கைப் புண் போன்றவை ஏற்படலாம் என அறிவேன்.${nof ? ' மேலும் தொடை எலும்பின் தலைப் பகுதிக்கு இரத்த ஓட்டம் குறைந்து (AVN) எலும்பு அழுகவோ கூடாமல் போகவோ வாய்ப்புள்ளது என்றும், அப்போது செயற்கை மூட்டு பொருத்தும் நிலை வரலாம் என்றும் அறிவேன்.' : ''}`],
+  ['nail', /\bIMIL\b|\bILN\b|\bNAIL|\bPFN|INTERLOCK/, () => 'மேலும், உள்புறக் கம்பி பொருத்தும் போது எலும்பு மஜ்ஜையில் உள்ள கொழுப்புத் துகள்கள் இரத்தத்தில் கலந்து நுரையீரலை அடைத்து (Fat embolism) மூச்சுத்திணறல் ஏற்பட்டு உயிருக்கு ஆபத்து வரலாம் என அறிவேன். மேலும் எலும்பு சுழன்று கூடுதல் (Malrotation), கம்பி செலுத்திய இடத்தில் வலி, பூட்டு திருகாணிகள் உடைதல் போன்றவை ஏற்படலாம் என அறிவேன்.'],
+  ['exfix', /EX\s*-?\s*FIX|EXTERNAL\s+FIXAT|\bLRS\b|ILIZAROV|\bJESS\b/, () => 'மேலும், வெளிப்புறக் கம்பி பொருத்திய இடங்களில் கிருமி தொற்று (Pin tract infection), கம்பி தளர்தல் ஏற்படலாம் என்றும், அதற்குக் கம்பிகளைத் தினமும் சுத்தம் செய்து பராமரிக்க வேண்டும் என்றும், பின்னர் வேறு அறுவை சிகிச்சை தேவைப்படலாம் என்றும் அறிவேன்.'],
+  ['clavicle', /CLAVIC/, () => 'மேலும், கழுத்துப் பட்டை எலும்பின் கீழ் உள்ள பெரிய இரத்த நாளங்கள், கை நரம்புகள் (Brachial plexus) மற்றும் நுரையீரல் சேதம் அடைந்து அதிக இரத்தப் போக்கு, கை செயல் இழப்பு, நுரையீரலில் காற்றுக் கசிவு (Pneumothorax) ஏற்படலாம் என அறிவேன்.'],
+  ['armNerve', /HUMER|SUPRACONDYLAR|ELBOW|FOREARM|\bRADIUS\b|\bULNA\b|MONTEGGIA|GALEAZZI/, () => 'மேலும், அறுவை சிகிச்சையின் போது கையின் நரம்புகள் (ரேடியல், அல்நார், மீடியன் நரம்பு) சேதம் அடைந்து மணிக்கட்டு, விரல்கள் செயல் இழக்கவோ (Wrist drop) உணர்ச்சியற்றுப் போகவோ வாய்ப்புள்ளது என்றும், அது சரியாகப் பல மாதங்கள் ஆகலாம் என்றும் அறிவேன்.'],
+  ['peroneal', /PLATEAU|PROXIMAL\s+(TIBIA|FIBULA)|KNEE\s+DISLOCATION/, () => 'மேலும், முழங்காலுக்குக் கீழ் உள்ள நரம்பு (Common peroneal nerve) சேதம் அடைந்து பாதத்தைத் தூக்க இயலாமை (Foot drop) ஏற்படலாம் என அறிவேன்.'],
+  ['compartment', /TIBIA|\bLEG\b|FOREARM|BOTH\s+BONES?/, () => 'மேலும், அறுவை சிகிச்சைக்குப் பின்னர் தசைப் பகுதியில் அழுத்தம் அதிகரித்து (Compartment syndrome) இரத்த ஓட்டம் பாதிக்கப்படலாம் என்றும், அதற்கு அவசரமாகத் தோலைக் கீறி அழுத்தத்தைக் குறைக்கும் அறுவை சிகிச்சை (Fasciotomy) தேவைப்படலாம் என்றும் அறிவேன்.'],
+  ['joint', /PLATEAU|PILON|PLAFOND|INTRA[\s-]?ARTICULAR|CONDYL|DISTAL\s+(END\s+)?(OF\s+)?RADIUS|\bDER\b|COLLES|BARTON|MALLEOL|OLECRANON|PATELLA|CALCAN|ELBOW|RADIAL\s+HEAD|PROXIMAL\s+HUMERUS|SHOULDER|LISFRANC|TALUS/, () => 'மேலும், மூட்டைச் சுற்றியுள்ள எலும்பு முறிவு என்பதால் அறுவை சிகிச்சைக்குப் பின்னரும் மூட்டு இறுக்கம், மூட்டு அசைவு குறைதல், நாளடைவில் மூட்டுத் தேய்மானம் (Arthritis) ஏற்படலாம் என்றும், அதற்கு நீண்ட நாட்கள் இயன்முறை சிகிச்சை (Physiotherapy) தேவைப்படும் என்றும் அறிவேன்.'],
+  ['scope', /ARTHROSCOP|\bACL\b|\bPCL\b|MENISC|BANKART|ROTATOR\s+CUFF|LIGAMENT\s+RECONSTRUCTION|\bMPFL\b|LATARJET/, () => 'மேலும், சவ்வு / தசைநார் சீரமைப்புக்குப் பின்னர் மூட்டு இறுக்கம், மூட்டில் நீர் அல்லது இரத்தம் சேர்தல், ஒட்டிய தசைநார் தளர்தல் அல்லது மீண்டும் கிழிதல் ஏற்படலாம் என்றும், நீண்ட நாட்கள் இயன்முறை சிகிச்சை (Physiotherapy) தேவைப்படும் என்றும் அறிவேன்.'],
+  ['tumour', /TUMOU?R|\bGCT\b|GIANT\s+CELL|SARCOMA|CHONDROMA|EXOSTOSIS|BONE\s+CYST|\bABC\b|METASTA|MYELOMA|OSTEOID|EWING|LIPOMA|NEOPLASM|LYTIC|CURETTAGE|EXCISION\s+BIOPSY|WIDE\s+EXCISION|MEGAPROSTHESIS/, () => 'மேலும், கட்டியை முழுமையாக அகற்ற இயலாத நிலை வரலாம் என்றும், அகற்றிய பின்னரும் கட்டி மீண்டும் வர (Recurrence) வாய்ப்புள்ளது என்றும், அகற்றிய திசு பரிசோதனைக்கு (HPE) அனுப்பப்படும் என்றும், அதன் முடிவைப் பொறுத்து மேலும் சிகிச்சை (கீமோதெரபி / கதிர்வீச்சு / மறு அறுவை சிகிச்சை) தேவைப்படலாம் என்றும் அறிவேன்.'],
+];
+// the order they are picked in (most important first)
+const CONSENT_MORE_ORDER = ['tumour', 'open', 'child', 'hip', 'clavicle', 'nail', 'exfix', 'armNerve', 'peroneal', 'compartment', 'joint', 'scope'];
 const CONSENT_ARTHROPLASTY_RE = /ARTHROPLASTY|BIPOLAR|AUSTIN\s*MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTHA\b|\bTKR\b|\bTKA\b|\bUKR\b|TOTAL\s+(HIP|KNEE)|PROSTHE(SIS|TIC)|REPLACEMENT/;
 function consentExtras(c, kind) {
   if (consentIsExit(c)) return [];
   if (kind === 'cervical') return [CONSENT_EXTRA.spine('கைகள், கால்கள்')];
   if (kind === 'dorsolumbar') return [CONSENT_EXTRA.spine('கால்கள்')];
   const out = [];
+  const plan = String(`${c?.plan || ''} ${c?.procedureDone || ''}`).toUpperCase();
+  const all = String(`${c?.diagnosis || ''} ${plan}`).toUpperCase();
+  const arthro = CONSENT_ARTHROPLASTY_RE.test(plan);
   if (kind === 'lower' && consentPelvic(c)) out.push(CONSENT_EXTRA.pelvis);
-  if (CONSENT_ARTHROPLASTY_RE.test(String(`${c?.plan || ''} ${c?.procedureDone || ''}`).toUpperCase())) out.push(CONSENT_EXTRA.arthroplasty);
+  if (arthro) out.push(CONSENT_EXTRA.arthroplasty);
+  const upper = kind === 'upper';
+  const limb = upper ? 'கை' : 'கால்';
+  const limbAcc = upper ? 'கையைத்' : 'காலைத்';
+  const age = parseFloat(String(c?.age ?? ''));
+  const by = Object.fromEntries(CONSENT_MORE.map((x) => [x[0], x]));
+  for (const k of CONSENT_MORE_ORDER) {
+    if (out.length >= 2) break;
+    const [, re, text] = by[k];
+    if (k === 'child') { if (age < 15 && !consentPelvic(c)) out.push(text(limb)); continue; }
+    if (!re.test(all)) continue;
+    if (k === 'hip' && (kind !== 'lower' || consentPelvic(c))) continue;
+    if (k === 'nail' && arthro) continue;
+    if (k === 'armNerve' && !upper) continue;
+    if (k === 'compartment' && /HUMER|ELBOW/.test(all) && !/FOREARM|BOTH\s+BONES?/.test(all)) continue;
+    if (k === 'open' && /OPEN\s+(BOOK|REDUCTION)/.test(all) && !/COMPOUND|GRADE|GUSTILO|OPEN\s+(FRACTURE|INJURY)/.test(all)) continue;
+    out.push(k === 'open' ? text(limbAcc) : k === 'hip' ? text(/NECK\s+(OF\s+)?(THE\s+)?FEMUR|\bNOF\b/.test(all) && !arthro) : text());
+  }
   return out;
 }
 const consentPelvic = (c) => /PELVI|ACETABUL|\bILIUM\b|ILIAC WING|PUBIC RAMI|PUBIC RAMUS|SACRO\s*ILIAC|\bSI JOINT\b|SYMPHYSIS/.test(String(`${c?.diagnosis || ''} ${c?.plan || ''}`).toUpperCase());
