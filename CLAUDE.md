@@ -112,3 +112,5 @@
   hip DVT/PE/pneumonia/bedsore (+AVN for NOF fixation), nail fat embolism/malrotation, ex-fix pin tract, clavicle brachial plexus/
   pneumothorax, upper limb nerves (wrist drop), peroneal nerve (foot drop), compartment syndrome, peri-articular stiffness/arthritis,
   arthroscopy graft failure. Breathlessness is மூச்சுத்திணறல் (never நெஞ்சுத்திணறல்).
+- Scheme report PowerPoint (SchemeTab.pptx, pptxgen LAYOUT_WIDE): title → one slide per unit (7 figure tiles + case table, 9 cases, then
+  "(contd.)" slides of 13) → last slide CONSOLIDATION — ALL UNITS (same columns as the Word/PDF table, NO SCHEME as a count).

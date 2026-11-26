@@ -4488,6 +4488,7 @@ const App = (() => {
           denied: done.filter((c) => nowOf(c) === 'DENIED').length,
           noScheme,
           days: [...u.lists],
+          cases: done,
         };
         r.applied = r.total - noScheme.length;
         r.pending = done.filter((c) => !['APPROVED', 'VALIDATION', 'DENIED', 'NO SCHEME'].includes(c.scheme) && nowOf(c) !== 'DENIED' && nowOf(c) !== 'NO SCHEME');
@@ -4545,6 +4546,7 @@ const App = (() => {
           <div class="form-actions">
             <button class="btn primary" id="sch-docx" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download Word (.docx)</button>
             <button class="btn" id="sch-pdf" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download PDF</button>
+            <button class="btn" id="sch-pptx" ${rows.some((r) => r.lists) ? '' : 'disabled'}>Download PowerPoint</button>
           </div>`}
         </div>`;
     },
@@ -4569,6 +4571,77 @@ const App = (() => {
         didParseCell: (h) => { if (h.section === 'body' && h.row.index === rows.length) h.cell.styles.fontStyle = 'bold'; },
       });
       SharePdf.share(new File([d.output('blob')], SchemeTab.fileName('pdf'), { type: 'application/pdf' }));
+    },
+    // PowerPoint: a title slide, then unit by unit (its figures + every case with its scheme status), and at the
+    // end the consolidation table of all the units.
+    async pptx() {
+      const rows = SchemeTab.summary();
+      const pres = new window.PptxGenJS();
+      pres.layout = 'LAYOUT_WIDE'; // 13.33 x 7.5 in
+      const NAVY = '13294B';
+      const range = SchemeTab.title(rows).replace(/^.*–\s*/, '');
+      const U = (v) => String(v ?? '').toUpperCase();
+      const head = (slide, text, sub) => {
+        slide.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.9, fill: { color: NAVY } });
+        slide.addText(text, { x: 0.4, y: 0.1, w: 10, h: 0.7, fontSize: 24, bold: true, color: 'FFFFFF', fontFace: 'Calibri' });
+        if (sub) slide.addText(sub, { x: 8.4, y: 0.1, w: 4.55, h: 0.7, fontSize: 14, color: 'FFFFFF', align: 'right', fontFace: 'Calibri' });
+      };
+      const th = (t) => ({ text: t, options: { bold: true, color: 'FFFFFF', fill: { color: NAVY }, align: 'center', valign: 'middle' } });
+      const statusOf = (c) => {
+        const now = c.now || c.scheme || '';
+        if (c.scheme === 'VALIDATION' && now === 'APPROVED') return 'VALIDATION → APPROVED';
+        return now || '—';
+      };
+      // title
+      const t = pres.addSlide();
+      t.background = { color: NAVY };
+      t.addText('SCHEME REPORT', { x: 0.5, y: 2.2, w: 12.33, h: 1, fontSize: 44, bold: true, color: 'FFFFFF', align: 'center' });
+      t.addText('OPERATED CASES SCHEME STATUS — UNIT WISE', { x: 0.5, y: 3.2, w: 12.33, h: 0.6, fontSize: 20, color: 'FFD34D', align: 'center' });
+      t.addText(range, { x: 0.5, y: 3.9, w: 12.33, h: 0.6, fontSize: 20, color: 'FFFFFF', align: 'center' });
+      t.addText('Department of Orthopaedic Surgery & Traumatology\nGovt. Rajaji Hospital & Madurai Medical College', { x: 0.5, y: 5.6, w: 12.33, h: 0.9, fontSize: 14, color: 'DDDDDD', align: 'center' });
+      // unit by unit
+      for (const r of rows) {
+        const sl = pres.addSlide();
+        head(sl, `UNIT ${r.label}`, range);
+        if (!r.lists) {
+          sl.addText(`No OT list from Unit ${r.label} this week.`, { x: 0.5, y: 3.2, w: 12.33, h: 0.8, fontSize: 22, color: '666666', align: 'center' });
+          continue;
+        }
+        const figs = [['TOTAL OPERATED', r.total], ['SCHEME APPLIED', r.applied], ['APPROVED', r.approved], ['VALIDATION ON DAY OF SURGERY', r.valDos], ['VALIDATION LATER APPROVED', r.valLater], ['DENIED', r.denied], ['NO SCHEME', r.noScheme.length]];
+        figs.forEach(([label, n], i) => {
+          const x = 0.4 + i * 1.79;
+          sl.addShape(pres.ShapeType.roundRect, { x, y: 1.1, w: 1.69, h: 1.15, fill: { color: i === 0 ? NAVY : 'EEF1F6' }, rectRadius: 0.08, line: { color: 'C9D1DE' } });
+          sl.addText(String(n), { x, y: 1.12, w: 1.69, h: 0.6, fontSize: 26, bold: true, align: 'center', color: i === 0 ? 'FFFFFF' : NAVY });
+          sl.addText(label, { x: x + 0.05, y: 1.7, w: 1.59, h: 0.5, fontSize: 9, align: 'center', color: i === 0 ? 'FFFFFF' : '333333' });
+        });
+        const body = r.cases.map((c, i) => [String(i + 1), `${U(c.name)}${c.ageSex ? ` ${c.ageSex}` : ''}`, U(c.ipNo), U(c.diagnosis), U(c.procedure), fmtDate(c.date), U(c.scheme) || '—', statusOf(c), U(c.reason)]);
+        const hdr = ['S.NO', 'NAME / AGE-SEX', 'IP NO', 'DIAGNOSIS', 'PROCEDURE', 'OT DATE', 'SCHEME ON OT DAY', 'STATUS NOW', 'REASON (NO SCHEME / DENIED)'].map(th);
+        const tbl = (slide, part, y) => slide.addTable([hdr, ...part], { x: 0.4, y, w: 12.53, colW: [0.5, 1.7, 0.85, 2.4, 2.2, 0.95, 1.2, 1.33, 1.4],
+          fontSize: 9, fontFace: 'Calibri', valign: 'middle', border: { type: 'solid', pt: 0.5, color: '9AA5B8' } });
+        // 9 cases under the figures, then 13 a slide on "(contd.)" slides
+        tbl(sl, body.slice(0, 9), 2.45);
+        for (let k = 9; k < body.length; k += 13) {
+          const more = pres.addSlide();
+          head(more, `UNIT ${r.label} (contd.)`, range);
+          tbl(more, body.slice(k, k + 13), 1.1);
+        }
+      }
+      // consolidation of all the units
+      const c = pres.addSlide();
+      head(c, 'CONSOLIDATION — ALL UNITS', range);
+      const tot = (k) => rows.reduce((n, r) => n + r[k], 0);
+      const line = (r) => [r.label, r.total, r.applied, r.approved, r.valDos, r.valLater, r.denied, r.noScheme.length].map(String);
+      c.addTable([
+        SchemeTab.HEAD.map(th),
+        ...rows.map((r) => line(r).map((v, j) => ({ text: v, options: { align: 'center', bold: j === 0, color: r.lists ? '000000' : '999999' } }))),
+        ['TOTAL', tot('total'), tot('applied'), tot('approved'), tot('valDos'), tot('valLater'), tot('denied'), rows.reduce((n, r) => n + r.noScheme.length, 0)]
+          .map((v) => ({ text: String(v), options: { align: 'center', bold: true, fill: { color: 'FFF4CC' } } })),
+      ], { x: 0.6, y: 1.3, w: 12.13, colW: [1.2, 1.6, 1.6, 1.4, 1.7, 1.7, 1.3, 1.63], fontSize: 14, fontFace: 'Calibri', valign: 'middle', rowH: 0.55,
+        border: { type: 'solid', pt: 0.75, color: '5A6680' } });
+      const missing = rows.filter((r) => !r.lists).map((r) => r.label);
+      if (missing.length) c.addText(`No OT list this week from Unit ${missing.join(', ')}.`, { x: 0.6, y: 6.7, w: 12, h: 0.4, fontSize: 11, color: '666666', italic: true });
+      const blob = await pres.write({ outputType: 'blob' });
+      offerFile(new File([blob], SchemeTab.fileName('pptx'), { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
     },
     // A Word file in the department's layout: landscape A4, the title in the page header, one table.
     async docx() {
@@ -4607,6 +4680,8 @@ const App = (() => {
       if (p) p.onclick = () => SchemeTab.pdf();
       const w = $('#sch-docx', el);
       if (w) w.onclick = () => SchemeTab.docx().catch((err) => toast('Could not make the Word file: ' + err.message, 5000));
+      const pp = $('#sch-pptx', el);
+      if (pp) pp.onclick = () => SchemeTab.pptx().catch((err) => toast('Could not make the PowerPoint: ' + err.message, 5000));
     },
   };
   // Each unit keeps its OT lists' scheme status up to date for Unit VI: a case marked Approved after its
