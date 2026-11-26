@@ -99,3 +99,8 @@
 ## Opening on the last ward
 - Opening the app (no hash / #/home) sets Home.fromStart; Home then jumps to localStorage wm.lastWard.<unitKey> (#/ward or #/postward,
   saved whenever either is shown). Owners are not jumped (they pick a unit first). First open, or nothing saved: "Which ward?".
+
+## Consent forms: pelvis + Tamil keyboard
+- Pelvis / acetabulum cases (consentPelvic in js/consent.js) on the lower-limb form: "கால் எலும்பு" → "இடுப்பு எலும்பு".
+- OT list → Consent forms → "Check before printing": "⌨ தமிழ் keyboard" (js/ta-keys.js, TaKeys.attach) types into the name / implant /
+  fracture boxes at the cursor; the phone keyboard is held down (inputmode none) while it is open.

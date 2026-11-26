@@ -1874,3 +1874,15 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .staff-row { display: flex; gap: .4rem; align-items: center; }
 .staff-row input { flex: 1; }
 .staff > .btn { justify-self: start; }
+
+/* On-screen Tamil keyboard (js/ta-keys.js) */
+.ta-toggle { margin-left: .3rem; }
+.ta-toggle.on { background: #ffd34d; color: #1a1a1a; }
+.ta-keys { position: sticky; bottom: 0; margin-top: .6rem; padding: .3rem .2rem calc(.3rem + env(safe-area-inset-bottom)); background: #2a2c31; border-radius: .8rem; display: grid; gap: .3rem; z-index: 2; }
+.ta-row { display: grid; gap: .16rem; }
+.ta-row button { min-width: 0; height: 2.3rem; padding: 0; border: 0; border-radius: .4rem; background: #4a4d55; color: #fff; overflow: hidden;
+  font: 600 .95rem/1 'Noto Sans Tamil', system-ui, sans-serif; touch-action: manipulation; }
+.ta-row button:active { background: #6b6f79; }
+.ta-ctl { grid-template-columns: 1fr 4fr 1fr 1.3fr 1.6fr; }
+.ta-ctl button { font-size: .95rem; }
+.ta-ctl .ta-done { background: #ffd34d; color: #1a1a1a; }

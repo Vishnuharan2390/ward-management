@@ -2796,7 +2796,8 @@ const App = (() => {
         });
         pop.innerHTML = `<div class="sug-box card" role="dialog" aria-label="Check consent forms">
             <h3>Check before printing</h3>
-            <p class="muted small">Tamil spelling is a guess from the English name — correct anything wrong. Changes are kept for this patient.</p>
+            <p class="muted small">Tamil spelling is a guess from the English name — correct anything wrong. Changes are kept for this patient.
+              <button type="button" class="btn small ta-toggle" data-ta-kb>⌨ தமிழ் keyboard</button></p>
             ${cases.map((c) => { const x = g(c); return `<div class="cf-row" data-cf="${c.id}">
               <div><b>${esc(c.name)}</b> <span class="muted small">${esc(c.diagnosis || '')}</span></div>
               <label>Form<select data-cfk="consentTpl"><option value="">Auto (${esc(ConsentForm.label({ ...c, consentTpl: '' }))})</option>${opts(Object.entries(CONSENT_TPLS).map(([k, t]) => [k, t.label]), c.consentTpl || '')}</select></label>
@@ -2828,6 +2829,8 @@ const App = (() => {
           if (PhonePdf.isPhone()) PhonePdf.consents(fresh, dd); else Print.consents(fresh, dd);
         });
         document.body.appendChild(pop);
+        // on-screen Tamil keyboard for the Tamil boxes (name, implant, fracture)
+        TaKeys.attach($('.sug-box', pop), '[data-cfk="nameTa"], [data-cfk="consentImplant"], [data-cfk="exitBone"]', $('[data-ta-kb]', pop));
       };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();

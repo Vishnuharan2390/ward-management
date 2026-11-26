@@ -148,6 +148,7 @@ const CONSENT_RE = {
   upper: /CLAVICLE|SHOULDER|HUMER|ELBOW|OLECRANON|CORONOID|RADIUS|RADIAL|ULNA|FOREARM|WRIST|SCAPHOID|CARPAL|METACARPAL|HAND|FINGER|THUMB|MONTEGGIA|GALEAZZI|COLLES|SMITH|BARTON|SCAPULA|ACROMIO|\bAC JOINT|BENNETT|BOXER|UPPER LIMB|\bBBFA\b|\bDER\b|SUPRACONDYLAR HUMER/,
   lower: /FEMUR|FEMORAL|\bNOF\b|TROCHANTER|\bHIP\b|ACETABUL|PELVI|TIBIA|TIBIAL|FIBULA|PLATEAU|PILON|PLAFOND|KNEE|PATELLA|ANKLE|MALLEOL|BIMALLEOLAR|TRIMALLEOLAR|FOOT|CALCAN|TALUS|TALAR|LISFRANC|METATARSAL|\bTOE|\bLEG\b|LOWER LIMB|\bBBFL\b/,
 };
+const consentPelvic = (c) => /PELVI|ACETABUL|\bILIUM\b|ILIAC WING|PUBIC RAMI|PUBIC RAMUS|SACRO\s*ILIAC|\bSI JOINT\b|SYMPHYSIS/.test(String(`${c?.diagnosis || ''} ${c?.plan || ''}`).toUpperCase());
 function consentKind(c) {
   if (c && CONSENT_TPLS[c.consentTpl]) return c.consentTpl;
   for (const text of [c?.diagnosis, c?.plan]) {
@@ -421,7 +422,10 @@ const ConsentForm = (() => {
       return (tk.blank ? tk.blank * MM + (tk.t ? g.measureText(tk.t).width : 0) : g.measureText(tk.t).width);
     };
     const exit = consentIsExit(c);
-    const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN(consentExitFracture(c)) : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t));
+    // Pelvis / acetabulum: "இடுப்பு எலும்பு" (hip bone) where the lower limb form says "கால் எலும்பு"
+    const pelvic = consentKind(c) === 'lower' && consentPelvic(c);
+    const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN(consentExitFracture(c)) : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t))
+      .map((t) => (pelvic ? t.replace(/கால் எலும்பு/g, 'இடுப்பு எலும்பு') : t));
     const minor = consentMinor(c);
     for (const p0 of paras) {
       const p = minor ? consentForChild(p0, c.sex) : p0;
