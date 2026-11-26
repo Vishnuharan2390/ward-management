@@ -84,3 +84,7 @@
 ## Op-note builder screws
 - Implants start with NO screw rows (opnDefScrews returns []). The usual ones (opnSugScrews: nail bolts, PFN neck screws, DHS…)
   are one-tap "+ …" chips (data-sug-scr) beside "+ Add screw / wire"; a chip disappears once that screw is added.
+
+## Back button + pull to refresh
+- js/nav-gestures.js: ‹ #back-btn in the title bar (history.back through in-app pages, sessionStorage wm.navStack; hidden on the
+  start page with nothing behind it). Pull down from the top of a page (> 80px) reloads it; not in rounds mode, modals or text boxes.
