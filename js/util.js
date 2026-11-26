@@ -68,7 +68,8 @@ function toast(msg, ms = 2200) {
 }
 
 // Downscale a photo so it fits comfortably in a single database document.
-async function compressImage(file, max = 1600, quality = 0.8) {
+// 1280 px at 75% keeps radiographs sharp on a phone and a slide, at about half the size of 1600 px / 80%.
+async function compressImage(file, max = 1280, quality = 0.75) {
   const src = URL.createObjectURL(file);
   try {
     const img = await new Promise((res, rej) => {

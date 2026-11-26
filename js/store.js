@@ -492,6 +492,43 @@ const Store = (() => {
     return out;
   }
 
+  // ---- Records: a receipt for every document generated (its frozen inputs), so it can be rebuilt later ----
+  const REC_LS = LS + 'records';
+  const recLocal = () => { try { return JSON.parse(localStorage.getItem(REC_LS)) || {}; } catch { return {}; } };
+  async function addRecord(rec) {
+    const id = rec.id || uid(); // the same document made again the same day replaces its record
+    const doc = { ...rec, id, at: Date.now(), by: who(), unit: fb ? fb.unit : '' };
+    if (!fb) {
+      const all = recLocal();
+      all[id] = doc;
+      try { localStorage.setItem(REC_LS, JSON.stringify(all)); } catch { /* full */ }
+      return doc;
+    }
+    await fb.fsM.setDoc(ref('records', id), doc);
+    return doc;
+  }
+  // records dated from..to (YYYY-MM-DD) of the given units (default: this unit)
+  async function records(from, to, units) {
+    if (!fb) return Object.values(recLocal()).filter((r) => r.date >= from && r.date <= to);
+    const out = [];
+    const failed = [];
+    await Promise.all((units || [fb.unit]).map(async (u) => {
+      try {
+        const q = fb.fsM.query(fb.fsM.collection(fb.db, 'units', u, 'records'), fb.fsM.where('date', '>=', from), fb.fsM.where('date', '<=', to));
+        (await fb.fsM.getDocs(q)).forEach((d) => out.push({ ...d.data(), id: d.id, unit: u }));
+      } catch (e) { failed.push(u); console.warn('records', u, e.code || e); }
+    }));
+    out.failed = failed;
+    return out;
+  }
+  async function caseRecords(caseId) {
+    if (!fb) return Object.values(recLocal()).filter((r) => (r.caseIds || []).includes(caseId));
+    const q = fb.fsM.query(fb.fsM.collection(fb.db, 'units', fb.unit, 'records'), fb.fsM.where('caseIds', 'array-contains', caseId));
+    const out = [];
+    (await fb.fsM.getDocs(q)).forEach((d) => out.push({ ...d.data(), id: d.id, unit: fb.unit }));
+    return out;
+  }
+
   // ---- every case of the given units (owners: all six, for the department census) ----
   async function unitsCases(units = UNIT_KEYS) {
     if (!fb) return Object.entries(state.cases).map(([id, c]) => ({ id, unit: '', ...c }));
@@ -674,7 +711,7 @@ const Store = (() => {
     saveOffline, pruneOffline,
     loadSaved,
     isSaved: (id) => !fb || !!savedIds?.has(id),
-    addMember, removeMember, setAdmin, setRole, specCases, unitsCases, saveSchemeReport, schemeReports, mySchemeReports,
+    addMember, removeMember, setAdmin, setRole, specCases, unitsCases, addRecord, records, caseRecords, saveSchemeReport, schemeReports, mySchemeReports,
     exportAll, importAll,
   };
 })();

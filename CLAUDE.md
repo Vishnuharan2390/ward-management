@@ -134,3 +134,12 @@
 - Analytics below the census (js/census-more.js, CensusMore.sections → page, PDF, PowerPoint): delay to surgery (+ factors with/
   without), OT efficiency (otDate vs surgery date), surgeon/PG logbook (+ CSV per case), implant usage, antibiogram (pus C/S), outcomes,
   scheme performance, epidemiology, bed use, comorbidity & labs, documentation audit.
+
+## Records (option A) — #/records, "Documents" card on the case sheet
+- keepRecord(type, {key, title, cases, args, live}) in js/app.js at every generator: discharge, dcimages, dcppt, otlist (recOt: print /
+  WhatsApp / bot / email), consents, otxray, admdeck, postopdeck, ward, pending; reports with live:true (scheme, census, logbook, spec).
+- Store.addRecord → units/<unit>/records/<type>_<date>_<key> (same doc made again that day replaces it); args = JSON of the frozen
+  inputs (case objects as they were, settings); >850 KB → tooBig, not kept. Store.records(from,to,units) / caseRecords(caseId).
+- REBUILD[type](args) replays the same generator (rebuilding=true stops a second record). Pictures come from the frozen image ids.
+  Existing rules (units/{unit}/{coll}) already cover records — no rules change.
+- Photos: compressImage default 1280 px, JPEG 75% (was 1600 / 80%).

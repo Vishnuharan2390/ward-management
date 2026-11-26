@@ -1197,12 +1197,13 @@ const App = (() => {
       }
       const pw = $('#print-ward', el);
       // Phones: the notebook as a PDF file (window.print is unreliable there).
-      if (pw) pw.onclick = () => (PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'));
+      const recWard = (kind) => { const cs = wardCases(W); keepRecord(kind, { key: post ? 'post' : 'pre', title: `${post ? 'Post-op' : 'Pre-op'} ward — ${kind === 'pending' ? 'pending works' : 'status'}`, cases: cs, args: [cs, Store.meta, post] }); };
+      if (pw) pw.onclick = () => { recWard('ward'); return PhonePdf.isPhone() ? SharePdf.ward(wardCases(W), Store.meta, post) : Print.wardBoard(wardCases(W), Store.meta, post ? 'POST-OP WARD' : 'PRE-OP WARD'); };
       // Sent as PDF files (share sheet → WhatsApp). Built straight from the tap, as Safari requires.
       const waW = $('#wa-ward', el);
-      if (waW) waW.onclick = () => SharePdf.ward(wardCases(W), Store.meta, post);
+      if (waW) waW.onclick = () => { recWard('ward'); SharePdf.ward(wardCases(W), Store.meta, post); };
       const waP = $('#wa-pending', el);
-      if (waP) waP.onclick = () => SharePdf.pending(wardCases(W), Store.meta, post);
+      if (waP) waP.onclick = () => { recWard('pending'); SharePdf.pending(wardCases(W), Store.meta, post); };
       // Rounds: go to the previous / next patient (saving the box being typed in first).
       const goRound = (id) => {
         document.activeElement?.blur?.();
@@ -1920,6 +1921,11 @@ const App = (() => {
             </div>
           </section>
 
+          <section class="card case-docs" id="case-docs">
+            <h3>Documents <span class="muted small">made for this patient — tap to get the file again</span></h3>
+            <div class="muted small" data-docs>Loading…</div>
+          </section>
+
           <section class="card">
             <h3>Radiographs & wound pictures</h3>
             <div class="img-adders">${IMAGE_KINDS.map((k) => `<label class="btn small">+ ${esc(k.label)}<input type="file" accept="image/*" multiple data-upload="${k.k}" hidden></label>`).join('')}</div>
@@ -1989,6 +1995,20 @@ const App = (() => {
           } else if (t.dataset.cmo !== undefined) cmSave(cm, t.value.trim().toUpperCase());
         });
         // Op-note builder: every choice is saved on the case (opBuild) and fills what follows.
+        // Documents made for this patient (Records)
+        const docsBox = $('[data-docs]', el);
+        let docs = [];
+        if (docsBox) {
+          cachedCaseRecords(id).then((list) => {
+            docs = list.sort((a, b) => (b.at || 0) - (a.at || 0));
+            docsBox.outerHTML = docs.length ? `<div data-docs>${docs.map((r) => recRow(r, false)).join('')}</div>` : '<p class="muted small" data-docs>None yet. Discharge summaries, consents, OT lists and PowerPoints made from now on appear here.</p>';
+          }).catch(() => { docsBox.textContent = 'Couldn\'t load the documents (no network?).'; });
+          $('#case-docs', el).addEventListener('click', (e) => {
+            const b = e.target.closest('[data-rec]');
+            const r = b && docs.find((x) => x.id === b.dataset.rec);
+            if (r) rebuildRecord(r);
+          });
+        }
         // Surgeons / assistant surgeons: + adds a box, ✕ removes one; every change saves the whole list.
         el.addEventListener('click', (e) => {
           const add = e.target.closest('[data-staff-add]');
@@ -2745,11 +2765,12 @@ const App = (() => {
         // A real PDF file, not the print dialog: iPhone ignores window.print(), and the print dialog
         // adds the web-address strip (Safari even with zero margins). Phone: share sheet;
         // computer: opens in a new tab to print or save.
+        recOt(cases, dd);
         SharePdf.otOpen(cases, dd, twice);
       };
       $('#ot-go', el).onclick = () => generate(false);
       $('#ot-go2', el).onclick = () => generate(true);
-      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); sendScheme(cases, dd); SharePdf.ot(cases, dd); };
+      $('#ot-wa', el).onclick = () => { const [cases, dd] = build(); sendScheme(cases, dd); recOt(cases, dd); SharePdf.ot(cases, dd); };
       // The unit's WhatsApp bot sends the PDF to the OT contacts in Settings.
       const waBot = $('#ot-wa-bot', el);
       // One tap: the share sheet first (iPhone only opens it straight from a tap) to pick the group,
@@ -2758,6 +2779,7 @@ const App = (() => {
         const nums = otWaNumbers();
         const [cases, dd] = build();
         sendScheme(cases, dd);
+        recOt(cases, dd);
         const file = SharePdf.otPdf(cases, dd);
         await SharePdf.share(file);
         if (!confirm(`Also send it from the unit's WhatsApp bot to the ${nums.length} OT contact${nums.length === 1 ? '' : 's'}?\n\n${nums.join('\n')}`)) return;
@@ -2786,6 +2808,7 @@ const App = (() => {
         if (!to) return toast('Add the OT list email address in Settings first', 4000);
         const [cases, dd] = build();
         sendScheme(cases, dd);
+        recOt(cases, dd);
         SharePdf.otEmail(cases, dd, to);
       };
       // Phones get a real PDF file (window.print is unreliable there); computers keep the print dialog.
@@ -2832,6 +2855,7 @@ const App = (() => {
           });
           pop.remove();
           const [fresh, dd] = build();
+          keepRecord('consents', { key: dd.date, title: `Consent forms — OT ${fmtDate(dd.date)}`, cases: fresh, args: [fresh, dd] });
           if (PhonePdf.isPhone()) PhonePdf.consents(fresh, dd); else Print.consents(fresh, dd);
         });
         document.body.appendChild(pop);
@@ -2841,21 +2865,8 @@ const App = (() => {
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
         toast('Collecting X-rays, CT and MRI…', 8000);
-        const KINDS = [['xray', 'PRE-OP X-RAY', 3], ['ct', 'CT', 1], ['mri', 'MRI', 1]];
-        const items = [];
-        const none = [];
-        for (const [i, c] of cases.entries()) {
-          const sections = [];
-          for (const [k, title, per] of KINDS) {
-            const images = (await Promise.all(caseImages(c.id, k).map((im) => Store.getImage(im.id)))).filter(Boolean);
-            if (images.length) sections.push({ title, images, per });
-          }
-          if (sections.length) items.push({ c, n: i + 1, sections });
-          else none.push(c.name || 'Unnamed');
-        }
-        if (!items.length) return toast('None of these cases has a pre-op X-ray, CT or MRI uploaded yet.', 4000);
-        toast(none.length ? `No pre-op imaging for: ${none.join(', ')} — left out.` : 'Ready', none.length ? 6000 : 1500);
-        if (PhonePdf.isPhone()) PhonePdf.otXrays(items, dd); else Print.otXrays(items, dd);
+        keepRecord('otxray', { key: dd.date, title: `OT list X-rays — ${fmtDate(dd.date)}`, cases, args: [cases, dd] });
+        await otXrays(cases, dd);
       };
     },
   };
@@ -3173,12 +3184,9 @@ const App = (() => {
         btn.textContent = 'Building…';
         try {
           const st = deckState(date, deckCfg(date));
-          await loadDeckImages(st);
-          const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
-          const blob = await pres.write({ outputType: 'blob' });
           const name = `ORTHO_UNIT_${st.unit}_${fmtDate(date).replace(/\//g, '_')}.pptx`;
-          const file = new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
-          offerFile(file);
+          keepRecord('admdeck', { key: date, title: `Admission day PPT — ${fmtDate(date)}`, cases: st.cases, args: [st, name] });
+          await deckFile(st, name);
         } catch (err) {
           console.error(err);
           toast('Could not build the PowerPoint: ' + err.message, 5000);
@@ -3317,11 +3325,9 @@ const App = (() => {
         btn.textContent = 'Building…';
         try {
           const st = postopState(ids());
-          await loadDeckImages(st);
-          const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
-          const blob = await pres.write({ outputType: 'blob' });
           const name = `POST_OP_CASES_UNIT_${st.unit}_${fmtDate(todayISO()).replace(/\//g, '_')}.pptx`;
-          offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+          keepRecord('postopdeck', { key: todayISO(), title: `Post-op PPT — ${st.cases.length} case${st.cases.length === 1 ? '' : 's'}`, cases: st.cases, args: [st, name] });
+          await deckFile(st, name);
         } catch (err) {
           console.error(err);
           toast('Could not build the PowerPoint: ' + err.message, 5000);
@@ -3334,6 +3340,192 @@ const App = (() => {
   };
 
   // Phones need a fresh tap for Save / Share, so ask in a small sheet.
+  // ---------------------------------------------------------------- Records (option A)
+  // Every document made leaves a receipt: its frozen inputs (the case data as it was, the settings). Tapping the
+  // receipt on the Records page rebuilds the same file. Reports (scheme, census, specialty, logbook) keep only
+  // their period and settings and are rebuilt from the data as it is then ("live").
+  const REC_TYPES = {
+    discharge: 'Discharge summary', dcimages: 'Discharge X-rays', dcppt: 'Discharge PowerPoint', otlist: 'OT list', consents: 'Consent forms',
+    otxray: 'OT list X-rays', admdeck: 'Admission day PPT', postopdeck: 'Post-op PPT', ward: 'Ward status', pending: 'Pending works',
+    spec: 'Specialty report', scheme: 'Scheme report', census: 'Census', logbook: 'Logbook',
+  };
+  let rebuilding = false;
+  function keepRecord(type, { key, title, cases = [], args, live = false }) {
+    if (rebuilding) return;
+    try {
+      const json = JSON.stringify(args ?? null);
+      const date = todayISO();
+      const big = json.length > 850000; // a database record holds up to 1 MB
+      Store.addRecord({
+        id: `${type}_${date}_${String(key ?? title).replace(/[^A-Za-z0-9]+/g, '_').slice(0, 80)}`,
+        type, title, date, live, tooBig: big, args: big ? '' : json,
+        caseIds: [...new Set(cases.map((c) => c.id).filter(Boolean))].slice(0, 200),
+        names: cases.map((c) => c.name).filter(Boolean).join(', ').slice(0, 600),
+        ips: cases.map((c) => c.ipNo).filter(Boolean).join(' ').slice(0, 300),
+      }).then(() => { Records.list = null; cases.forEach((c) => caseDocsCache.delete(c.id)); }).catch((e) => console.warn('record', e));
+    } catch (e) { console.warn('record', e); }
+  }
+  // a patient's documents, kept for a minute (the case page redraws often)
+  const caseDocsCache = new Map();
+  function cachedCaseRecords(id) {
+    const hit = caseDocsCache.get(id);
+    if (hit && Date.now() - hit.t < 60000) return hit.p;
+    const p = Store.caseRecords(id);
+    caseDocsCache.set(id, { t: Date.now(), p });
+    p.catch(() => caseDocsCache.delete(id));
+    return p;
+  }
+  const recOt = (cases, dd) => keepRecord('otlist', { key: dd.date, title: `OT list — ${fmtDate(dd.date)}`, cases, args: [cases, dd] });
+  // the pictures a (frozen) case had, of one kind, oldest first
+  const frozenImgs = (c, kind) => listOf(c.images).filter((i) => i.kind === kind).map((i) => i.id);
+  async function otXrays(cases, dd) {
+    const KINDS = [['xray', 'PRE-OP X-RAY', 3], ['ct', 'CT', 1], ['mri', 'MRI', 1]];
+    const items = [];
+    const none = [];
+    for (const [i, c] of cases.entries()) {
+      const sections = [];
+      for (const [k, title, per] of KINDS) {
+        const images = (await Promise.all(frozenImgs(c, k).map((iid) => Store.getImage(iid)))).filter(Boolean);
+        if (images.length) sections.push({ title, images, per });
+      }
+      if (sections.length) items.push({ c, n: i + 1, sections });
+      else none.push(c.name || 'Unnamed');
+    }
+    if (!items.length) return toast('None of these cases has a pre-op X-ray, CT or MRI uploaded.', 4000);
+    toast(none.length ? `No pre-op imaging for: ${none.join(', ')} — left out.` : 'Ready', none.length ? 6000 : 1500);
+    if (PhonePdf.isPhone()) PhonePdf.otXrays(items, dd); else Print.otXrays(items, dd);
+  }
+  async function deckFile(st, name) {
+    await loadDeckImages(st);
+    const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
+    const blob = await pres.write({ outputType: 'blob' });
+    offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+  }
+  // the discharge PowerPoint: slides + the discharge summary a page per slide (the uploaded PDF if there was one)
+  async function dischargeDeck(st0, cc, d, meta, upId) {
+    const st = { ...st0 };
+    await loadDeckImages(st);
+    const upUrl = upId && await Store.getImage(upId);
+    if (upUrl) {
+      const doc = await DcImport.open(await (await fetch(upUrl)).blob());
+      const pages = await DcImport.pageImages(doc);
+      st.pages = pages.map((pg) => pg.data);
+      st.pageAspect = pages[0]?.aspect || DcPages.ASPECT;
+    } else {
+      st.pages = await DcPages.render(cc, d, meta);
+      st.pageAspect = DcPages.ASPECT;
+    }
+    const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
+    const blob = await pres.write({ outputType: 'blob' });
+    // NAME_AGE-SEX_IPNO.pptx — a "/" isn't allowed in file names, so 26/M is written 26-M.
+    const part = (x) => DeckEngine.up(x).replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    const name = [part(cc.name) || 'PATIENT', [cc.age, cc.sex].map((x) => part(x)).filter(Boolean).join('-'), part(cc.ipNo)].filter(Boolean).join('_') + '.pptx';
+    offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+  }
+  // Rebuild a record: the same generator, fed the frozen inputs
+  const REBUILD = {
+    discharge: ([c, d, meta]) => (PhonePdf.isPhone() ? PhonePdf.discharge(c, d, meta) : Print.discharge(c, d, meta)),
+    dcimages: async ([c, d, meta]) => {
+      const sections = [];
+      for (const [k, title] of [['xray', 'PRE-OP X-RAY'], ['poxray', 'POST-OP X-RAY'], ['powound', 'POST-OP WOUND PIC']]) {
+        const images = (await Promise.all(frozenImgs(c, k).map((iid) => Store.getImage(iid)))).filter(Boolean);
+        if (images.length) sections.push({ title, images });
+      }
+      if (!sections.length) return toast('Those pictures are no longer there.', 4000);
+      if (PhonePdf.isPhone()) PhonePdf.radiographs(c, d, sections, meta); else Print.imagesPdf(c, d, sections, meta);
+    },
+    dcppt: ([st, cc, d, meta, upId]) => dischargeDeck(st, cc, d, meta, upId),
+    otlist: ([cases, dd]) => SharePdf.share(SharePdf.otPdf(cases, dd)),
+    consents: ([cases, dd]) => (PhonePdf.isPhone() ? PhonePdf.consents(cases, dd) : Print.consents(cases, dd)),
+    otxray: ([cases, dd]) => otXrays(cases, dd),
+    admdeck: ([st, name]) => deckFile(st, name),
+    postopdeck: ([st, name]) => deckFile(st, name),
+    ward: ([cases, meta, post]) => (PhonePdf.isPhone() ? SharePdf.ward(cases, meta, post) : Print.wardBoard(cases, meta, post ? 'POST-OP WARD' : 'PRE-OP WARD')),
+    pending: ([cases, meta, post]) => SharePdf.pending(cases, meta, post),
+    scheme: async ([week, fmt]) => { SchemeTab.week = week; await SchemeTab.load(); return SchemeTab[fmt](); },
+    spec: async ([spec, week]) => { SpecTab.week = week; await SpecTab.load(); const { file } = await specReport(spec, week, SpecTab.data || []); offerFile(file); },
+    census: async ([mode, anchor, scope, fmt]) => {
+      Object.assign(Census, { mode, anchor, scope });
+      if (scope === 'all' && Census.owner()) Census.all = await Store.unitsCases();
+      return fmt === 'pdf' ? Census.pdf() : fmt === 'ppt' ? Census.ppt() : Census.csv();
+    },
+    logbook: async ([mode, anchor, scope]) => {
+      Object.assign(Census, { mode, anchor, scope });
+      if (scope === 'all' && Census.owner()) Census.all = await Store.unitsCases();
+      Census.logbook();
+    },
+  };
+  async function rebuildRecord(r) {
+    if (r.tooBig || !r.args) return toast('This one was too large to keep a copy of — make it again from its page.', 5000);
+    const fn = REBUILD[r.type];
+    if (!fn) return toast('This kind of document can\'t be rebuilt yet.', 4000);
+    toast(`Rebuilding ${REC_TYPES[r.type] || 'document'}…`, 6000);
+    rebuilding = true;
+    try { await fn(JSON.parse(r.args)); } catch (e) { console.error(e); toast('Could not rebuild it: ' + e.message, 6000); } finally { rebuilding = false; }
+  }
+  const recRow = (r, unitTag) => `<div class="rec-row">
+      <div class="rec-main"><b>${esc(r.title || REC_TYPES[r.type] || r.type)}</b>
+        <div class="muted small">${esc([fmtDate(r.date), new Date(r.at || 0).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), r.by, unitTag ? unitLabel(r.unit) : ''].filter(Boolean).join(' · '))}</div>
+        ${r.names && r.type !== 'discharge' && r.type !== 'dcimages' && r.type !== 'dcppt' ? `<div class="small rec-names">${esc(r.names)}</div>` : ''}
+        ${r.live ? '<div class="muted small">Rebuilt from the data as it is now</div>' : ''}</div>
+      <button class="btn small primary" data-rec="${esc(r.id)}" data-rec-unit="${esc(r.unit || '')}">Rebuild</button></div>`;
+
+  const Records = {
+    live: false,
+    list: null,
+    loaded: false,
+    from: '',
+    to: '',
+    type: '',
+    q: '',
+    all: false,
+    async load() {
+      Records.loading = true;
+      try { Records.list = await Store.records(Records.from, Records.to, Records.all && Store.mode === 'firebase' && Store.isOwner() ? Store.unitKeys : undefined); } catch (e) { Records.list = []; Records.list.failed = ['all']; }
+      Records.loading = false;
+      Records.loaded = true;
+      if (/^#\/records/.test(location.hash)) { current = null; render(); }
+    },
+    render() {
+      Records.to ||= todayISO();
+      Records.from ||= addDays(todayISO(), -30);
+      if (!Records.list && !Records.loading) setTimeout(Records.load, 0);
+      const q = Records.q.trim().toUpperCase();
+      const rows = (Records.list || []).filter((r) => (!Records.type || r.type === Records.type) && (!q || `${r.title} ${r.names} ${r.ips}`.toUpperCase().includes(q)))
+        .sort((a, b) => (b.at || 0) - (a.at || 0));
+      const owner = Store.mode === 'firebase' && Store.isOwner();
+      return `
+        <div class="toolbar"><h2>Records <span class="muted small">every document made in Callus</span></h2></div>
+        <div class="card form rec-filters">
+          <label>From<input type="date" id="rec-from" value="${esc(Records.from)}"></label>
+          <label>To<input type="date" id="rec-to" value="${esc(Records.to)}"></label>
+          <label>Type<select id="rec-type"><option value="">All documents</option>${opts(Object.entries(REC_TYPES), Records.type)}</select></label>
+          <label>Search<input type="search" id="rec-q" value="${esc(Records.q)}" placeholder="Patient name or IP no."></label>
+          ${owner ? `<label class="small rec-all"><input type="checkbox" id="rec-all" ${Records.all ? 'checked' : ''}> All six units</label>` : ''}
+        </div>
+        ${Records.list?.failed?.length ? '<p class="notice small">Couldn\'t read some units\' records — no network?</p>' : ''}
+        <div class="card">
+          ${Records.loading && !Records.list ? '<p class="muted">Loading…</p>' : rows.length ? `<p class="muted small">${rows.length} document${rows.length === 1 ? '' : 's'}. Tap Rebuild to get the file again — patient documents come back exactly as they were made.</p>${rows.map((r) => recRow(r, Records.all)).join('')}`
+    : '<p class="empty">No documents in these dates yet. Every discharge summary, OT list, consent, PowerPoint and report made from now on is listed here.</p>'}
+        </div>`;
+    },
+    mount(el) {
+      const reload = () => { Records.list = null; render(); };
+      $('#rec-from', el).onchange = (e) => { Records.from = e.target.value || addDays(todayISO(), -30); reload(); };
+      $('#rec-to', el).onchange = (e) => { Records.to = e.target.value || todayISO(); reload(); };
+      $('#rec-type', el).onchange = (e) => { Records.type = e.target.value; render(); };
+      $('#rec-q', el).oninput = (e) => { Records.q = e.target.value; clearTimeout(Records.t); Records.t = setTimeout(() => { render(); const i = $('#rec-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 350); };
+      const all = $('#rec-all', el);
+      if (all) all.onchange = () => { Records.all = all.checked; reload(); };
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-rec]');
+        if (!b) return;
+        const r = (Records.list || []).find((x) => x.id === b.dataset.rec && (x.unit || '') === b.dataset.recUnit);
+        if (r) rebuildRecord(r);
+      });
+    },
+  };
+
   function offerFile(file) {
     const saveIt = () => {
       const a = document.createElement('a');
@@ -3764,6 +3956,7 @@ const App = (() => {
             if (st === 'postop' && c().status !== 'postop') transferToPostop(id);
             else if (c().status !== st) Store.patch('cases', id, { status: st });
           }
+          keepRecord('discharge', { key: id, title: `Discharge summary — ${c().name || ''}`, cases: [{ id, ...c() }], args: [{ id, ...c() }, d, Store.meta] });
           if (PhonePdf.isPhone()) PhonePdf.discharge(c(), d, Store.meta);
           else Print.discharge(c(), d, Store.meta);
         };
@@ -3799,6 +3992,7 @@ const App = (() => {
           if (!sections.length) return toast('No pre-op X-ray, post-op X-ray or post-op wound pic uploaded yet.', 4000);
           const missing = ['PRE-OP X-RAY', 'POST-OP X-RAY', 'POST-OP WOUND PIC'].filter((t) => !sections.some((x) => x.title === t));
           if (missing.length) toast('Not uploaded, left out: ' + missing.join(', '), 4000);
+          keepRecord('dcimages', { key: id, title: `Discharge X-rays — ${c().name || ''}`, cases: [{ id, ...c() }], args: [{ id, ...c() }, d, Store.meta] });
           if (PhonePdf.isPhone()) PhonePdf.radiographs(c(), d, sections, Store.meta);
           else Print.imagesPdf(c(), d, sections, Store.meta);
         };
@@ -3836,25 +4030,9 @@ const App = (() => {
           btn.disabled = true;
           btn.textContent = 'Building…';
           try {
-            await loadDeckImages(st);
-            // the discharge summary, a page per slide, at the end — your uploaded PDF if there is one
-            const up = caseImages(id, 'dcpdf').at(-1);
-            const upUrl = up && await Store.getImage(up.id);
-            if (upUrl) {
-              const doc = await DcImport.open(await (await fetch(upUrl)).blob());
-              const pages = await DcImport.pageImages(doc);
-              st.pages = pages.map((p) => p.data);
-              st.pageAspect = pages[0]?.aspect || DcPages.ASPECT;
-            } else {
-              st.pages = await DcPages.render(cc, d, Store.meta);
-              st.pageAspect = DcPages.ASPECT;
-            }
-            const pres = DeckEngine.buildPptx(window.PptxGenJS, st, Object.fromEntries(deckImgs));
-            const blob = await pres.write({ outputType: 'blob' });
-            // NAME_AGE-SEX_IPNO.pptx — a "/" isn't allowed in file names, so 26/M is written 26-M.
-            const part = (x) => DeckEngine.up(x).replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-            const name = [part(cc.name) || 'PATIENT', [cc.age, cc.sex].map((x) => part(x)).filter(Boolean).join('-'), part(cc.ipNo)].filter(Boolean).join('_') + '.pptx';
-            offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+            const upId = caseImages(id, 'dcpdf').at(-1)?.id || '';
+            keepRecord('dcppt', { key: id, title: `Discharge PowerPoint — ${cc.name || ''}`, cases: [{ id, ...cc }], args: [st, { id, ...cc }, d, Store.meta, upId] });
+            await dischargeDeck(st, cc, d, Store.meta, upId);
             if (!slides.length) toast('No X-rays uploaded yet — the PowerPoint has only the summary slide.', 4000);
           } catch (err) {
             console.error(err);
@@ -4562,6 +4740,7 @@ const App = (() => {
       return `SCHEME REPORT ${fmtDate(mon).replace(/\//g, '-')} TO ${fmtDate(addDays(mon, 6)).replace(/\//g, '-')}.${ext}`;
     },
     pdf() {
+      keepRecord('scheme', { key: `${SchemeTab.week}_pdf`, title: `Scheme report ${fmtDate(SchemeTab.week)} – ${fmtDate(addDays(SchemeTab.week, 6))} (PDF)`, args: [SchemeTab.week, 'pdf'], live: true });
       const rows = SchemeTab.summary();
       const { jsPDF } = window.jspdf;
       const d = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
@@ -4582,6 +4761,7 @@ const App = (() => {
     // PowerPoint: a title slide, then unit by unit (its figures + every case with its scheme status), and at the
     // end the consolidation table of all the units.
     async pptx() {
+      keepRecord('scheme', { key: `${SchemeTab.week}_pptx`, title: `Scheme report ${fmtDate(SchemeTab.week)} – ${fmtDate(addDays(SchemeTab.week, 6))} (PowerPoint)`, args: [SchemeTab.week, 'pptx'], live: true });
       const rows = SchemeTab.summary();
       await ReportDeck.loadLogo();
       const pres = ReportDeck.create(); // the house design shared by every unit's report
@@ -4644,6 +4824,7 @@ const App = (() => {
     },
     // A Word file in the department's layout: landscape A4, the title in the page header, one table.
     async docx() {
+      keepRecord('scheme', { key: `${SchemeTab.week}_docx`, title: `Scheme report ${fmtDate(SchemeTab.week)} – ${fmtDate(addDays(SchemeTab.week, 6))} (Word)`, args: [SchemeTab.week, 'docx'], live: true });
       const rows = SchemeTab.summary();
       const x = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const run = (t, bold) => `<w:r><w:rPr>${bold ? '<w:b/>' : ''}<w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr><w:t xml:space="preserve">${x(t)}</w:t></w:r>`;
@@ -4798,6 +4979,17 @@ const App = (() => {
     },
     scopeLabel: () => (Census.scope === 'all' && Census.owner() ? 'ALL UNITS' : `ORTHO UNIT ${Store.meta.unitId}`),
     ctx: () => ({ operatedOn, unitLabel, today: todayISO() }),
+    rec(fmt) {
+      const [, , label] = Census.range();
+      const names = { pdf: 'PDF', ppt: 'PowerPoint', csv: 'patient list', logbook: 'logbook' };
+      keepRecord(fmt === 'logbook' ? 'logbook' : 'census', { key: `${Census.mode}_${Census.range()[0]}_${Census.scope}_${fmt}`,
+        title: `${fmt === 'logbook' ? 'Logbook' : 'Census'} — ${label} — ${Census.scopeLabel().toLowerCase()} (${names[fmt]})`, args: [Census.mode, Census.anchor || todayISO(), Census.scope, fmt], live: true });
+    },
+    logbook() {
+      Census.rec('logbook');
+      const [from, to] = Census.range();
+      offerFile(new File([CensusMore.logbookCSV(Census.cases(), from, to, Census.ctx())], Census.fileName('csv').replace(/^CENSUS/, 'LOGBOOK'), { type: 'text/csv' }));
+    },
     more(list, from, to) { return CensusMore.sections(list, from, to, Census.ctx()); },
     render() {
       const [from, to, label] = Census.range();
@@ -4854,6 +5046,7 @@ const App = (() => {
       return { head, rows, s, label, from, to };
     },
     pdf() {
+      Census.rec('pdf');
       const { head, rows, s, label } = Census.table();
       const { jsPDF } = window.jspdf;
       const d = new jsPDF({ orientation: head.length > 4 ? 'landscape' : 'portrait', unit: 'mm', format: 'a4' });
@@ -4887,6 +5080,7 @@ const App = (() => {
       SharePdf.share(new File([d.output('blob')], Census.fileName('pdf'), { type: 'application/pdf' }));
     },
     async ppt() {
+      Census.rec('ppt');
       const { head, rows, s, label } = Census.table();
       await ReportDeck.loadLogo();
       const pres = ReportDeck.create();
@@ -4920,6 +5114,7 @@ const App = (() => {
       offerFile(new File([blob], Census.fileName('pptx'), { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
     },
     csv() {
+      Census.rec('csv');
       const [from, to] = Census.range();
       const inR = (d) => !!d && d >= from && d <= to;
       const list = Census.cases().filter((c) => inR(c.doa) || inR(operatedOn(c)) || inR(c.discharge?.dod) || Object.keys(TRANSFER_DEPTS).some((k) => inR(c[k]?.out)));
@@ -4938,10 +5133,7 @@ const App = (() => {
         if (sc) { Census.scope = sc.dataset.czScope; render(); return; }
         const st = e.target.closest('[data-cz-step]');
         if (st) { Census.step(+st.dataset.czStep); render(); return; }
-        if (e.target.closest('[data-cz-logbook]')) {
-          const [from, to] = Census.range();
-          offerFile(new File([CensusMore.logbookCSV(Census.cases(), from, to, Census.ctx())], Census.fileName('csv').replace(/^CENSUS/, 'LOGBOOK'), { type: 'text/csv' }));
-        }
+        if (e.target.closest('[data-cz-logbook]')) Census.logbook();
       });
       $('#cz-pdf', el)?.addEventListener('click', () => { try { Census.pdf(); } catch (err) { toast('Could not make the PDF: ' + err.message, 5000); } });
       $('#cz-ppt', el)?.addEventListener('click', () => Census.ppt().catch((err) => toast('Could not make the PowerPoint: ' + err.message, 5000)));
@@ -5084,6 +5276,7 @@ const App = (() => {
         btn.disabled = true;
         btn.textContent = 'Building…';
         try {
+          keepRecord('spec', { key: SpecTab.week, title: `${SPECIALTIES[SpecTab.spec()].report || 'Specialty report'} ${fmtDate(SpecTab.week)} – ${fmtDate(addDays(SpecTab.week, 6))}`, args: [SpecTab.spec(), SpecTab.week], live: true });
           const { file, missing } = await specReport(SpecTab.spec(), SpecTab.week, SpecTab.data || []);
           offerFile(file);
           if (missing) toast(`${missing} picture(s) couldn't be loaded (no network?) — the rest are in.`, 5000);
@@ -5199,6 +5392,7 @@ const App = (() => {
     if (h === '#/todo') return Todo;
     if (h === '#/updates') return Updates;
     if (h === '#/census') return Census;
+    if (h === '#/records') return Records;
     if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
     if (h === '#/scheme') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : Home;
     if (h === '#/cases') return Dashboard;
@@ -5217,7 +5411,7 @@ const App = (() => {
     if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
     if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
     if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
-    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|census|home)\b/);
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|census|records|home)\b/);
     return m ? '#/' + m[1] : '#/';
   }
   // The tabs this view has, which one is open, and the PGs' count of new HS updates.
