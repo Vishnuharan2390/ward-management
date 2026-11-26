@@ -104,3 +104,7 @@
 - Pelvis / acetabulum cases (consentPelvic in js/consent.js) on the lower-limb form: "கால் எலும்பு" → "இடுப்பு எலும்பு".
 - OT list → Consent forms → "Check before printing": "⌨ தமிழ் keyboard" (js/ta-keys.js, TaKeys.attach) types into the name / implant /
   fracture boxes at the cursor; the phone keyboard is held down (inputmode none) while it is open.
+- Procedure-specific risk paragraph (CONSENT_EXTRA / consentExtras in js/consent.js), before the closing paragraph, not for implant exit:
+  pelvis/acetabulum = abdominopelvic organs, vessels, sciatic nerve; arthroplasty (plan) = limb shortening/lengthening, dislocation,
+  loosening, periprosthetic fracture; cervical/dorsolumbar = dural tear CSF leak + cord / root injury (replaces the template one-liner).
+  The page shrinks text down to 7pt to stay on one A4 sheet.

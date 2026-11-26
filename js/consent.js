@@ -148,6 +148,22 @@ const CONSENT_RE = {
   upper: /CLAVICLE|SHOULDER|HUMER|ELBOW|OLECRANON|CORONOID|RADIUS|RADIAL|ULNA|FOREARM|WRIST|SCAPHOID|CARPAL|METACARPAL|HAND|FINGER|THUMB|MONTEGGIA|GALEAZZI|COLLES|SMITH|BARTON|SCAPULA|ACROMIO|\bAC JOINT|BENNETT|BOXER|UPPER LIMB|\bBBFA\b|\bDER\b|SUPRACONDYLAR HUMER/,
   lower: /FEMUR|FEMORAL|\bNOF\b|TROCHANTER|\bHIP\b|ACETABUL|PELVI|TIBIA|TIBIAL|FIBULA|PLATEAU|PILON|PLAFOND|KNEE|PATELLA|ANKLE|MALLEOL|BIMALLEOLAR|TRIMALLEOLAR|FOOT|CALCAN|TALUS|TALAR|LISFRANC|METATARSAL|\bTOE|\bLEG\b|LOWER LIMB|\bBBFL\b/,
 };
+// Procedure-specific risks, added before the closing "not responsible" paragraph (not for implant removal).
+const CONSENT_EXTRA = {
+  pelvis: 'மேலும், இடுப்பு எலும்பு அறுவை சிகிச்சையின் போது இடுப்பு மற்றும் வயிற்றுப் பகுதியில் உள்ள உறுப்புகளான சிறுநீர்ப்பை, சிறுநீர்க் குழாய், குடல், பிறப்பு உறுப்புகள் மற்றும் பெரிய இரத்த நாளங்கள், நரம்புகள் (சியாட்டிக் நரம்பு) சேதம் அடைய வாய்ப்புள்ளது என அறிவேன். அதனால் அதிக இரத்தப் போக்கு, சிறுநீர் மற்றும் மலம் கழிப்பதில் சிரமம், காலில் உணர்ச்சியின்மை அல்லது செயல் இழப்பு ஏற்படலாம் என அறிவேன். அவற்றைச் சரிசெய்ய வேறு துறை மருத்துவர்களின் உதவியுடன் கூடுதல் அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.',
+  arthroplasty: 'மேலும், உலோகத்தினால் ஆன செயற்கை மூட்டு பொருத்திய பின்னர் காலின் நீளம் குறைந்தோ அல்லது கூடியோ (கால் நீள வேறுபாடு) போக வாய்ப்புள்ளது என அறிவேன். செயற்கை மூட்டு இடம் விலகுதல் (Dislocation), தளர்ந்து போதல் (Loosening), மூட்டு இறுக்கம், செயற்கை மூட்டைச் சுற்றியுள்ள எலும்பு உடைதல் போன்றவை ஏற்படலாம் என அறிவேன். கிருமி தொற்று ஏற்பட்டால் செயற்கை மூட்டை அகற்றி மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.',
+  spine: (limbs) => `மேலும், தண்டுவடத்தைச் சுற்றியுள்ள சவ்வு (Dura) கிழிந்து தண்டுவட நீர் (CSF) கசிவு ஏற்படலாம் என்றும், அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை தேவைப்படலாம் என்றும் அறிவேன். மேலும் தண்டுவடம் அல்லது நரம்பு வேர்களுக்குக் காயம் ஏற்பட்டு ${limbs} செயல் இழப்பு மேலும் அதிகரிக்கவோ, புதிதாக ஏற்படவோ வாய்ப்புள்ளது என அறிவேன்.`,
+};
+const CONSENT_ARTHROPLASTY_RE = /ARTHROPLASTY|BIPOLAR|AUSTIN\s*MOORE|\bAMP\b|THOMPSON|\bTHR\b|\bTHA\b|\bTKR\b|\bTKA\b|\bUKR\b|TOTAL\s+(HIP|KNEE)|PROSTHE(SIS|TIC)|REPLACEMENT/;
+function consentExtras(c, kind) {
+  if (consentIsExit(c)) return [];
+  if (kind === 'cervical') return [CONSENT_EXTRA.spine('கைகள், கால்கள்')];
+  if (kind === 'dorsolumbar') return [CONSENT_EXTRA.spine('கால்கள்')];
+  const out = [];
+  if (kind === 'lower' && consentPelvic(c)) out.push(CONSENT_EXTRA.pelvis);
+  if (CONSENT_ARTHROPLASTY_RE.test(String(`${c?.plan || ''} ${c?.procedureDone || ''}`).toUpperCase())) out.push(CONSENT_EXTRA.arthroplasty);
+  return out;
+}
 const consentPelvic = (c) => /PELVI|ACETABUL|\bILIUM\b|ILIAC WING|PUBIC RAMI|PUBIC RAMUS|SACRO\s*ILIAC|\bSI JOINT\b|SYMPHYSIS/.test(String(`${c?.diagnosis || ''} ${c?.plan || ''}`).toUpperCase());
 function consentKind(c) {
   if (c && CONSENT_TPLS[c.consentTpl]) return c.consentTpl;
@@ -426,6 +442,11 @@ const ConsentForm = (() => {
     const pelvic = consentKind(c) === 'lower' && consentPelvic(c);
     const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN(consentExitFracture(c)) : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t))
       .map((t) => (pelvic ? t.replace(/கால் எலும்பு/g, 'இடுப்பு எலும்பு') : t));
+    // procedure-specific risks go just before the closing paragraph
+    const extras = consentExtras(c, consentKind(c));
+    paras.splice(paras.length - 1, 0, ...extras);
+    // the spine paragraph says it in full: drop the template's one-line "CSF leak may occur"
+    if (extras.some((x) => x.includes('(CSF)'))) paras.forEach((t, i) => { if (!t.includes('(CSF)')) paras[i] = t.replace(/\s*மேலும் தண்டுவட நீர் கசிவு ஏற்படலாம் என அறிவேன்\.?/, ''); });
     const minor = consentMinor(c);
     for (const p0 of paras) {
       const p = minor ? consentForChild(p0, c.sex) : p0;
@@ -534,8 +555,8 @@ const ConsentForm = (() => {
     const g = cv.getContext('2d');
     g.textBaseline = 'alphabetic';
     const bottom = H - 8 * MM;
-    for (let pt = 11; pt >= 7.5; pt -= 0.25) {
-      if (draw(g, c, draft, pt) <= bottom || pt <= 7.5) break;
+    for (let pt = 11; pt >= 7; pt -= 0.25) {
+      if (draw(g, c, draft, pt) <= bottom || pt <= 7) break;
     }
     return cv;
   }
