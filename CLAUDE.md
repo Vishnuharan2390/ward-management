@@ -85,7 +85,8 @@
 - Implant list: "From the OT list" (opnOtImplants(c.implants) via OPN_OT_WORDS) → usual for the fracture → others → Custom implant.
   opnDefaults preselects the OT list's implant. "+ Custom implant" button too.
 - No screw rows until asked. opnScrewSections(imp) gives each kind its menus: nail = proximal then distal locking; plate/MIPO =
-  proximal / distal to the fracture + lag screws; PFN = lag + anti-rotation (PFNA helical blade) then distal bolts; DHS = lag + shaft.
+  proximal / distal to the fracture + lag screws; PFN = 8mm lag + 6.4mm anti-rotation (PFNA helical blade) then distal bolts;
+  DHS = 12.5mm lag + shaft. Every screw / wire / pin type carries its diameter (OPN_SCREWS).
   Other kinds: free rows. Spine template procedures: rows with type, level(s), side, number, size.
 - Wording: opnScrewSay → "2 X 4.9MM LOCKING BOLTS OF SIZE 34MM EACH WERE USED FOR PROXIMAL LOCKING…" (singular when 1).
 - The note has NO diagnosis / procedure / implants header (those are the boxes above); "Write OT notes" also fills Implants used.

@@ -11,8 +11,10 @@ const OPN_CATEGORIES = [
 const OPN_ANAES = ['SPINAL ANAESTHESIA', 'COMBINED SPINAL EPIDURAL ANAESTHESIA', 'GENERAL ANAESTHESIA', 'SUPRACLAVICULAR BRACHIAL PLEXUS BLOCK', 'INFRACLAVICULAR BRACHIAL PLEXUS BLOCK', 'AXILLARY BRACHIAL PLEXUS BLOCK', 'INTERSCALENE BLOCK', 'REGIONAL BLOCK WITH GENERAL ANAESTHESIA', 'LOCAL ANAESTHESIA'];
 const OPN_POSITIONS = ['SUPINE', 'SUPINE ON FRACTURE TABLE', 'SUPINE WITH ARM ON HAND TABLE', 'SUPINE WITH SANDBAG UNDER IPSILATERAL HIP', 'SUPINE WITH KNEE FLEXED OVER BOLSTER', 'BEACH CHAIR', 'LATERAL', 'LATERAL WITH ARM OVER BOLSTER', 'PRONE', 'PRONE WITH ARM OVER BOLSTER', 'PRONE ON BOLSTERS', 'LATERAL DECUBITUS', 'SUPINE WITH ARTHROSCOPY LEG HOLDER', 'SUPINE WITH NECK EXTENDED'];
 const OPN_SCREWS = ['3.5MM CORTICAL SCREWS', '4.5MM CORTICAL SCREWS', '2.7MM CORTICAL SCREWS', '3.5MM LOCKING SCREWS', '5MM LOCKING SCREWS', '2.4MM LOCKING SCREWS', '4MM CANCELLOUS SCREWS', '6.5MM CANCELLOUS SCREWS (PARTIALLY THREADED)', '4MM CANNULATED CANCELLOUS SCREWS', '6.5MM CANNULATED CANCELLOUS SCREWS', '7MM CANNULATED CANCELLOUS SCREWS', '4.9MM LOCKING BOLTS', '5MM LOCKING BOLTS', '3.9MM LOCKING BOLTS', '4.9MM DISTAL LOCKING BOLTS',
-  'LAG SCREW', 'ANTI-ROTATION SCREW', 'HELICAL BLADE', 'HERBERT SCREWS', 'K-WIRES', '18G SS WIRE', 'SCHANZ PINS', 'STEINMANN PINS',
-  'PEDICLE SCREWS', 'SUTURE ANCHORS', 'INTERFERENCE SCREW', 'CORTICAL BUTTON (ENDOBUTTON)'];
+  '8MM LAG SCREW', '10.5MM LAG SCREW', '12.5MM DHS LAG SCREW', '6.4MM ANTI-ROTATION SCREW', '6.5MM ANTI-ROTATION SCREW', 'HELICAL BLADE',
+  '3MM HERBERT SCREWS', '2.4MM HERBERT SCREWS', '1.5MM K-WIRES', '1.8MM K-WIRES', '2MM K-WIRES', '2.5MM K-WIRES', '18G SS WIRE',
+  '4.5MM SCHANZ PINS', '5MM SCHANZ PINS', '6MM SCHANZ PINS', '3MM STEINMANN PINS', '4MM STEINMANN PINS',
+  'PEDICLE SCREWS', '3.5MM SUTURE ANCHORS', '5MM SUTURE ANCHORS', '7MM INTERFERENCE SCREW', '8MM INTERFERENCE SCREW', '9MM INTERFERENCE SCREW', 'CORTICAL BUTTON (ENDOBUTTON)'];
 // The menus each kind of implant gets: nails proximal then distal locking; plates screws proximal / distal to
 // the fracture + lag screws; PFN lag + anti-rotation screw then distal bolts; DHS lag screw + shaft screws.
 const OPN_BOLTS = ['4.9MM LOCKING BOLTS', '5MM LOCKING BOLTS', '4.5MM LOCKING BOLTS', '3.9MM LOCKING BOLTS', '6.4MM LOCKING BOLTS'];
@@ -25,12 +27,12 @@ function opnScrewSections(imp) {
   const bolts = (at, title) => ({ at, title, types: OPN_BOLTS, add: [[`+ ${title.toLowerCase().replace(/^\w/, (c) => c.toUpperCase())} bolts`, OPN_BOLTS[0]]] });
   if (k === 'nail') return [bolts('PROXIMAL', 'Proximal locking'), bolts('DISTAL', 'Distal locking')];
   if (k === 'pfn') {
-    return [{ at: 'NECK', title: 'Proximally — into the neck', one: true, types: ['LAG SCREW', 'ANTI-ROTATION SCREW', 'HELICAL BLADE'],
-      add: imp.implant === 'pfna' ? [['+ Helical blade', 'HELICAL BLADE']] : [['+ Lag screw', 'LAG SCREW'], ['+ Anti-rotation screw', 'ANTI-ROTATION SCREW']] },
+    return [{ at: 'NECK', title: 'Proximally — into the neck', one: true, types: ['8MM LAG SCREW', '10.5MM LAG SCREW', '6.4MM ANTI-ROTATION SCREW', '6.5MM ANTI-ROTATION SCREW', 'HELICAL BLADE'],
+      add: imp.implant === 'pfna' ? [['+ Helical blade', 'HELICAL BLADE']] : [['+ Lag screw (8mm)', '8MM LAG SCREW'], ['+ Anti-rotation screw (6.4mm)', '6.4MM ANTI-ROTATION SCREW']] },
     bolts('DISTAL', 'Distal locking')];
   }
   if (k === 'dhs') {
-    return [{ at: 'NECK', title: 'Lag screw', one: true, types: ['LAG SCREW'], add: [['+ Lag screw', 'LAG SCREW']] },
+    return [{ at: 'NECK', title: 'Lag screw', one: true, types: ['12.5MM DHS LAG SCREW', '8MM LAG SCREW'], add: [['+ Lag screw (12.5mm)', '12.5MM DHS LAG SCREW']] },
       { at: 'SHAFT', title: 'Screws to the shaft (side plate)', types: OPN_PLATE_SCREWS, add: [['+ Shaft screws', '4.5MM CORTICAL SCREWS']] }];
   }
   if (k === 'plate' || k === 'mipo') {
@@ -870,7 +872,7 @@ function opnHTML(raw, ctx = {}) {
       <label class="span2">Anaesthesia<select data-ob="anaes">${o(pairs(OPN_ANAES), B.anaes || '')}</select></label></div>`;
   // Screw / wire rows, the same for every section
   const screwRows = (imp, ia) => (imp.screws || []).map((s, si) => `<div class="opn-screw">
-          <select ${ia} data-s="${si}" data-sf="type" aria-label="Screw / wire">${o([...pairs(OPN_SCREWS), ['custom', 'Custom…']], s.type || '')}</select>
+          <select ${ia} data-s="${si}" data-sf="type" aria-label="Screw / wire">${o([...pairs([...new Set([...OPN_SCREWS, ...(s.type && s.type !== 'custom' ? [s.type] : [])])]), ['custom', 'Custom…']], s.type || '')}</select>
           ${s.type === 'custom' ? `<input ${ia} data-s="${si}" data-sf="custom" value="${esc(s.custom || '')}" aria-label="Custom screw / wire">` : ''}
           <label class="opn-n">No.<input ${ia} data-s="${si}" data-sf="n" inputmode="numeric" value="${esc(s.n || '')}"></label>
           <label class="opn-len">Length (mm)<input ${ia} data-s="${si}" data-sf="len" inputmode="decimal" value="${esc(s.len || '')}" placeholder="e.g. 40 or 36, 38"></label>

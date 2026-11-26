@@ -165,7 +165,7 @@ const OPN_TPL = {
     bankart: {
       label: 'Arthroscopic Bankart repair', pos: 'LATERAL DECUBITUS', tq: false, anaes: 'GENERAL ANAESTHESIA',
       fields: [opnSel('remp', 'Remplissage', YESNO)],
-      imps: ['SUTURE ANCHORS'], defImps: [{ name: 'SUTURE ANCHORS', screws: [{ type: 'SUTURE ANCHORS', n: '3' }] }],
+      imps: ['SUTURE ANCHORS'], defImps: [{ name: 'SUTURE ANCHORS', screws: [{ type: '5MM SUTURE ANCHORS', n: '3' }] }],
       name: (f, x) => `ARTHROSCOPIC BANKART REPAIR ${x.side} SHOULDER${f.remp === 'YES' ? ' WITH REMPLISSAGE' : ''}`,
       steps: (f, x) => [
         'Posterior viewing portal and anterior working portals made. Diagnostic arthroscopy done: anteroinferior labral tear (Bankart lesion) found.',
@@ -179,7 +179,7 @@ const OPN_TPL = {
     cuff: {
       label: 'Arthroscopic rotator cuff repair', pos: 'BEACH CHAIR', tq: false, anaes: 'GENERAL ANAESTHESIA',
       fields: [opnSel('tech', 'Repair', ['SINGLE ROW', 'DOUBLE ROW (SUTURE BRIDGE)']), opnSel('sad', 'Subacromial decompression', ['YES', 'NO'])],
-      imps: ['SUTURE ANCHORS', 'KNOTLESS ANCHORS'], defImps: [{ name: 'SUTURE ANCHORS', screws: [{ type: 'SUTURE ANCHORS', n: '2' }] }],
+      imps: ['SUTURE ANCHORS', 'KNOTLESS ANCHORS'], defImps: [{ name: 'SUTURE ANCHORS', screws: [{ type: '5MM SUTURE ANCHORS', n: '2' }] }],
       name: (f, x) => `ARTHROSCOPIC ${f.tech.replace(/ \(.*\)/, '')} ROTATOR CUFF REPAIR ${x.side} SHOULDER${f.sad === 'YES' ? ' WITH SUBACROMIAL DECOMPRESSION' : ''}`,
       steps: (f, x) => [
         'Posterior, lateral and anterior portals made. Glenohumeral diagnostic arthroscopy done; scope moved to the subacromial space.',
@@ -243,7 +243,7 @@ const OPN_TPL = {
     crpp: {
       label: 'CRPP supracondylar humerus', pos: 'SUPINE WITH ARM ON HAND TABLE', tq: false, anaes: 'GENERAL ANAESTHESIA',
       fields: [opnSel('config', 'K-wires', ['2 LATERAL DIVERGENT K-WIRES', '3 LATERAL DIVERGENT K-WIRES', 'CROSSED (MEDIAL + LATERAL) K-WIRES'])],
-      imps: ['K-WIRES'], defImps: [{ name: 'K-WIRES', screws: [{ type: 'K-WIRES', n: '2' }] }],
+      imps: ['K-WIRES'], defImps: [{ name: 'K-WIRES', screws: [{ type: '1.8MM K-WIRES', n: '2' }] }],
       name: (f, x) => `CLOSED REDUCTION AND PERCUTANEOUS PINNING ${x.side} SUPRACONDYLAR HUMERUS`,
       steps: (f) => [
         'Closed reduction done with traction-countertraction, correction of medial / lateral displacement and flexion of the elbow with pressure over the olecranon. Reduction confirmed under C-arm in AP and lateral views (Baumann angle, anterior humeral line).',
