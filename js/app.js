@@ -4797,6 +4797,8 @@ const App = (() => {
       return Store.unitKeys.map((k, i) => ({ label: UNITS[i].id, list: list.filter((c) => c.unit === k) }));
     },
     scopeLabel: () => (Census.scope === 'all' && Census.owner() ? 'ALL UNITS' : `ORTHO UNIT ${Store.meta.unitId}`),
+    ctx: () => ({ operatedOn, unitLabel, today: todayISO() }),
+    more(list, from, to) { return CensusMore.sections(list, from, to, Census.ctx()); },
     render() {
       const [from, to, label] = Census.range();
       if (Census.scope === 'all' && Census.owner() && !Census.all && !Census.loading) setTimeout(Census.loadAll, 0);
@@ -4828,7 +4830,14 @@ const App = (() => {
           ${small('Operations by subspecialty', s.bySpec)}
           ${small('Operations by scheme', s.byScheme)}
           ${small('Transferred out to', Object.entries(s.trans).filter(([, n]) => n).map(([k, n]) => [TRANSFER_DEPTS[k].long, n]))}
-        </div>`}`;
+        </div>
+        <h3 class="cz-h">Analytics · ${esc(label)}</h3>
+        <div class="cz-grid cz-more">${Census.more(list, from, to).map((x) => `<div class="card cz-card" data-cz-sec="${x.k}"><h3>${esc(x.title)}</h3>
+          ${x.note ? `<p class="muted small">${esc(x.note)}</p>` : ''}
+          ${x.rows.length ? `<div class="table-wrap"><table class="board cz-tbl">${x.head.some(Boolean) && x.head.length > 2 ? `<thead><tr>${x.head.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>` : ''}
+            <tbody>${x.rows.map((r) => `<tr class="${String(r[0]).startsWith('  ') ? 'sub' : ''}">${r.map((v, j) => (j ? `<td>${esc(String(v))}</td>` : `<td class="cz-k">${esc(String(v).trim())}</td>`)).join('')}</tr>`).join('')}</tbody></table></div>`
+    : '<p class="muted small">Nothing in this period.</p>'}
+          ${x.k === 'logbook' ? '<button class="btn small" data-cz-logbook>Download logbook (CSV)</button>' : ''}</div>`).join('')}</div>`}`;
     },
     // ---- downloads
     fileName(ext) {
@@ -4864,6 +4873,17 @@ const App = (() => {
         d.autoTable({ ...opt(y, [title, 'NO.'], list.map(([k, n]) => [k.toUpperCase(), String(n)])), tableWidth: 110 });
         y = d.lastAutoTable.finalY + 6;
       }
+      // the analytics, one table each
+      const [from, to] = Census.range();
+      for (const x of Census.more(Census.cases(), from, to)) {
+        if (!x.rows.length) continue;
+        // keep each table on one page
+        const PH = d.internal.pageSize.getHeight();
+        if (y + (x.rows.length + 1) * 7 + 4 > PH - 14 && (x.rows.length + 1) * 7 < PH - 30) { d.addPage(); y = 16; }
+        const h = x.head.length > 2 && x.head.some(Boolean) ? x.head.map((t, j) => (j ? t.toUpperCase() : x.title.toUpperCase())) : [x.title.toUpperCase(), ...x.head.slice(1).map((t) => t.toUpperCase())];
+        d.autoTable({ ...opt(y, h, x.rows.map((r) => r.map((v) => String(v).trim()))), tableWidth: x.head.length > 2 ? 'auto' : 120, pageBreak: 'auto', rowPageBreak: 'avoid' });
+        y = d.lastAutoTable.finalY + 6;
+      }
       SharePdf.share(new File([d.output('blob')], Census.fileName('pdf'), { type: 'application/pdf' }));
     },
     async ppt() {
@@ -4880,6 +4900,21 @@ const App = (() => {
       [['Admissions by mode of injury', s.byMode], ['Operations by subspecialty', s.bySpec], ['Operations by scheme', s.byScheme]].forEach(([t, list], i) => {
         ReportDeck.table(pres, b, [[t, 'No.'], ...(list.length ? list : [['None', '']]).map(([k, n]) => [k.toUpperCase(), n])], { x: 0.4 + i * 4.24, y: 1.2, w: 4.0, colW: [3.1, 0.9], fontSize: 12 });
       });
+      // analytics: two tables to a slide
+      const [from, to] = Census.range();
+      const secs = Census.more(Census.cases(), from, to).filter((x) => x.rows.length);
+      for (let i = 0; i < secs.length; i += 2) {
+        const sl = pres.addSlide({ masterName: 'RPT' });
+        const pair = secs.slice(i, i + 2);
+        ReportDeck.header(pres, sl, { kicker: 'CENSUS · ANALYTICS', title: pair.map((x) => x.title).join('  ·  '), right: label });
+        pair.forEach((x, j) => {
+          const w = 6.06;
+          const head = x.head.length > 2 && x.head.some(Boolean) ? x.head.map((t, k) => (k ? t : x.title)) : [x.title, ...x.head.slice(1)];
+          const rowsX = x.rows.slice(0, 16).map((r) => r.map((v) => String(v).trim()));
+          const first = head.length > 3 ? 2.4 : 4.3;
+          ReportDeck.table(pres, sl, [head, ...rowsX], { x: 0.4 + j * (w + 0.41), y: 1.2, w, colW: [first, ...head.slice(1).map(() => (w - first) / (head.length - 1))], fontSize: rowsX.length > 11 ? 9 : 11 });
+        });
+      }
       ReportDeck.thanks(pres);
       const blob = await pres.write({ outputType: 'blob' });
       offerFile(new File([blob], Census.fileName('pptx'), { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
@@ -4902,7 +4937,11 @@ const App = (() => {
         const sc = e.target.closest('[data-cz-scope]');
         if (sc) { Census.scope = sc.dataset.czScope; render(); return; }
         const st = e.target.closest('[data-cz-step]');
-        if (st) { Census.step(+st.dataset.czStep); render(); }
+        if (st) { Census.step(+st.dataset.czStep); render(); return; }
+        if (e.target.closest('[data-cz-logbook]')) {
+          const [from, to] = Census.range();
+          offerFile(new File([CensusMore.logbookCSV(Census.cases(), from, to, Census.ctx())], Census.fileName('csv').replace(/^CENSUS/, 'LOGBOOK'), { type: 'text/csv' }));
+        }
       });
       $('#cz-pdf', el)?.addEventListener('click', () => { try { Census.pdf(); } catch (err) { toast('Could not make the PDF: ' + err.message, 5000); } });
       $('#cz-ppt', el)?.addEventListener('click', () => Census.ppt().catch((err) => toast('Could not make the PowerPoint: ' + err.message, 5000)));

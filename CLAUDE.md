@@ -131,3 +131,6 @@
 - Weekly (Mon–Sun) / monthly / yearly, ‹ › to move. Own unit; owners also "All units" (Store.unitsCases reads every unit, column per unit).
 - Admissions (DOA), operations (operatedOn), discharges by disposition (discharge.dod), transfers out (c[dept].out), under care at the end,
   average pre-op stay and length of stay; breakdowns by mode of injury, subspecialty, scheme. PDF (jsPDF), PowerPoint (ReportDeck), CSV list.
+- Analytics below the census (js/census-more.js, CensusMore.sections → page, PDF, PowerPoint): delay to surgery (+ factors with/
+  without), OT efficiency (otDate vs surgery date), surgeon/PG logbook (+ CSV per case), implant usage, antibiogram (pus C/S), outcomes,
+  scheme performance, epidemiology, bed use, comorbidity & labs, documentation audit.

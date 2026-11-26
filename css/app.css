@@ -1904,3 +1904,9 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .cz-main tr.sub td:first-child { padding-left: 1.4rem; opacity: .8; }
 .cz-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: .8rem; }
 .cz-tbl th { text-align: right; width: 4rem; }
+
+.cz-h { margin: 1.2rem 0 .5rem; }
+.cz-more .cz-tbl td { text-align: right; white-space: nowrap; }
+.cz-more .cz-tbl td.cz-k { text-align: left; white-space: normal; }
+.cz-more .cz-tbl tr.sub td.cz-k { padding-left: 1.2rem; opacity: .8; }
+.cz-more [data-cz-sec="abg"] .cz-tbl td:last-child { white-space: normal; text-align: left; }
