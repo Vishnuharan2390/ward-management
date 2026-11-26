@@ -2932,7 +2932,7 @@ const App = (() => {
   async function loadDeckImages(st) {
     const ids = st.cases.flatMap((c) => c.slides.flatMap((s) => s.images)).filter((id) => !deckImgs.has(id));
     for (const id of ids) {
-      const data = await Store.getImage(id);
+      const data = await Store.getImage(id, st.imgUnit || undefined);
       if (!data) continue;
       const img = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = data; });
       if (img) deckImgs.set(id, { data, w: img.naturalWidth, h: img.naturalHeight, url: data });
@@ -3340,6 +3340,196 @@ const App = (() => {
   };
 
   // Phones need a fresh tap for Save / Share, so ask in a small sheet.
+  // ---- The discharge summary's contents: its defaults, then whatever was saved for the case
+  function dischargeDraft(c, unitId) {
+    const unit = unitName(unitId);
+    const d = {
+      disposition: 'discharge',
+      dod: todayISO(),
+      dos: c.surgeryDate || c.otDate || '',
+      consultant: unit,
+      unitLine: unit,
+      doctor: 'ORTHO ' + unit,
+      attender: c.attender,
+      phone: c.phone,
+      address: c.address,
+      diagnosis: c.diagnosis,
+      procedure: c.procedureDone || c.plan,
+      past: pastTemplate(c),
+      exam: EXAM_TEMPLATE,
+      treatment: [...DRUGS_ALL, ...(isSpinePelvis(c) ? DRUGS_SPINE_PELVIS : [])].join('\n'),
+      // written from the diagnosis: immobilisation + local examination (spine: power table)
+      condition: dcConditionText(dcRegions(c, { dos: c.surgeryDate || c.otDate })),
+      ...(() => { const adv = dcUsualAdvice(c, { dos: c.surgeryDate || c.otDate }); return { advice: adv.map((a) => a[0]).join('\n'), adviceTa: adv.map((a) => a[1]).join('\n') }; })(),
+      ...(c.discharge || {}),
+    };
+    if (d.disposition === 'lama') d.disposition = 'ama';
+    // H/O injury / illness: taken from the e-case sheet unless the discharge summary already has its own
+    if (!hasText(d.history) && hasText(c.history)) d.history = c.history;
+    if (!d.course) d.course = courseTemplate(c, d);
+    return d;
+  }
+  // The discharge PowerPoint's slides for a case (any unit: imgUnit says where its pictures are)
+  function dischargeDeckState(id, cc, d, unitId, imgUnit) {
+    const fd = (iso) => (iso ? fmtDate(iso).replace(/\//g, '.') : '—');
+    const statusOf = { dar: 'DISCHARGED AT REQUEST', ama: 'AMA', absconded: 'ABSCOND', postop: 'TRANSFERRED TO POST-OP WARD' };
+    const want = [['xray', 'PRE-OP X-RAY'], ['wound', 'WOUND PIC'], ['poxray', 'POST-OP X-RAY']];
+    const slides = want.map(([k, label]) => ({ id: 'dc-' + k, label, images: listOf(cc.images).filter((i) => i.kind === k).map((i) => i.id) })).filter((x) => x.images.length);
+    return {
+      noCover: true,
+      unit: unitOf(unitId).id,
+      date: d.dod || todayISO(),
+      cons: {},
+      imgUnit: imgUnit || '',
+      cases: [{
+        id,
+        title: 'DISCHARGE SUMMARY',
+        status: statusOf[d.disposition] || '',
+        rows: [
+          { k: 'NAME', v: DeckEngine.up(cc.name), kb: true, vb: true },
+          { k: 'AGE/SEX', v: DeckEngine.up(ageSex(cc)), vb: true },
+          { k: 'IP NO', v: DeckEngine.up(cc.ipNo) },
+          { k: 'DOA / DOS / DOD', v: `${fd(cc.doa)} / ${fd(d.dos)} / ${fd(d.dod)}` },
+          { k: 'DIAGNOSIS', v: DeckEngine.up(d.diagnosis || cc.diagnosis), vb: true, diag: true },
+          { k: 'PROCEDURE DONE', v: DeckEngine.up(d.procedure || cc.plan) },
+          { k: 'PHONE NO', v: (cc.phone || '').trim() },
+          { k: 'ADDRESS', v: DeckEngine.up(cc.address).replace(/\s*\n\s*/g, ', ') },
+        ],
+        slides,
+      }],
+    };
+  }
+
+  // ---------------------------------------------------------------- Research library
+  // Every case of the department in diagnosis folders (RESEARCH_TREE in js/data.js): open a folder for its
+  // cases, each case's discharge PowerPoint, the whole folder's PowerPoints as one zip, and a spreadsheet.
+  const Research = {
+    live: false,
+    all: null,
+    loading: false,
+    operatedOnly: true,
+    from: '',
+    to: '',
+    unit: '',
+    q: '',
+    owner: () => Store.mode === 'firebase' && Store.isOwner(),
+    async load() {
+      Research.loading = true;
+      try { Research.all = Research.owner() ? await Store.unitsCases() : Object.entries(Store.cases).map(([id, c]) => ({ id, unit: Store.unitKey || '', ...c })); } catch { Research.all = []; Research.all.failed = ['all']; }
+      Research.loading = false;
+      if (/^#\/research/.test(location.hash)) { current = null; render(); }
+    },
+    cases() {
+      const src = Research.owner() ? Research.all || [] : Object.entries(Store.cases).map(([id, c]) => ({ id, unit: Store.unitKey || '', ...c }));
+      const when = (c) => operatedOn(c) || c.doa || '';
+      return src.filter((c) => c.name && (!Research.operatedOnly || operatedOn(c)) && (!Research.unit || c.unit === Research.unit)
+        && (!Research.from || when(c) >= Research.from) && (!Research.to || when(c) <= Research.to))
+        .sort((a, b) => when(b).localeCompare(when(a)));
+    },
+    filtersHTML() {
+      return `<div class="card form rs-filters">
+          <label class="rs-chk"><input type="checkbox" id="rs-op" ${Research.operatedOnly ? 'checked' : ''}> Operated cases only</label>
+          <label>From<input type="date" id="rs-from" value="${esc(Research.from)}"></label>
+          <label>To<input type="date" id="rs-to" value="${esc(Research.to)}"></label>
+          ${Research.owner() ? `<label>Unit<select id="rs-unit"><option value="">All units</option>${Store.unitKeys.map((k, i) => `<option value="${k}"${Research.unit === k ? ' selected' : ''}>Unit ${UNITS[i].id}</option>`).join('')}</select></label>` : ''}
+          <label class="span2">Search diagnosis / procedure / name<input type="search" id="rs-q" value="${esc(Research.q)}" placeholder="e.g. SCHATZKER VI, DFLP, KUMAR"></label>
+        </div>`;
+    },
+    render() {
+      if (Research.owner() && !Research.all && !Research.loading) setTimeout(Research.load, 0);
+      const m = location.hash.match(/^#\/research\/(\w+)/);
+      const list = Research.cases();
+      const q = Research.q.trim().toUpperCase();
+      const byFolder = {};
+      list.forEach((c) => researchFolders(c).forEach((k) => (byFolder[k] ||= []).push(c)));
+      const head = `<div class="toolbar"><h2>Research library <span class="muted small">${Research.owner() ? 'all units' : `Unit ${esc(Store.meta.unitId)}`} · by diagnosis</span></h2>${m || q ? '<a class="btn small" href="#/research">‹ All folders</a>' : ''}</div>`;
+      if (Research.loading && !Research.all) return head + '<div class="card empty">Loading every case…</div>';
+      if (m || q) {
+        const f = m ? (m[1] === 'unsorted' ? { label: 'Not sorted into a folder', group: 'Others' } : RESEARCH_FOLDERS[m[1]]) : null;
+        let cases = m ? byFolder[m[1]] || [] : list;
+        if (q) cases = cases.filter((c) => `${c.diagnosis} ${c.plan} ${c.procedureDone} ${c.implantsUsed} ${c.name} ${c.ipNo}`.toUpperCase().includes(q));
+        Research.shown = cases;
+        return `${head}${Research.filtersHTML()}
+          <div class="card">
+            <div class="row-between"><h3>${f ? `${esc(f.group)} › ${esc(f.label)}` : `Search: “${esc(Research.q)}”`} <span class="pill">${cases.length}</span></h3></div>
+            ${cases.length ? `<div class="actions"><button class="btn primary" id="rs-zip">Download all discharge PowerPoints (.zip)</button><button class="btn" id="rs-csv">Spreadsheet (Excel / CSV)</button></div>
+              <p class="muted small" id="rs-msg">${cases.length > 25 ? 'Many cases: the zip can take a few minutes and is best made on a computer, or narrow the dates first.' : ''}</p>` : ''}
+            ${cases.map((c) => `<div class="rec-row">
+              <div class="rec-main"><b>${esc(c.name)}</b> <span class="muted">${esc(ageSex(c))}</span>${Research.owner() ? ` <span class="tag">${esc(unitLabel(c.unit))}</span>` : ''}
+                <div class="small">${esc(c.diagnosis || '')}</div>
+                <div class="muted small">${esc([c.procedureDone ? '✓ ' + c.procedureDone : c.plan ? '▸ ' + c.plan : '', c.implantsUsed, c.ipNo && 'IP ' + c.ipNo, c.doa && 'DOA ' + fmtDate(c.doa), operatedOn(c) && 'DOS ' + fmtDate(operatedOn(c)), c.discharge?.dod && 'DOD ' + fmtDate(c.discharge.dod)].filter(Boolean).join(' · '))}</div></div>
+              <button class="btn small" data-rs-ppt="${esc(c.unit || '')}|${esc(c.id)}">Discharge PPT</button></div>`).join('') || '<p class="empty">No cases here with these filters.</p>'}
+          </div>`;
+      }
+      return `${head}${Research.filtersHTML()}
+        ${Research.all?.failed?.length ? '<p class="notice small">Couldn\'t read every unit — no network?</p>' : ''}
+        <p class="muted small">${list.length} case${list.length === 1 ? '' : 's'}${Research.operatedOnly ? ' operated' : ''} — sorted by diagnosis (a case with two injuries is in both folders). Open a folder for its cases and their discharge PowerPoints.</p>
+        ${[...RESEARCH_TREE, { k: 'none', label: 'Not sorted', folders: [['unsorted', 'Not sorted into a folder']] }].map((g) => {
+          const n = g.folders.reduce((x, [k]) => x + (byFolder[k]?.length || 0), 0);
+          return `<details class="card rs-group"${n ? ' open' : ''}><summary><b>${esc(g.label)}</b> <span class="pill">${n}</span></summary>
+            <div class="rs-folders">${g.folders.filter(([k]) => Research.showEmpty || byFolder[k]?.length).map(([k, label]) => `<a class="rs-folder${byFolder[k]?.length ? '' : ' empty'}" href="#/research/${k}"><span class="rs-ico" aria-hidden="true">📁</span><span>${esc(label)}</span><b>${byFolder[k]?.length || 0}</b></a>`).join('') || '<p class="muted small">No cases yet.</p>'}</div></details>`;
+        }).join('')}
+        <p class="small"><button type="button" class="link" id="rs-empty">${Research.showEmpty ? 'Hide' : 'Show'} empty folders</button></p>`;
+    },
+    async ppt(c, asFile = false) {
+      const unitId = c.unit ? UNITS[Store.unitKeys.indexOf(c.unit)]?.id || Store.meta.unitId : Store.meta.unitId;
+      const d = dischargeDraft(c, unitId);
+      const st = dischargeDeckState(c.id, c, d, unitId, c.unit && c.unit !== Store.unitKey ? c.unit : '');
+      const upId = listOf(c.images).filter((i) => i.kind === 'dcpdf').at(-1)?.id || '';
+      return dischargeDeck(st, c, d, { ...Store.meta, unitId }, upId, { asFile });
+    },
+    async zip() {
+      const cases = Research.shown || [];
+      const msg = (t) => { const m = $('#rs-msg'); if (m) m.textContent = t; };
+      const z = new window.JSZip();
+      let bad = 0;
+      for (const [i, c] of cases.entries()) {
+        msg(`Building ${i + 1} of ${cases.length}: ${c.name}…`);
+        try { const f = await Research.ppt(c, true); z.file(`${String(i + 1).padStart(3, '0')}_${f.name}`, f); } catch (e) { bad++; console.warn('research ppt', c.name, e); }
+        deckImgs.clear(); // keep memory down between cases
+      }
+      msg('Packing the zip…');
+      const f = (location.hash.match(/^#\/research\/(\w+)/) || [])[1];
+      const name = `${(f && RESEARCH_FOLDERS[f]?.label) || 'SEARCH'} - DISCHARGE PPTS (${cases.length}).zip`.replace(/[\\/:*?"<>|]+/g, ' ');
+      const blob = await z.generateAsync({ type: 'blob', compression: 'STORE' });
+      msg(bad ? `Done — ${bad} couldn't be built (no network?).` : 'Done.');
+      offerFile(new File([blob], name, { type: 'application/zip' }));
+    },
+    csv() {
+      const q = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const days = (a, b) => (a && b ? Math.round((new Date(b) - new Date(a)) / 864e5) : '');
+      const head = ['UNIT', 'NAME', 'AGE', 'SEX', 'IP NO', 'MODE OF INJURY', 'DIAGNOSIS', 'COMORBIDITIES', 'DOA', 'DATE OF SURGERY', 'DOA TO SURGERY (DAYS)', 'PROCEDURE', 'IMPLANTS', 'SURGEON', 'ASSISTANTS', 'DATE OF DISCHARGE', 'LENGTH OF STAY (DAYS)', 'OUTCOME', 'SCHEME', 'PUS C/S', 'FOLDERS'];
+      const rows = (Research.shown || []).map((c) => [unitLabel(c.unit), c.name, c.age, c.sex, c.ipNo, c.mode, c.diagnosis, c.comorbid, fmtDate(c.doa), operatedOn(c) ? fmtDate(operatedOn(c)) : '', days(c.doa, operatedOn(c)),
+        c.procedureDone || c.plan, c.implantsUsed || c.implants, c.surgeon, c.assistants, c.discharge?.dod ? fmtDate(c.discharge.dod) : '', days(c.doa, c.discharge?.dod),
+        c.status === 'discharged' ? (DISPOSITIONS[c.discharge?.disposition]?.label || 'Discharge') : statusWord(c), c.scheme, [c.pus?.organism, c.pus?.sensitive].filter(Boolean).join(' — '),
+        researchFolders(c).map((k) => RESEARCH_FOLDERS[k]?.label || 'Not sorted').join('; ')]);
+      const f = (location.hash.match(/^#\/research\/(\w+)/) || [])[1];
+      const text = '﻿' + [head, ...rows].map((r) => r.map(q).join(',')).join('\r\n');
+      offerFile(new File([text], `${(f && RESEARCH_FOLDERS[f]?.label) || 'SEARCH'} - ${rows.length} CASES.csv`.replace(/[\\/:*?"<>|]+/g, ' '), { type: 'text/csv' }));
+    },
+    mount(el) {
+      $('#rs-op', el).onchange = (e) => { Research.operatedOnly = e.target.checked; render(); };
+      $('#rs-from', el).onchange = (e) => { Research.from = e.target.value; render(); };
+      $('#rs-to', el).onchange = (e) => { Research.to = e.target.value; render(); };
+      const u = $('#rs-unit', el);
+      if (u) u.onchange = () => { Research.unit = u.value; render(); };
+      $('#rs-q', el).oninput = (e) => { Research.q = e.target.value; clearTimeout(Research.t); Research.t = setTimeout(() => { render(); const i = $('#rs-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 400); };
+      $('#rs-zip', el)?.addEventListener('click', (e) => { e.currentTarget.disabled = true; Research.zip().catch((err) => toast('Could not make the zip: ' + err.message, 6000)).finally(() => { const b = $('#rs-zip'); if (b) b.disabled = false; }); });
+      $('#rs-csv', el)?.addEventListener('click', () => Research.csv());
+      $('#rs-empty', el)?.addEventListener('click', () => { Research.showEmpty = !Research.showEmpty; render(); });
+      el.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-rs-ppt]');
+        if (!b) return;
+        const [unit, id] = b.dataset.rsPpt.split('|');
+        const c = (Research.shown || []).find((x) => x.id === id && (x.unit || '') === unit);
+        if (!c) return;
+        b.disabled = true;
+        b.textContent = 'Building…';
+        Research.ppt(c).catch((err) => toast('Could not build it: ' + err.message, 5000)).finally(() => { b.disabled = false; b.textContent = 'Discharge PPT'; });
+      });
+    },
+  };
+
   // ---------------------------------------------------------------- Records (option A)
   // Every document made leaves a receipt: its frozen inputs (the case data as it was, the settings). Tapping the
   // receipt on the Records page rebuilds the same file. Reports (scheme, census, specialty, logbook) keep only
@@ -3402,10 +3592,10 @@ const App = (() => {
     offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
   }
   // the discharge PowerPoint: slides + the discharge summary a page per slide (the uploaded PDF if there was one)
-  async function dischargeDeck(st0, cc, d, meta, upId) {
+  async function dischargeDeck(st0, cc, d, meta, upId, { asFile = false } = {}) {
     const st = { ...st0 };
     await loadDeckImages(st);
-    const upUrl = upId && await Store.getImage(upId);
+    const upUrl = upId && await Store.getImage(upId, st.imgUnit || undefined);
     if (upUrl) {
       const doc = await DcImport.open(await (await fetch(upUrl)).blob());
       const pages = await DcImport.pageImages(doc);
@@ -3420,7 +3610,9 @@ const App = (() => {
     // NAME_AGE-SEX_IPNO.pptx — a "/" isn't allowed in file names, so 26/M is written 26-M.
     const part = (x) => DeckEngine.up(x).replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     const name = [part(cc.name) || 'PATIENT', [cc.age, cc.sex].map((x) => part(x)).filter(Boolean).join('-'), part(cc.ipNo)].filter(Boolean).join('_') + '.pptx';
-    offerFile(new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }));
+    const file = new File([blob], name, { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
+    if (asFile) return file;
+    offerFile(file);
   }
   // Rebuild a record: the same generator, fed the frozen inputs
   const REBUILD = {
@@ -3612,31 +3804,7 @@ const App = (() => {
         const c = Store.cases[id];
         if (!c) return notFound();
         const m = Store.meta;
-        const unit = unitName(m.unitId);
-        const d = {
-          disposition: 'discharge',
-          dod: todayISO(),
-          dos: c.surgeryDate || c.otDate || '',
-          consultant: unit,
-          unitLine: unit,
-          doctor: 'ORTHO ' + unit,
-          attender: c.attender,
-          phone: c.phone,
-          address: c.address,
-          diagnosis: c.diagnosis,
-          procedure: c.procedureDone || c.plan,
-          past: pastTemplate(c),
-          exam: EXAM_TEMPLATE,
-          treatment: [...DRUGS_ALL, ...(isSpinePelvis(c) ? DRUGS_SPINE_PELVIS : [])].join('\n'),
-          // written from the diagnosis: immobilisation + local examination (spine: power table)
-          condition: dcConditionText(dcRegions(c, { dos: c.surgeryDate || c.otDate })),
-          ...(() => { const adv = dcUsualAdvice(c, { dos: c.surgeryDate || c.otDate }); return { advice: adv.map((a) => a[0]).join('\n'), adviceTa: adv.map((a) => a[1]).join('\n') }; })(),
-          ...(c.discharge || {}),
-        };
-        if (d.disposition === 'lama') d.disposition = 'ama';
-        // H/O injury / illness: taken from the e-case sheet unless the discharge summary already has its own
-        if (!hasText(d.history) && hasText(c.history)) d.history = c.history;
-        if (!d.course) d.course = courseTemplate(c, d);
+        const d = dischargeDraft(c, m.unitId);
         const sp = isSpinePelvis(c);
         const drugBtns = `<div class="span2 drug-btns">
             <button type="button" class="chip" data-drugset="all">+ All-case drugs</button>
@@ -4001,32 +4169,8 @@ const App = (() => {
           const btn = e.currentTarget;
           const d = save();
           const cc = c();
-          const fd = (iso) => (iso ? fmtDate(iso).replace(/\//g, '.') : '—');
-          const statusOf = { dar: 'DISCHARGED AT REQUEST', ama: 'AMA', absconded: 'ABSCOND', postop: 'TRANSFERRED TO POST-OP WARD' };
-          const want = [['xray', 'PRE-OP X-RAY'], ['wound', 'WOUND PIC'], ['poxray', 'POST-OP X-RAY']];
-          const slides = want.map(([k, label]) => ({ id: 'dc-' + k, label, images: caseImages(id, k).map((im) => im.id) })).filter((x) => x.images.length);
-          const st = {
-            noCover: true,
-            unit: unitOf(Store.meta.unitId).id,
-            date: d.dod || todayISO(),
-            cons: {},
-            cases: [{
-              id,
-              title: 'DISCHARGE SUMMARY',
-              status: statusOf[d.disposition] || '',
-              rows: [
-                { k: 'NAME', v: DeckEngine.up(cc.name), kb: true, vb: true },
-                { k: 'AGE/SEX', v: DeckEngine.up(ageSex(cc)), vb: true },
-                { k: 'IP NO', v: DeckEngine.up(cc.ipNo) },
-                { k: 'DOA / DOS / DOD', v: `${fd(cc.doa)} / ${fd(d.dos)} / ${fd(d.dod)}` },
-                { k: 'DIAGNOSIS', v: DeckEngine.up(d.diagnosis || cc.diagnosis), vb: true, diag: true },
-                { k: 'PROCEDURE DONE', v: DeckEngine.up(d.procedure || cc.plan) },
-                { k: 'PHONE NO', v: (cc.phone || '').trim() },
-                { k: 'ADDRESS', v: DeckEngine.up(cc.address).replace(/\s*\n\s*/g, ', ') },
-              ],
-              slides,
-            }],
-          };
+          const st = dischargeDeckState(id, cc, d, Store.meta.unitId);
+          const slides = st.cases[0].slides;
           btn.disabled = true;
           btn.textContent = 'Building…';
           try {
@@ -5452,6 +5596,7 @@ const App = (() => {
     if (h === '#/updates') return Updates;
     if (h === '#/census') return Census;
     if (h === '#/records') return Records;
+    if (/^#\/research(\/\w+)?$/.test(h)) return Research;
     if (h === '#/spec') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : SpecTab;
     if (h === '#/scheme') return Store.meta.unitId === SCHEME_UNIT ? SchemeTab : Home;
     if (h === '#/cases') return Dashboard;
@@ -5470,7 +5615,7 @@ const App = (() => {
     if (view === 'consultant') return /^#\/settings/.test(h) ? '#/settings' : '#/';
     if (view === 'hs' && /^#\/(case|cases|new|discharge)\b/.test(h)) return '#/cases';
     if (view === 'hs' && /^#?\/?$/.test(h)) return '#/todo';
-    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|census|records|home)\b/);
+    const m = h.match(/^#\/(ward|postward|ot|deck|postop|settings|todo|updates|cases|spec|scheme|census|records|research|home)\b/);
     return m ? '#/' + m[1] : '#/';
   }
   // The tabs this view has, which one is open, and the PGs' count of new HS updates.

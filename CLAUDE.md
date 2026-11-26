@@ -155,3 +155,11 @@
 ## Ward status PDF / printout
 - No plan (diagnosis + "DONE: procedure" once done; post-op also POD). To-dos in two columns: INVESTIGATION (invTodoText) and
   OPINIONS (opTodoText = opinions pending + to-do tasks). Phone PDF (SharePdf wardPdf, 138 mm) and computer printout (Print.wardBoard).
+
+## Research library (#/research, nav "Research"; Research in js/app.js)
+- RESEARCH_TREE + researchFolders(c) in js/data.js: groups (upper limb, pelvis & hip, lower limb, spine, arthroplasty, arthroscopy,
+  tumour, infection, paediatric, others) → folders by regex on the diagnosis (arthroplasty / implant removal on the procedure, on:"P";
+  not: excludes). A case can be in several folders; none → "unsorted".
+- Owners see all units (Store.unitsCases), others their unit. Filters: operated only (default), from/to (DOS or DOA), unit, search.
+- Folder → cases → "Discharge PPT" (built from the case now: dischargeDraft + dischargeDeckState + dischargeDeck, pictures read from
+  the case's own unit via st.imgUnit); "Download all discharge PowerPoints (.zip)" (JSZip, STORE); spreadsheet CSV for research.

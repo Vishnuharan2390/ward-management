@@ -1329,3 +1329,83 @@ function courseTemplate(c, d) {
   ];
   return parts.filter(Boolean).join(' ');
 }
+
+// ---- Research library: every case sorted into diagnosis folders (a case can be in more than one) ----
+// [key, label, regex, { on: 'P' = match the procedure / plan instead of the diagnosis, not: exclude regex }]
+const RESEARCH_TREE = [
+  { k: 'upper', label: 'Upper limb', folders: [
+    ['clavicle', 'Clavicle', /CLAVIC/],
+    ['shoulder', 'Shoulder dislocation / AC joint', /SHOULDER DISLOCATION|DISLOCATION (OF )?(THE )?SHOULDER|ACROMIO ?CLAVICULAR|\bACJ\b/],
+    ['proxhum', 'Proximal humerus', /PROXIMAL (END (OF )?)?(THE )?HUMERUS|SURGICAL NECK|GREATER TUBEROSITY|HUMERAL HEAD/],
+    ['humshaft', 'Humerus shaft', /SHAFT (OF )?(THE )?HUMERUS|HUMERUS SHAFT|HUMERAL SHAFT|MIDSHAFT HUMERUS/],
+    ['disthum', 'Distal humerus / supracondylar', /SUPRACONDYLAR|INTERCONDYLAR|DISTAL (END (OF )?)?(THE )?HUMERUS|LATERAL CONDYLE|MEDIAL EPICONDYLE|CAPITELLUM/, { not: /FEMUR|FEMORAL/ }],
+    ['elbow', 'Olecranon / radial head / elbow', /OLECRANON|RADIAL HEAD|RADIAL NECK|ELBOW DISLOCATION|CORONOID|TERRIBLE TRIAD|MONTEGGIA/],
+    ['forearm', 'Forearm shaft (both bones)', /BOTH BONES? (OF )?(THE )?FOREARM|FOREARM|SHAFT (OF )?(THE )?(RADIUS|ULNA)|GALEAZZI/],
+    ['distrad', 'Distal radius', /DISTAL (END (OF )?)?(THE )?RADIUS|\bDER\b|COLLES|SMITH'?S? FRACTURE|BARTON/],
+    ['hand', 'Wrist & hand', /SCAPHOID|METACARPAL|PHALAN|CARPAL|BENNETT|THUMB|FINGER|\bHAND\b/],
+  ] },
+  { k: 'pelvis', label: 'Pelvis & hip', folders: [
+    ['pelvis', 'Pelvis', /PELVI|SACRO ?ILIAC|PUBIC RAM|SYMPHYSIS|ILIAC WING|SACRUM/],
+    ['acetab', 'Acetabulum', /ACETABUL/],
+    ['nof', 'Neck of femur', /NECK (OF )?(THE )?FEMUR|\bNOF\b|FEMORAL NECK|SUBCAPITAL|TRANSCERVICAL/],
+    ['it', 'Intertrochanteric', /INTER ?TROCHANTER|\bIT (FRACTURE|FEMUR)|PERTROCHANTER/],
+    ['subtroch', 'Subtrochanteric', /SUB ?TROCHANTER/],
+    ['hipdisl', 'Hip dislocation', /HIP DISLOCATION|DISLOCATION (OF )?(THE )?HIP/],
+  ] },
+  { k: 'lower', label: 'Lower limb', folders: [
+    ['femshaft', 'Femur shaft', /SHAFT (OF )?(THE )?FEMUR|FEMUR SHAFT|FEMORAL SHAFT|MIDSHAFT FEMUR/],
+    ['distfem', 'Distal femur', /DISTAL (END (OF )?)?(THE )?FEMUR|SUPRACONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR|INTERCONDYLAR (FRACTURE )?(OF )?(THE )?FEMUR|HOFFA|FEMORAL CONDYLE/],
+    ['patella', 'Patella', /PATELLA/],
+    ['plateau', 'Tibial plateau / proximal tibia', /PLATEAU|PROXIMAL (END (OF )?)?(THE )?TIBIA|SCHATZKER|BICONDYLAR (FRACTURE )?(OF )?(THE )?TIBIA/],
+    ['tibshaft', 'Tibia shaft / both bones leg', /SHAFT (OF )?(THE )?TIBIA|TIBIA SHAFT|TIBIAL SHAFT|BOTH BONES? (OF )?(THE )?LEG|\bBBFL\b/],
+    ['pilon', 'Pilon / distal tibia', /PILON|PLAFOND|DISTAL (END (OF )?)?(THE )?TIBIA|DISTAL THIRD (OF )?(THE )?TIBIA/],
+    ['ankle', 'Ankle (malleolar)', /MALLEOL|ANKLE|SYNDESMO/],
+    ['foot', 'Foot (calcaneum, talus, metatarsal)', /CALCAN|TALUS|TALAR|LISFRANC|METATARS|NAVICULAR|CUBOID|\bTOES?\b/],
+  ] },
+  { k: 'spine', label: 'Spine', folders: [
+    ['cspine', 'Cervical spine injury', /CERVICAL|\bC[1-7]\b/, { not: /DISC|SPONDYLO|MYELOPATHY/ }],
+    ['dlspine', 'Dorsolumbar spine injury', /DORSAL|LUMBAR|THORACIC|DORSOLUMBAR|THORACOLUMBAR|BURST|\b[DTL]\d{1,2}\b/, { not: /PIVD|DISC|STENOSIS|LISTHESIS|POTT|SPONDYLO/ }],
+    ['spinedeg', 'Degenerative / PIVD / TB spine', /PIVD|DISC (PROLAPSE|HERNIA)|CANAL STENOSIS|LISTHESIS|POTT|SPONDYLO|MYELOPATHY/],
+  ] },
+  { k: 'arthro', label: 'Arthroplasty', folders: [
+    ['tkr', 'TKR', /\bTKR\b|\bTKA\b|TOTAL KNEE/, { on: 'P' }],
+    ['thr', 'THR', /\bTHR\b|\bTHA\b|TOTAL HIP/, { on: 'P' }],
+    ['hemi', 'Hemiarthroplasty (bipolar / AMP / Thompson)', /BIPOLAR|HEMI ?-?ARTHROPLASTY|AUSTIN MOORE|\bAMP\b|THOMPSON/, { on: 'P' }],
+    ['ukr', 'UKR', /\bUKR\b|\bUKA\b|UNICONDYLAR KNEE/, { on: 'P' }],
+    ['revision', 'Revision arthroplasty', /REVISION/, { on: 'P' }],
+  ] },
+  { k: 'sports', label: 'Arthroscopy & sports', folders: [
+    ['acl', 'ACL / PCL', /\bACL\b|\bPCL\b|CRUCIATE/],
+    ['menisc', 'Meniscus', /MENISC/],
+    ['shoulderscope', 'Shoulder (Bankart, rotator cuff)', /BANKART|ROTATOR CUFF|SUPRASPINATUS|LABRAL|\bSLAP\b|RECURRENT (ANTERIOR )?(SHOULDER )?DISLOCATION/],
+  ] },
+  { k: 'tumour', label: 'Tumour', folders: [
+    ['benign', 'Benign / tumour-like', /\bGCT\b|GIANT CELL|OSTEOCHONDROMA|EXOSTOSIS|BONE CYST|\bABC\b|\bUBC\b|ENCHONDROMA|OSTEOID OSTEOMA|FIBROUS DYSPLASIA|LIPOMA/],
+    ['malignant', 'Malignant / metastasis', /SARCOMA|EWING|METASTA|MYELOMA|MALIGNAN|CARCINOMA|LYMPHOMA/],
+  ] },
+  { k: 'infection', label: 'Infection', folders: [
+    ['osteomyel', 'Osteomyelitis', /OSTEOMYELITIS|SEQUESTR/],
+    ['septic', 'Septic arthritis', /SEPTIC ARTHRITIS|PYOGENIC ARTHRITIS/],
+    ['implantinf', 'Infected implant / wound', /INFECTED|WOUND DEHISCENCE|DISCHARGING SINUS|\bSSI\b/],
+    ['diabfoot', 'Diabetic foot / gangrene / cellulitis', /DIABETIC FOOT|GANGRENE|CELLULITIS|NECROTISING/],
+  ] },
+  { k: 'paeds', label: 'Paediatric orthopaedics', folders: [
+    ['ctev', 'CTEV', /CTEV|CLUB ?FOOT/],
+    ['ddh', 'DDH / Perthes / SCFE', /\bDDH\b|PERTHES|\bSCFE\b|SLIPPED CAPITAL/],
+    ['deformity', 'Cerebral palsy / deformity', /CEREBRAL PALSY|GENU VALGUM|GENU VARUM|CUBITUS VARUS|DEFORMITY/],
+  ] },
+  { k: 'others', label: 'Others', folders: [
+    ['open', 'Open (compound) fractures', /COMPOUND|OPEN (FRACTURE|GRADE|INJURY)|GUSTILO|GRADE\s*(I{1,3}|[123])\s*[ABC]?\b/, { not: /OPEN BOOK|OPEN REDUCTION/ }],
+    ['exit', 'Implant removal', /IMPLANT\s*(EXIT|REMOVAL)|REMOVAL\s+OF\s+(THE\s+)?(IMPLANT|PLATE|NAIL|K[\s-]?WIRE|SCREW|HARDWARE)/, { on: 'P' }],
+    ['nonunion', 'Non-union / malunion', /NON ?-?UNION|MALUNION|DELAYED UNION/],
+    ['softtissue', 'Tendon / soft tissue / crush', /TENDON|TENDO ?ACHILLES|CRUSH|DEGLOVING|MANGLED/],
+  ] },
+];
+const RESEARCH_FOLDERS = Object.fromEntries(RESEARCH_TREE.flatMap((g) => g.folders.map(([k, label, re, o = {}]) => [k, { k, label, group: g.label, re, ...o }])));
+// The folders a case belongs in ('unsorted' when none fits)
+function researchFolders(c) {
+  const D = String(c.diagnosis || '').toUpperCase();
+  const P = String(`${c.procedureDone || ''} ${c.plan || ''}`).toUpperCase();
+  const out = Object.values(RESEARCH_FOLDERS).filter((f) => { const t = f.on === 'P' ? P : D; return f.re.test(t) && !(f.not && f.not.test(t)); }).map((f) => f.k);
+  return out.length ? out : ['unsorted'];
+}

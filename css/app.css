@@ -1918,3 +1918,15 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .rec-row:last-child { border-bottom: 0; }
 .rec-main { min-width: 0; }
 .rec-names { margin-top: .15rem; opacity: .85; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+/* Research library */
+.rs-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .6rem; align-items: end; }
+.rs-chk { display: flex; gap: .4rem; align-items: center; }
+.rs-group summary { cursor: pointer; font-size: 1.05rem; }
+.rs-folders { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: .45rem; margin-top: .6rem; }
+.rs-folder { display: grid; grid-template-columns: auto 1fr auto; gap: .5rem; align-items: center; padding: .6rem .7rem; border-radius: .7rem;
+  border: 1px solid var(--line, #333); color: inherit; text-decoration: none; background: var(--card, #1b1b1d); }
+.rs-folder b { font-size: 1.05rem; }
+.rs-folder.empty { opacity: .45; }
+.rs-ico { font-size: 1.2rem; }
+.rs-folder span:nth-child(2) { text-align: left; }
