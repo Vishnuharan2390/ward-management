@@ -156,6 +156,7 @@
   scheme performance, epidemiology, bed use, comorbidity & labs, documentation audit.
 
 ## Records (option A) — #/records, "Documents" card on the case sheet
+- Ward status and pending works are NOT kept (REC_SKIP; older ones hidden from Records and the case's Documents card).
 - keepRecord(type, {key, title, cases, args, live}) in js/app.js at every generator: discharge, dcimages, dcppt, otlist (recOt: print /
   WhatsApp / bot / email), consents, otxray, admdeck, postopdeck, ward, pending; reports with live:true (scheme, census, logbook, spec).
 - Store.addRecord → units/<unit>/records/<type>_<date>_<key> (same doc made again that day replaces it); args = JSON of the frozen

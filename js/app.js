@@ -3654,12 +3654,14 @@ const App = (() => {
   // their period and settings and are rebuilt from the data as it is then ("live").
   const REC_TYPES = {
     discharge: 'Discharge summary', dcimages: 'Discharge X-rays', dcppt: 'Discharge PowerPoint', otlist: 'OT list', consents: 'Consent forms',
-    otxray: 'OT list X-rays', admdeck: 'Admission day PPT', postopdeck: 'Post-op PPT', ward: 'Ward status', pending: 'Pending works',
+    otxray: 'OT list X-rays', admdeck: 'Admission day PPT', postopdeck: 'Post-op PPT',
     spec: 'Specialty report', scheme: 'Scheme report', census: 'Census', logbook: 'Logbook',
   };
+  // not kept in Records (and older ones hidden): the ward status and pending works change every hour
+  const REC_SKIP = new Set(['ward', 'pending']);
   let rebuilding = false;
   function keepRecord(type, { key, title, cases = [], args, live = false }) {
-    if (rebuilding) return;
+    if (rebuilding || REC_SKIP.has(type)) return;
     try {
       const json = JSON.stringify(args ?? null);
       const date = todayISO();
@@ -3678,7 +3680,7 @@ const App = (() => {
   function cachedCaseRecords(id) {
     const hit = caseDocsCache.get(id);
     if (hit && Date.now() - hit.t < 60000) return hit.p;
-    const p = Store.caseRecords(id);
+    const p = Store.caseRecords(id).then((list) => list.filter((r) => !REC_SKIP.has(r.type)));
     caseDocsCache.set(id, { t: Date.now(), p });
     p.catch(() => caseDocsCache.delete(id));
     return p;
@@ -3809,7 +3811,7 @@ const App = (() => {
       Records.from ||= addDays(todayISO(), -30);
       if (!Records.list && !Records.loading) setTimeout(Records.load, 0);
       const q = Records.q.trim().toUpperCase();
-      const rows = (Records.list || []).filter((r) => (!Records.type || r.type === Records.type) && (!q || `${r.title} ${r.names} ${r.ips}`.toUpperCase().includes(q)))
+      const rows = (Records.list || []).filter((r) => !REC_SKIP.has(r.type) && (!Records.type || r.type === Records.type) && (!q || `${r.title} ${r.names} ${r.ips}`.toUpperCase().includes(q)))
         .sort((a, b) => (b.at || 0) - (a.at || 0));
       const owner = Store.mode === 'firebase' && Store.isOwner();
       return `
