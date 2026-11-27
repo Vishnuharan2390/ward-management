@@ -59,7 +59,7 @@ function deptSay(k) {
 const ANAES = 'GA/RA';
 const LEVELS = ['I', 'II', 'III', 'IV'];
 const SCHEMES = ['APPROVED', 'VALIDATION', 'TO BE SUBMITTED', 'DENIED', 'NO SCHEME'];
-const ROLES = ['House Surgeon', 'PG', 'Senior PG', 'Assistant Professor', 'Professor'];
+const ROLES = ['House Surgeon', 'PG-1', 'PG-2', 'PG-3', 'Assistant Professor', 'Professor'];
 
 const UNITS = [
   { id: 'I', chief: 'PROF. DR. PATHIARASAKUMAR MS ORTHO', aps: ['DR. KARTHIKEYAN MS ORTHO', 'DR. PARAMAGURU RAJESH MS ORTHO', 'DR. ASHOK MS ORTHO'] },

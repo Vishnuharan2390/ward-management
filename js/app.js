@@ -4475,7 +4475,7 @@ const App = (() => {
         <form class="card form" id="prof">
           <fieldset><legend>You (on this device)</legend>
             <label>Your name<input name="name" value="${esc(p.name)}"></label>
-            <label>Role<select name="role"><option value="">—</option>${opts(ROLES, p.role)}</select></label>
+            <label>Role<select name="role"><option value="">—</option>${opts(ROLES.includes(p.role) || !p.role ? ROLES : [p.role, ...ROLES], p.role)}</select></label>
           </fieldset>
         </form>
 
@@ -4529,15 +4529,15 @@ const App = (() => {
           ${Store.guest ? '<p><b>Guest demo.</b> These are sample patients, on this phone only. <button class="btn small" data-guest-exit>Leave the demo</button></p>' : Store.mode === 'local'
             ? (window.WARD_CONFIG?.firebase
               ? '<p>This copy was opened as a file, so it runs in <b>local mode</b>: data stays in this browser only. For live sharing, open <b>https://callus-madurai.pages.dev/</b> (or <b>https://vishnuharan2390.github.io/ward-management/</b>) instead.</p>'
-              : '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and senior PGs, connect Firebase — see <b>README.md</b>.</p>')
+              : '<p>Running in <b>local mode</b>: data lives only in this browser. To share with your HS and PGs, connect Firebase — see <b>README.md</b>.</p>')
             : `<p>Signed in as <b>${esc(Store.user?.email)}</b> · sync: ${esc(Store.status)} <button class="btn small" id="signout">Sign out</button></p>
                ${Store.localCaseCount() ? `<p class="notice">This device has <b>${Store.localCaseCount()}</b> case(s) saved before sharing was switched on. <button class="btn small primary" id="upload-local">Copy them to the shared database</button></p>` : ''}
                <h4>Unit ${esc(m.unitId)} team</h4>
-               <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> ${Store.canManageTeam() ? ` <select class="role-pick" data-role-of="${esc(x.email)}" aria-label="Role of ${esc(x.name || x.email)}">${opts(ROLES.includes(x.role) || !x.role ? ROLES : [x.role, ...ROLES], x.role || 'PG')}</select> <span class="muted">${esc(x.email)}</span>` : `<span class="muted">${esc(x.role)} · ${esc(x.email)}</span>`}${x.admin ? ' <span class="tag">unit admin</span>' : ''}${Store.isOwner() ? ` <button class="btn small" data-admin="${esc(x.email)}" data-on="${x.admin ? '' : '1'}">${x.admin ? 'Remove admin' : 'Make admin'}</button>` : ''}${Store.canManageTeam() && (Store.isOwner() || x.email !== Store.user?.email?.toLowerCase()) ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">No one yet.</li>'}</ul>
+               <ul class="members">${members.map((x) => `<li><b>${esc(x.name || x.email)}</b> ${Store.canManageTeam() ? ` <select class="role-pick" data-role-of="${esc(x.email)}" aria-label="Role of ${esc(x.name || x.email)}">${opts(ROLES.includes(x.role) || !x.role ? ROLES : [x.role, ...ROLES], x.role || 'PG-1')}</select> <span class="muted">${esc(x.email)}</span>` : `<span class="muted">${esc(x.role)} · ${esc(x.email)}</span>`}${x.admin ? ' <span class="tag">unit admin</span>' : ''}${Store.isOwner() ? ` <button class="btn small" data-admin="${esc(x.email)}" data-on="${x.admin ? '' : '1'}">${x.admin ? 'Remove admin' : 'Make admin'}</button>` : ''}${Store.canManageTeam() && (Store.isOwner() || x.email !== Store.user?.email?.toLowerCase()) ? ` <button class="icon" data-rm="${esc(x.email)}">✕</button>` : ''}</li>`).join('') || '<li class="muted">No one yet.</li>'}</ul>
                ${Store.canManageTeam() ? `<form class="inline-add" id="add-member">
                  <label class="mini-lab">Gmail of HS / PG<input name="email" type="email" required></label>
                  <label class="mini-lab">Name<input name="name"></label>
-                 <select name="role">${opts(ROLES, 'PG')}</select>
+                 <select name="role">${opts(ROLES, 'PG-1')}</select>
                  <button class="btn small primary">Add</button></form>
                  <p class="muted small">Each person can be on one unit's team only. Someone on another unit's team has to be removed there first.</p>` : '<p class="muted small">Ask your unit\'s admin to add people.</p>'}`}
         </div>
