@@ -78,6 +78,8 @@ function unitOf(id) {
 const allUnits = () => UNITS.map((u) => unitOf(u.id));
 const unitName = (id) => 'UNIT ' + unitOf(id).id;
 // OT list file name: "OT LIST UNIT I 11-11-2026" (unit number, then the date of the list).
+// The message that goes with the OT list PDF on WhatsApp
+const otShareText = (draft) => `GOOD MORNING SIR\nOT LIST FOR TOMORROW ${fmtDate(draft.date)} SIR\nTHANK YOU SIR`;
 const otFileName = (draft) => `OT LIST UNIT ${unitOf(draft.unitId).id} ${fmtDate(draft.date).replace(/\//g, '-')}`;
 
 // Defaults match the unit's letterhead; editable in Settings.

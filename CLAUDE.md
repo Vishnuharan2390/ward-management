@@ -168,6 +168,10 @@
   then per case its pictures (X-ray → CT → MRI, each with a navy strip "NAME 40/M · XRAY 1") + caption "NAME, AGE/SEX\nDIAGNOSIS\nXRAY, CT"
   (WhatsApp puts it on the first picture). Button shows "📤 2/4 · Send case 1: NAME (3 pictures)".
 
+## OT list PDF on WhatsApp
+- File "OT LIST UNIT I 28-11-2026.pdf" (otFileName, js/data.js). SharePdf.ot / the bot button / Records rebuild share it with
+  otShareText(draft): "GOOD MORNING SIR / OT LIST FOR TOMORROW 28/11/2026 SIR / THANK YOU SIR" (also copied to the clipboard).
+
 ## Ward status PDF / printout
 - No plan (diagnosis + "DONE: procedure" once done; post-op also POD). To-dos in two columns: INVESTIGATION (invTodoText) and
   OPINIONS (opTodoText = opinions pending + to-do tasks). Phone PDF (SharePdf wardPdf, 138 mm) and computer printout (Print.wardBoard).

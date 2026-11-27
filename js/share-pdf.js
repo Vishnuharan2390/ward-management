@@ -212,11 +212,13 @@ const SharePdf = (() => {
 
   // Phone: share sheet (pick WhatsApp). Computer / browsers without file sharing: download it.
   // Resolves when the share sheet closes (sent or cancelled), or at once after a download.
-  function send(file) {
+  // text: the message that goes with the file (also copied, in case WhatsApp drops it — paste as the caption)
+  function send(file, text) {
     let ok = false;
     try { ok = !!(navigator.share && navigator.canShare && navigator.canShare({ files: [file] })); } catch { ok = false; }
-    if (ok) return navigator.share({ files: [file], title: file.name }).catch((e) => { if (e.name !== 'AbortError') download(file); });
-    download(file);
+    if (text) navigator.clipboard?.writeText(text).catch(() => {});
+    if (ok) return navigator.share(text ? { files: [file], text } : { files: [file], title: file.name }).catch((e) => { if (e.name !== 'AbortError') download(file); });
+    download(file, text ? `Saved ${file.name} — the message is copied: paste it in WhatsApp with the PDF.` : undefined);
     return Promise.resolve();
   }
   function download(file, msg) {
@@ -244,7 +246,7 @@ const SharePdf = (() => {
     ward: (cases, meta, post) => send(wardPdf(cases, meta, post)),
     otOpen: (cases, draft, twice = false) => open(otPdf(cases, draft, twice)),
     pending: (cases, meta, post) => send(pendingPdf(cases, meta, post)),
-    ot: (cases, draft, twice = false) => send(otPdf(cases, draft, twice)),
+    ot: (cases, draft, twice = false) => send(otPdf(cases, draft, twice), otShareText(draft)),
     otEmail: (cases, draft, to) => email(otPdf(cases, draft), to, draft),
     wardPdf, pendingPdf, otPdf,
     share: send,

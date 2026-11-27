@@ -2781,7 +2781,7 @@ const App = (() => {
         sendScheme(cases, dd);
         recOt(cases, dd);
         const file = SharePdf.otPdf(cases, dd);
-        await SharePdf.share(file);
+        await SharePdf.share(file, otShareText(dd));
         if (!confirm(`Also send it from the unit's WhatsApp bot to the ${nums.length} OT contact${nums.length === 1 ? '' : 's'}?\n\n${nums.join('\n')}`)) return;
         waBot.disabled = true;
         toast('Sending to the OT contacts…', 15000);
@@ -3712,7 +3712,7 @@ const App = (() => {
       if (PhonePdf.isPhone()) PhonePdf.radiographs(c, d, sections, meta); else Print.imagesPdf(c, d, sections, meta);
     },
     dcppt: ([st, cc, d, meta, upId]) => dischargeDeck(st, cc, d, meta, upId),
-    otlist: ([cases, dd]) => SharePdf.share(SharePdf.otPdf(cases, dd)),
+    otlist: ([cases, dd]) => SharePdf.share(SharePdf.otPdf(cases, dd), otShareText(dd)),
     consents: ([cases, dd]) => (PhonePdf.isPhone() ? PhonePdf.consents(cases, dd) : Print.consents(cases, dd)),
     otxray: ([cases, dd]) => otXrays(cases, dd),
     admdeck: ([st, name]) => deckFile(st, name),
