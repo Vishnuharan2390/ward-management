@@ -90,6 +90,8 @@
   proximal / distal to the fracture + lag screws; PFN = 8mm lag + 6.4mm anti-rotation (PFNA helical blade) then distal bolts;
   DHS = 12.5mm lag + shaft. Every screw / wire / pin type carries its diameter (OPN_SCREWS).
   Other kinds: free rows. Spine template procedures: rows with type, level(s), side, number, size.
+- External fixator (not Ilizarov): Schanz pins proximal / distal fragment (OPN_EXFIX_PINS, 4.5MM default) + Frame (OPN_EXFIX_FRAME: AO CLAMPS,
+  AO RODS, CONNECTING CLAMPS, T-CLAMPS; at "FRAME"); note says the pins per fragment, then "assembled with …".
 - Wording: opnScrewSay → "2 X 4.9MM LOCKING BOLTS OF SIZE 34MM EACH WERE USED FOR PROXIMAL LOCKING…" (singular when 1).
 - The note has NO diagnosis / procedure / implants header (those are the boxes above); "Write OT notes" also fills Implants used.
 - Surgeons and assistant surgeons: one box each + "+ Surgeon" / "+ Assistant surgeon" (staffHTML), saved comma-joined in surgeon / assistants.

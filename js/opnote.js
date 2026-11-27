@@ -14,12 +14,16 @@ const OPN_SCREWS = ['3.5MM CORTICAL SCREWS', '4.5MM CORTICAL SCREWS', '2.7MM COR
   '8MM LAG SCREW', '10.5MM LAG SCREW', '12.5MM DHS LAG SCREW', '6.4MM ANTI-ROTATION SCREW', '6.5MM ANTI-ROTATION SCREW', 'HELICAL BLADE',
   '3MM HERBERT SCREWS', '2.4MM HERBERT SCREWS', '1.5MM K-WIRES', '1.8MM K-WIRES', '2MM K-WIRES', '2.5MM K-WIRES', '18G SS WIRE',
   '4.5MM SCHANZ PINS', '5MM SCHANZ PINS', '6MM SCHANZ PINS', '3MM STEINMANN PINS', '4MM STEINMANN PINS',
+  'AO CLAMPS', 'AO RODS', 'CONNECTING CLAMPS', 'T-CLAMPS',
   'PEDICLE SCREWS', '3.5MM SUTURE ANCHORS', '5MM SUTURE ANCHORS', '7MM INTERFERENCE SCREW', '8MM INTERFERENCE SCREW', '9MM INTERFERENCE SCREW', 'CORTICAL BUTTON (ENDOBUTTON)'];
 // The menus each kind of implant gets: nails proximal then distal locking; plates screws proximal / distal to
 // the fracture + lag screws; PFN lag + anti-rotation screw then distal bolts; DHS lag screw + shaft screws.
 const OPN_BOLTS = ['4.9MM LOCKING BOLTS', '5MM LOCKING BOLTS', '4.5MM LOCKING BOLTS', '3.9MM LOCKING BOLTS', '6.4MM LOCKING BOLTS'];
 const OPN_PLATE_SCREWS = ['4.5MM CORTICAL SCREWS', '5MM LOCKING SCREWS', '3.5MM CORTICAL SCREWS', '3.5MM LOCKING SCREWS', '2.7MM CORTICAL SCREWS', '2.4MM LOCKING SCREWS', '4MM CANCELLOUS SCREWS', '6.5MM CANCELLOUS SCREWS'];
 const OPN_LAG_SCREWS = ['4.5MM CORTICAL SCREW', '3.5MM CORTICAL SCREW', '2.7MM CORTICAL SCREW', '4MM CANCELLOUS SCREW', '6.5MM CANCELLOUS SCREW (PARTIALLY THREADED)', '4MM CANNULATED CANCELLOUS SCREW'];
+// External fixator: pins in each main fragment, then the frame (the department's AO set)
+const OPN_EXFIX_PINS = ['4.5MM SCHANZ PINS', '5MM SCHANZ PINS', '6MM SCHANZ PINS', '4MM STEINMANN PINS'];
+const OPN_EXFIX_FRAME = ['AO CLAMPS', 'AO RODS', 'CONNECTING CLAMPS', 'T-CLAMPS'];
 const OPN_SPINE_SCREWS = ['PEDICLE SCREWS', 'LATERAL MASS SCREWS', 'CORTICAL BONE TRAJECTORY SCREWS', 'ILIAC SCREWS', 'LAMINAR HOOKS'];
 const OPN_SPINE_SIDES = [['BILATERAL', 'Both sides'], ['RIGHT', 'Right'], ['LEFT', 'Left']];
 function opnScrewSections(imp) {
@@ -42,6 +46,11 @@ function opnScrewSections(imp) {
       { at: 'DISTAL', title: 'Screws distal to the fracture', types: OPN_PLATE_SCREWS, add: [['+ Distal screws', def]] },
       { at: 'ACROSS FRACTURE', title: 'Lag screws (across the fracture)', types: OPN_LAG_SCREWS, add: [['+ Lag screw', small ? '3.5MM CORTICAL SCREW' : '4.5MM CORTICAL SCREW']] }];
   }
+  if (k === 'exfix' && imp.implant !== 'ilizarov') {
+    return [{ at: 'PROXIMAL', title: 'Schanz pins — proximal fragment', types: OPN_EXFIX_PINS, add: [['+ Proximal pins', '4.5MM SCHANZ PINS']] },
+      { at: 'DISTAL', title: 'Schanz pins — distal fragment', types: OPN_EXFIX_PINS, add: [['+ Distal pins', '4.5MM SCHANZ PINS']] },
+      { at: 'FRAME', title: 'Frame', types: OPN_EXFIX_FRAME, add: [['+ AO clamps', 'AO CLAMPS'], ['+ AO rods', 'AO RODS'], ['+ Connecting clamps', 'CONNECTING CLAMPS'], ['+ T-clamps', 'T-CLAMPS']] }];
+  }
   return null; // anything else: free rows with a "where" choice
 }
 // Lengths typed as "34" or "34, 36" → ['34', '36']; something else (e.g. "6.5 X 45") → null (written as typed).
@@ -62,7 +71,7 @@ const opnCount = (g) => g.reduce((a, s) => a + (+s.n || 1), 0);
 const opnSayList = (g) => opnJoin(g.map(opnScrewSay));
 
 // Where a group of screws goes; used to place them in the right sentence of the note.
-const OPN_SCREW_AT = [['PROXIMAL', 'Proximal'], ['DISTAL', 'Distal'], ['NECK', 'Neck / head'], ['SHAFT', 'Shaft'], ['ACROSS FRACTURE', 'Across fracture (lag)']];
+const OPN_SCREW_AT = [['PROXIMAL', 'Proximal'], ['DISTAL', 'Distal'], ['NECK', 'Neck / head'], ['SHAFT', 'Shaft'], ['ACROSS FRACTURE', 'Across fracture (lag)'], ['FRAME', 'Frame']];
 
 // ---- Approaches: what is done between incision and the fracture.
 // pos = usual position, tq = tourniquet usually used, closed = closed / percutaneous technique.
@@ -442,7 +451,7 @@ const opnLen = (len) => {
 };
 const opnScrewType = (s) => (s.type === 'custom' ? (s.custom || '') : s.type || '').trim();
 // One of them: "4.9MM LOCKING BOLTS" → "4.9MM LOCKING BOLT" (when the number is 1)
-const opnOne = (s, t) => (String(s.n || '').trim() === '1' ? t.replace(/\b(BOLT|SCREW|WIRE|PIN|ANCHOR|HOOK|BLADE)S\b/i, '$1') : t);
+const opnOne = (s, t) => (String(s.n || '').trim() === '1' ? t.replace(/\b(BOLT|SCREW|WIRE|PIN|ANCHOR|HOOK|BLADE|CLAMP|ROD)S\b/i, '$1') : t);
 // "3 X 3.5MM LOCKING SCREWS (36, 38, 40MM)" — without its position (the sentence says where).
 const opnScrewBase = (s) => {
   const len = opnLen(s.len);
@@ -574,9 +583,22 @@ function opnProc(p) {
       case 'kwire':
         L.push(`Fixed with ${screwText || 'K-wires'}; wires bent and cut outside the skin / buried as appropriate.`);
         break;
-      case 'exfix':
-        L.push(`Two pins inserted in each main fragment and the ${impName} assembled with clamps and rods after achieving reduction${screwText ? ` (${screwText})` : ''}.`);
+      case 'exfix': {
+        const pp = at('PROXIMAL');
+        const dd = at('DISTAL');
+        const fr = at('FRAME');
+        const rest = notAt('PROXIMAL', 'DISTAL', 'FRAME');
+        if (!pp.length && !dd.length && !fr.length) {
+          L.push(`Two pins inserted in each main fragment and the ${impName} assembled with clamps and rods after achieving reduction${screwText ? ` (${screwText})` : ''}.`);
+          break;
+        }
+        const pins = [[pp, 'proximal'], [dd, 'distal']].filter(([g]) => g.length)
+          .map(([g, w], i) => `${list(g)}${i ? '' : opnCount(g) === 1 ? ' was placed' : ' were placed'} in the ${w} fragment`);
+        if (pins.length) L.push(`${pins.join(' and ')}${rest.length ? `, along with ${list(rest)}` : ''}.`);
+        else if (rest.length) L.push(`${list(rest)} were placed.`);
+        L.push(`The ${impName} was assembled${fr.length ? ` with ${list(fr)}` : ' with clamps and rods'} and all clamps were tightened after confirming the reduction.`);
         break;
+      }
       case 'hemi':
         L.push('Femoral head removed with a corkscrew and its size measured. Neck osteotomy done 1-1.5cm above the lesser trochanter.');
         L.push(`Femoral canal prepared with box chisel and rasps, and ${impName}${size ? '' : ' of appropriate size'} inserted with appropriate anteversion; hip reduced and found stable through range of motion.`);
