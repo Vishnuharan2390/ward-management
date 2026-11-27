@@ -111,7 +111,8 @@
 - Forms (CONSENT_TPLS): upper, lower, cervical, dorsolumbar, pelvis (lower with இடுப்பு எலும்பு), arthroplasty, arthroscopy, paeds
   (tenotomy / PMSTR / quadricepsplasty; parent wording). consentKind auto-picks arthroplasty (plan, no fracture), arthroscopy
   (CONSENT_SCOPE_RE), paeds (CONSENT_PAEDS_RE, no fracture), pelvis; the three elective forms take no CONSENT_MORE extras.
-  c.minor === true forces parent wording (used for the blank paediatric form).
+  c.minor === true forces parent wording (used for the blank paediatric form). exit = "Implant exit (any limb)" (கை / கால்),
+  consentTpl "exit" forces exit wording; normal exits still use their own limb form via CONSENT_EXIT_RE on the plan.
 - Also CONSENT_MORE (first 2 by CONSENT_MORE_ORDER): tumour recurrence/HPE, open # debridement/flap/amputation, child growth plate,
   hip DVT/PE/pneumonia/bedsore (+AVN for NOF fixation), nail fat embolism/malrotation, ex-fix pin tract, clavicle brachial plexus/
   pneumothorax, upper limb nerves (wrist drop), peroneal nerve (foot drop), compartment syndrome, peri-articular stiffness/arthritis,

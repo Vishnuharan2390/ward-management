@@ -104,10 +104,13 @@ const CONSENT_TPLS = {
 
 CONSENT_TPLS.pelvis = { ...CONSENT_TPLS.lower, label: 'Pelvis / acetabulum', bone: 'இடுப்பு', paras: CONSENT_TPLS.lower.paras.map((t) => t.replace(/கால் எலும்பு/g, 'இடுப்பு எலும்பு')) };
 Object.assign(CONSENT_TPLS, CONSENT_FORMS_MORE);
+// Implant exit for any limb (picked on the OT list, or for a blank form); limb cases normally get their own limb form in exit wording.
+CONSENT_TPLS.exit = { label: 'Implant exit (any limb)', bone: 'கை / கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+  paras: [CONSENT_LIMB_OPEN('கை / கால்'), ...CONSENT_LIMB_RISKS('கை / கால்', 'கை / காலுக்கு', 'கை / காலைத்')] };
 
 // Implant exit: the implant paragraph is about removing it, not fixing the bone.
 const CONSENT_EXIT_RE = /IMPLANT\s*(EXIT|REMOVAL)|HARDWARE\s*REMOVAL|REMOVAL\s+OF\s+(THE\s+)?(IMPLANTS?|HARDWARE|PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|EXTERNAL\s+FIXATOR|JESS)|\b(PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|FIXATOR|JESS|LRS|ILIZAROV|IMPLANTS?)\s+(EXIT|REMOVAL)\b|\bROI\b/;
-const consentIsExit = (c) => CONSENT_EXIT_RE.test(String(c?.plan || '').toUpperCase());
+const consentIsExit = (c) => c?.consentTpl === 'exit' || CONSENT_EXIT_RE.test(String(c?.plan || '').toUpperCase());
 const CONSENT_EXIT_PARA = (bone) => `மேலும், எலும்பில் பொருத்திய உலோகத்தை நீக்கும் போது, அதனை முழுமையாக நீக்க இயலாத நிலை வரலாம் என அறிவேன். உலோகம் அல்லது திருகாணி உடைந்து அதன் ஒரு பகுதி எலும்பிலேயே தங்கிவிட வாய்ப்புள்ளது என அறிவேன். மேலும் உலோகத்தை நீக்கும் போதோ அல்லது நீக்கிய பின்னரோ எனது ${bone} எலும்பு உடைய வாய்ப்புள்ளது என அறிவேன். அவ்வாறு உடைந்தால் அதனைச் சரிசெய்ய மறு அறுவை சிகிச்சை செய்யும் நிலை வரலாம் என அறிவேன்.`;
 
 // Implant exit, first paragraph: which bone was broken, what was put in, and that it now has to come out.
