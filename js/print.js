@@ -246,7 +246,7 @@ const Print = (() => {
 
 
   // Pre-op imaging of the OT list cases: for each patient, X-rays, then CT, then MRI, each under
-  // its own heading (X-rays 3 per page; CT and MRI one image per page), name/age/sex/diagnosis on every page.
+  // its own heading (X-rays, CT and MRI one image per page), name/age/sex/diagnosis on every page.
   function otXrays(items, draft) {
     const pages = [];
     items.forEach(({ c, n, sections }) => {

@@ -161,6 +161,9 @@
 - storage.rules (owner publishes: Storage → Rules; cross-service firestore.exists on the team list) + tools/storage-cors.json (one-time
   CORS on the bucket so the app can read photos back). Tested: rulestest/storage.test.mjs (13) on the emulator.
 
+## Pre-op imaging (OT list → "Pre-op imaging PDF")
+- otXrays in js/app.js: KINDS per page = 1 for X-ray, CT and MRI (one image per page, phone PDF and printout alike).
+
 ## Ward status PDF / printout
 - No plan (diagnosis + "DONE: procedure" once done; post-op also POD). To-dos in two columns: INVESTIGATION (invTodoText) and
   OPINIONS (opTodoText = opinions pending + to-do tasks). Phone PDF (SharePdf wardPdf, 138 mm) and computer printout (Print.wardBoard).

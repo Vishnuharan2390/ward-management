@@ -3568,7 +3568,7 @@ const App = (() => {
   // the pictures a (frozen) case had, of one kind, oldest first
   const frozenImgs = (c, kind) => listOf(c.images).filter((i) => i.kind === kind).map((i) => i.id);
   async function otXrays(cases, dd) {
-    const KINDS = [['xray', 'PRE-OP X-RAY', 3], ['ct', 'CT', 1], ['mri', 'MRI', 1]];
+    const KINDS = [['xray', 'PRE-OP X-RAY', 1], ['ct', 'CT', 1], ['mri', 'MRI', 1]];
     const items = [];
     const none = [];
     for (const [i, c] of cases.entries()) {
