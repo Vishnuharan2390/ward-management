@@ -1823,6 +1823,14 @@ html[data-ui="graphite"] .posted-mark, html[data-ui="midnight"] .posted-mark, ht
 .rd-der .rd-chips { margin-top: .4rem; }
 .pill.bad { background: #c62828; color: #fff; }
 .rd-der .chip { background: #fff; color: #7a1414; border: 1px solid #e0a3a3; }
+/* Rounds: routine ESR / qCRP and FBS / PPBS due today */
+.rd-due { margin: .6rem 0; padding: .55rem .7rem; border-radius: .7rem; border: 1px solid #9fb6e0; background: #eaf1fd; color: #13294b; }
+.rd-due-row + .rd-due-row { margin-top: .55rem; padding-top: .55rem; border-top: 1px dashed #9fb6e0; }
+.rd-due-h { font-weight: 700; margin-bottom: .35rem; }
+.rd-due-h .muted { color: #4a5f86; font-weight: 400; }
+.rd-due-in { display: flex; flex-wrap: wrap; gap: .5rem; align-items: flex-end; }
+.rd-due .rd-due-in label { display: flex; flex-direction: column; font-size: .8rem; font-weight: 600; gap: .15rem; color: #13294b !important; }
+.rd-due-in input { width: 6rem; background: #fff; color: #13294b; border: 1px solid #9fb6e0; border-radius: .45rem; padding: .35rem .45rem; font-size: 1rem; }
 
 /* Clear (×) button in text boxes — js/clear.js */
 .has-clr.filled {

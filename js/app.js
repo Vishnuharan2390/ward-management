@@ -861,6 +861,7 @@ const App = (() => {
           </div>
         </div>
         <div class="rd-dx">${esc(c.diagnosis)}</div>${bedsoreLine(c)}${c.comorbid ? `<div class="rd-cm">K/C/O ${esc(c.comorbid)}</div>` : ''}${post ? (c.procedureDone || c.plan ? `<div class="rd-plan">✓ ${esc(c.procedureDone || c.plan)}</div>` : '') : `${c.plan ? `<div class="rd-plan">▸ ${esc(c.plan)}</div>` : ''}${doneHTML(c)}`}
+        ${dueHTML(c)}
         ${derangedHTML(c)}
         ${reviewHTML(c)}
         <div class="rd-sec"><div class="rd-lab">Investigation</div>
@@ -891,6 +892,33 @@ const App = (() => {
   }
 
   // ---- Rounds: the latest values that are out of range, so nobody has to read through every result.
+  // ---- Rounds: routine ESR / qCRP (wound cases, weekly on the unit's day) and FBS / PPBS (diabetics, every
+  // 2 days) — asked for here, saved straight into the case's chart (made if it isn't there).
+  function dueHTML(c) {
+    const due = monitorDue(c, Store.meta.unitId);
+    if (!due.length) return '';
+    return `<div class="rd-due" role="note">${due.map((d) => `<div class="rd-due-row" data-due="${d.k}">
+        <div class="rd-due-h">🩸 ${esc(d.title)} due today <span class="muted small">${esc(d.why)}</span></div>
+        <div class="rd-due-in">${d.keys.map(([k, l]) => `<label>${esc(l)}<input data-due-in="${k}" inputmode="decimal" data-no-clear></label>`).join('')}
+          <button type="button" class="btn small primary" data-due-save="${d.k}">Save to chart</button></div></div>`).join('')}</div>`;
+  }
+  function dueSave(caseId, kind, row) {
+    const c = Store.cases[caseId];
+    const v = {};
+    $$('[data-due-in]', row).forEach((x) => { if (x.value.trim()) v[x.dataset.dueIn] = x.value.trim(); });
+    if (!Object.keys(v).length) return toast('Type the values first');
+    const chId = Object.entries(c.charts || {}).find(([, ch]) => ch.type === kind)?.[0] || `auto_${kind}`;
+    const ch = {};
+    if (!c.charts?.[chId]) {
+      const tpl = CHART_TEMPLATES[kind];
+      ch[`charts.${chId}`] = { type: kind, title: tpl.title, cols: tpl.cols.map(chartCol), at: Date.now(), rows: {} };
+    }
+    ch[`charts.${chId}.rows.${uid()}`] = { date: todayISO(), time: '', v, at: Date.now(), by: Store.who() };
+    Store.patch('cases', caseId, ch);
+    logUpdate(caseId, `${CHART_TEMPLATES[kind].title}: ${Object.entries(v).map(([k, x]) => `${k === 'crp' ? 'qCRP' : k.toUpperCase()} ${x}`).join(', ')}`);
+    toast(`✓ Saved to ${c.name}'s ${CHART_TEMPLATES[kind].title}`);
+  }
+
   function derangedHTML(c) {
     const d = derangedList(c);
     if (!d.length) return '';
@@ -1305,6 +1333,9 @@ const App = (() => {
           }
           return;
         }
+        // Routine ESR / qCRP, FBS / PPBS → the chart
+        const ds = e.target.closest('[data-due-save]');
+        if (ds) return dueSave(ds.closest('[data-nbcase]').dataset.nbcase, ds.dataset.dueSave, ds.closest('.rd-due-row'));
         // From earlier rounds: open a result form / save it / mark done
         if (reviewClick(e)) return;
         // Quick-tap chip: add the line to the box and save it.
@@ -5960,6 +5991,15 @@ const App = (() => {
         // viral markers positive → (HBsAg+/HCV+/PLHA) in the diagnosis (letter case aside: typing makes it capitals)
         const dx = diagnosisWithViral(c);
         if (dx.toUpperCase() !== String(c.diagnosis || '').trim().toUpperCase()) Store.patch('cases', id, { diagnosis: dx });
+        // wound cases / diabetics in the wards get their ESR-CRP / diabetic chart made (fixed id: two phones can't make two)
+        if (['preop', 'posted', 'postop'].includes(c.status || 'preop')) {
+          for (const [kind, test] of [['inflam', isWoundCase], ['dm', isDiabetic]]) {
+            if (test(c) && !Object.values(c.charts || {}).some((ch) => ch.type === kind) && !c.charts?.[`auto_${kind}`]) {
+              const tpl = CHART_TEMPLATES[kind];
+              Store.patch('cases', id, { [`charts.auto_${kind}`]: { type: kind, title: tpl.title, cols: tpl.cols.map(chartCol), at: Date.now(), rows: {} } });
+            }
+          }
+        }
         // ward: only one of WARDS, written exactly ("90-A", "90A ORTHO 1" → "90A"; not a listed ward → blank)
         if ((c.ward || '') !== normWard(c.ward)) Store.patch('cases', id, { ward: normWard(c.ward) });
       }

@@ -604,6 +604,56 @@ function chartRows(c, ch) {
   return [...own, ...inv].sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.time || '').localeCompare(b.time || '') || (a.at || 0) - (b.at || 0));
 }
 
+// ---- Routine monitoring asked for on rounds (and charted automatically):
+// wound cases → ESR / qCRP once a week, on the unit's fixed day = 2 days after its admission day
+// (admission days: I Mon, II Tue, III Wed, IV Thu, V Fri, VI Sat → ESR days Wed, Thu, Fri, Sat, Sun, Mon);
+// diabetics → FBS / PPBS every 2 days. Sunday admissions rotate between units and don't move the ESR day.
+const UNIT_ADM_DOW = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6 }; // 0 = Sunday
+const ESR_DOW = Object.fromEntries(Object.entries(UNIT_ADM_DOW).map(([u, d]) => [u, (d + 2) % 7]));
+// Sunday admission rotation: Sunday 29 Nov 2026 is Unit V; then VI, I, II … one unit each Sunday.
+const SUNDAY_ADM = { date: '2026-11-29', unit: 'V' };
+function sundayAdmUnit(iso) {
+  const weeks = Math.round((new Date(iso + 'T00:00:00') - new Date(SUNDAY_ADM.date + 'T00:00:00')) / (7 * 864e5));
+  const ids = UNITS.map((u) => u.id);
+  return ids[(((ids.indexOf(SUNDAY_ADM.unit) + weeks) % ids.length) + ids.length) % ids.length];
+}
+const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const isWoundCase = (c) => CHART_TEMPLATES.inflam.match.test(`${c.comorbid || ''} ${c.diagnosis || ''} ${c.plan || ''} ${c.procedureDone || ''}`)
+  || Object.values(c.charts || {}).some((ch) => ch.type === 'inflam');
+const isDiabetic = (c) => CHART_TEMPLATES.dm.match.test(`${c.comorbid || ''} ${c.diagnosis || ''}`)
+  || Object.values(c.charts || {}).some((ch) => ch.type === 'dm');
+// the last date any of these values was entered (charts or investigation sets)
+function lastValueDate(c, keys) {
+  let last = '';
+  const look = (date, v) => { if (date && keys.some((k) => hasText(v?.[k])) && date > last) last = date; };
+  Object.values(c.charts || {}).forEach((ch) => listOf(ch.rows).forEach((r) => look(r.date, r.v)));
+  labSets(c).forEach((s) => look(s.date, s.v));
+  return last;
+}
+// What rounds should ask for today: [{ k: 'inflam' | 'dm', title, why, keys, last }]
+function monitorDue(c, unitId, today = todayISO()) {
+  const out = [];
+  const dow = new Date(today + 'T00:00:00').getDay();
+  if (isWoundCase(c)) {
+    const last = lastValueDate(c, ['esr', 'crp']);
+    const day = ESR_DOW[unitId];
+    const onDay = day === dow;
+    const stale = !last || daysSince(last) >= 7;
+    if (last !== today && (onDay || (stale && (daysSince(c.doa) ?? 0) >= 2))) {
+      out.push({ k: 'inflam', title: 'ESR / qCRP', keys: [['esr', 'ESR'], ['crp', 'qCRP']], last,
+        why: onDay ? `weekly — every ${DOW_NAMES[day]} for Unit ${unitId}` : last ? `overdue — last ${fmtDate(last)}` : 'not done yet' });
+    }
+  }
+  if (isDiabetic(c)) {
+    const last = lastValueDate(c, ['fbs', 'ppbs']);
+    if (last !== today && (!last || daysSince(last) >= 2)) {
+      out.push({ k: 'dm', title: 'FBS / PPBS', keys: [['fbs', 'FBS'], ['ppbs', 'PPBS']], last,
+        why: last ? `every 2 days — last ${fmtDate(last)}` : 'every 2 days — not done yet' });
+    }
+  }
+  return out;
+}
+
 function suggestedCharts(c) {
   const have = new Set(Object.values(c.charts || {}).map((ch) => ch.type));
   return Object.entries(CHART_TEMPLATES).filter(([t, tpl]) => !have.has(t) && tpl.match.test(`${c.comorbid || ''} ${c.diagnosis || ''} ${c.plan || ''}`)).map(([t]) => t);
