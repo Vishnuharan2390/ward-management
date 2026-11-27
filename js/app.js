@@ -4483,8 +4483,14 @@ const App = (() => {
         <div class="card" id="look">
           <h3>Look</h3>
           <p class="muted small">How the app looks on this device. Printouts and PowerPoints are not affected.</p>
-          <p class="small"><b>Modern</b></p>
-          <div class="chips">${[['graphite', 'Graphite (dark)'], ['tangerine', 'Tangerine'], ['blossom', 'Blossom (pastel)'], ['mint', 'Mint (pastel)'], ['sorbet', 'Sorbet (pastel)'], ['crimson', 'Navy & Crimson (gradient)'], ['aurora', 'Aurora (gradient)'], ['modern', 'Modern clinical'], ['midnight', 'Midnight (dark)'], ['glass', 'Glass'], ['material', 'Material']]
+          <p class="small"><b>Light</b></p>
+          <div class="chips">${[['modern', 'Modern clinical'], ['ocean', 'Ocean'], ['forest', 'Forest'], ['royal', 'Royal navy & gold'], ['paper', 'Paper (sepia)'], ['tangerine', 'Tangerine'], ['glass', 'Glass'], ['material', 'Material'], ['contrast', 'High contrast (sunlight)']]
+            .map(([k, l]) => `<button class="chip${(document.documentElement.dataset.ui || 'win98') === k ? ' on' : ''}" data-ui-pick="${k}">${l}</button>`).join('')}</div>
+          <p class="small"><b>Gradient & pastel</b></p>
+          <div class="chips">${[['crimson', 'Navy & Crimson'], ['aurora', 'Aurora'], ['sunset', 'Sunset'], ['blossom', 'Blossom'], ['mint', 'Mint'], ['sorbet', 'Sorbet']]
+            .map(([k, l]) => `<button class="chip${(document.documentElement.dataset.ui || 'win98') === k ? ' on' : ''}" data-ui-pick="${k}">${l}</button>`).join('')}</div>
+          <p class="small"><b>Dark (night duty)</b></p>
+          <div class="chips">${[['graphite', 'Graphite'], ['midnight', 'Midnight'], ['nord', 'Nord'], ['lavender', 'Lavender'], ['amoled', 'Pure black (AMOLED)']]
             .map(([k, l]) => `<button class="chip${(document.documentElement.dataset.ui || 'win98') === k ? ' on' : ''}" data-ui-pick="${k}">${l}</button>`).join('')}</div>
           <p class="small"><b>Retro</b></p>
           <div class="chips">${[['win98', 'Windows 98'], ['xp', 'Windows XP'], ['mac', 'Classic Mac'], ['dos', 'DOS terminal']]
@@ -4560,8 +4566,8 @@ const App = (() => {
         if (!k) return;
         if (k === 'win98') delete document.documentElement.dataset.ui;
         else document.documentElement.dataset.ui = k;
-        document.documentElement.classList.toggle('flat', ['modern', 'midnight', 'glass', 'material', 'crimson', 'aurora', 'blossom', 'mint', 'sorbet', 'tangerine', 'graphite'].includes(k));
-        document.documentElement.classList.toggle('grad', ['crimson', 'aurora', 'blossom', 'mint', 'sorbet'].includes(k));
+        document.documentElement.classList.toggle('flat', ['modern', 'midnight', 'glass', 'material', 'crimson', 'aurora', 'blossom', 'mint', 'sorbet', 'tangerine', 'graphite', 'ocean', 'forest', 'royal', 'paper', 'contrast', 'sunset', 'nord', 'lavender', 'amoled'].includes(k));
+        document.documentElement.classList.toggle('grad', ['crimson', 'aurora', 'blossom', 'mint', 'sorbet', 'sunset'].includes(k));
         try { localStorage.setItem('wm.ui', k); } catch { /* private mode */ }
         render();
       });

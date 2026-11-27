@@ -56,6 +56,11 @@
 - The emblem is the Andry tree (assets/andry-tree.svg; title bar + hospital panel via CSS mask). assets/icons/callus-tree.svg = that tree
   in white on navy; the PNG app icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).
 
+## Looks (Settings → Look; css/app.css html[data-ui=…], per device in localStorage wm.ui)
+- Light: modern, ocean, forest, royal, paper, tangerine, glass, material, contrast · Gradient/pastel (html.grad): crimson, aurora, sunset,
+  blossom, mint, sorbet · Dark: graphite (default), midnight, nord, lavender, amoled · Retro: win98, xp, mac, dos.
+- A new flat look must be added to the flat (and grad) lists in BOTH index.html's inline script and the Look click handler in js/app.js.
+
 ## Wards
 - Ward fields are a dropdown of WARDS only (js/data.js) via wardOpts in js/app.js — nothing else can be entered. normWard(w) maps typed
   forms ("90-A", "90A ORTHO 1", "ward 90a", "101 ICU", "pay ward") to the listed ward, else blank; tagSpecs rewrites stored wards with it;

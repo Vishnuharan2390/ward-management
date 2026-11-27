@@ -1938,3 +1938,103 @@ textarea.has-clr.filled { background-position: right 8px top 8px !important; }
 .rs-folder.empty { opacity: .45; }
 .rs-ico { font-size: 1.2rem; }
 .rs-folder span:nth-child(2) { text-align: left; }
+
+/* ================= More looks (flat base; each sets the tokens) ================= */
+/* Ocean — fresh white & teal-blue */
+html[data-ui="ocean"] {
+  --desk: #eef6f9; --bg: #eef6f9; --card: #fff; --field: #fff; --ink: #0d2633; --muted: #577282; --line: #d6e6ee;
+  --hi: #fff; --lo: #d6e6ee; --face: #fff; --brand: #0b6e8a; --brand-2: #0b6e8a; --red: #d0263b; --ok: #12805c; --blue-bg: #e2f2f8;
+  --top-bg: linear-gradient(110deg, #0b4f6c, #0b6e8a 55%, #14a3a8); --top-accent: transparent; --top-muted: #cdebf2;
+  --nav-on-bg: var(--bg); --nav-on-ink: #0b6e8a; --head-ink: #0b4f6c; --primary-bg: #0b8aa8; --btn-bg: #e6f3f8; --btn-ink: #0b3d52;
+  --th-bg: #0b6e8a; --rc: 14px; --rb: 10px; --window: 0 1px 2px rgba(11,79,108,.06), 0 6px 18px rgba(11,79,108,.08);
+  --font: "DM Sans", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font);
+}
+/* Forest — sage & deep green, calm */
+html[data-ui="forest"] {
+  --desk: #f1f4ee; --bg: #f1f4ee; --card: #fbfcf9; --field: #fff; --ink: #1b2a1f; --muted: #5f6f61; --line: #dde5d8;
+  --hi: #fff; --lo: #dde5d8; --face: #fbfcf9; --brand: #2f5d3a; --brand-2: #2f5d3a; --red: #b8322a; --ok: #2f7d45; --blue-bg: #e7efe2;
+  --top-bg: #23452c; --top-accent: #a8c686; --top-muted: #cfe0c3;
+  --nav-on-bg: var(--bg); --nav-on-ink: #23452c; --head-ink: #23452c; --primary-bg: #3c7a4a; --btn-bg: #e7efe2; --btn-ink: #1f3a26;
+  --th-bg: #2f5d3a; --rc: 12px; --rb: 9px; --window: 0 0 0 1px #dde5d8, 0 4px 14px rgba(35,69,44,.06);
+  --font: "DM Sans", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font);
+}
+/* Royal — navy & gold */
+html[data-ui="royal"] {
+  --desk: #f5f3ee; --bg: #f5f3ee; --card: #fff; --field: #fff; --ink: #121a2e; --muted: #5d6478; --line: #e6e1d4;
+  --hi: #fff; --lo: #e6e1d4; --face: #fff; --brand: #0f1f46; --brand-2: #0f1f46; --red: #b4232c; --ok: #1d7a46; --blue-bg: #f3ecd8;
+  --top-bg: #0f1f46; --top-accent: #c9a227; --top-muted: #d9cfae;
+  --nav-on-bg: var(--bg); --nav-on-ink: #0f1f46; --head-ink: #0f1f46; --primary-bg: #0f1f46; --primary-ink: #f4d77a; --btn-bg: #f3ecd8; --btn-ink: #3a2e0c;
+  --th-bg: #0f1f46; --th-ink: #f4d77a; --rc: 10px; --rb: 8px; --window: 0 0 0 1px #e6e1d4, 0 4px 14px rgba(15,31,70,.07);
+  --font: "Lora", Georgia, serif; --field-font: "DM Sans", -apple-system, "Segoe UI", sans-serif;
+}
+html[data-ui="royal"] .hosp { border-top: 4px solid #c9a227; }
+html[data-ui="royal"] .stats b { color: #9a7a12; }
+/* Paper — warm sepia, book-like serif */
+html[data-ui="paper"] {
+  --desk: #f3ecdf; --bg: #f3ecdf; --card: #fbf7ef; --field: #fffdf8; --ink: #2b2318; --muted: #7a6c58; --line: #e3d8c4;
+  --hi: #fff; --lo: #e3d8c4; --face: #fbf7ef; --brand: #6b3e1f; --brand-2: #6b3e1f; --red: #a8261d; --ok: #3f6e2a; --blue-bg: #f1e7d3;
+  --top-bg: #fbf7ef; --top-ink: #2b2318; --top-muted: #7a6c58; --top-accent: #c9a77a;
+  --nav-on-bg: #6b3e1f; --nav-on-ink: #fbf7ef; --head-ink: #6b3e1f; --primary-bg: #6b3e1f; --primary-ink: #fbf7ef; --btn-bg: #f1e7d3; --btn-ink: #3b2a17;
+  --th-bg: #e9dcc3; --th-ink: #3b2a17; --rc: 6px; --rb: 6px; --window: 0 0 0 1px #e3d8c4, 0 2px 8px rgba(80,55,20,.06);
+  --font: "Lora", Georgia, "Times New Roman", serif; --field-font: var(--font);
+}
+/* High contrast — black on white, bold, big targets (bright sunlight / poor eyesight) */
+html[data-ui="contrast"] {
+  --desk: #fff; --bg: #fff; --card: #fff; --field: #fff; --ink: #000; --muted: #222; --line: #000;
+  --hi: #fff; --lo: #000; --face: #fff; --brand: #000; --brand-2: #000; --red: #c00000; --ok: #005a1e; --warn: #6b4500; --blue-bg: #fff;
+  --top-bg: #000; --top-ink: #fff; --top-muted: #fff; --top-accent: #ffd400;
+  --nav-on-bg: #ffd400; --nav-on-ink: #000; --head-ink: #000; --primary-bg: #000; --primary-ink: #ffd400; --btn-bg: #fff; --btn-ink: #000;
+  --th-bg: #000; --th-ink: #fff; --rc: 4px; --rb: 4px; --window: 0 0 0 2px #000;
+  --font: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; --field-font: var(--font);
+}
+html[data-ui="contrast"] body { font-size: 17px; font-weight: 500; }
+html[data-ui="contrast"] .btn, html[data-ui="contrast"] .chip { border: 2px solid #000; font-weight: 700; }
+html[data-ui="contrast"] input, html[data-ui="contrast"] select, html[data-ui="contrast"] textarea { border: 2px solid #000 !important; }
+html[data-ui="contrast"] .muted { color: #222; }
+/* Sunset — orange → pink → violet gradient */
+html[data-ui="sunset"] {
+  --g1: #ff7a45; --g2: #f0437a; --g3: #8b5cf6; --brand: #c2264f; --brand-2: #c2264f; --red: #d31d3d; --ok: #12805c;
+  --bg: #fdf4f2; --head-ink: #a3214a; --nav-on-ink: #c2264f; --primary-ink: #fff;
+  --body-bg: radial-gradient(1000px 520px at 100% 0%, rgba(255,122,69,.14), transparent 60%), radial-gradient(900px 520px at 0% 100%, rgba(139,92,246,.14), transparent 60%), #fdf6f4;
+  --font: "Poppins", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font);
+}
+/* Dark looks */
+html[data-ui="nord"] {
+  --desk: #2e3440; --bg: #2e3440; --card: #3b4252; --field: #343b49; --ink: #eceff4; --muted: #a9b3c6; --line: #4c566a;
+  --hi: #4c566a; --lo: #4c566a; --dk: #1f232b; --face: #3b4252; --brand: #88c0d0; --brand-2: #88c0d0; --red: #ef7d87; --red-bg: #45333a;
+  --ok: #a3be8c; --ok-bg: #34402f; --warn: #ebcb8b; --warn-bg: #443d2c; --blue-bg: #3d4a5c;
+  --top-bg: #272c36; --top-ink: #eceff4; --top-muted: #a9b3c6; --top-accent: #88c0d0;
+  --nav-on-bg: #2e3440; --nav-on-ink: #88c0d0; --head-ink: #8fbcbb; --primary-bg: #88c0d0; --primary-ink: #1f2530; --btn-bg: #434c5e; --btn-ink: #eceff4;
+  --th-bg: #434c5e; --th-ink: #e5e9f0; --rc: 12px; --rb: 8px; --window: 0 0 0 1px #4c566a;
+  --font: "Space Grotesk", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: "DM Sans", -apple-system, sans-serif;
+  color-scheme: dark;
+}
+html[data-ui="lavender"] {
+  --desk: #17131f; --bg: #17131f; --card: #221c2e; --field: #1c1727; --ink: #efeaf7; --muted: #a79bbd; --line: #362c48;
+  --hi: #362c48; --lo: #362c48; --dk: #0c0a10; --face: #221c2e; --brand: #c4a7ff; --brand-2: #c4a7ff; --red: #ff7a93; --red-bg: #3a1d29;
+  --ok: #7fd8a8; --ok-bg: #16302a; --warn: #f5c56b; --warn-bg: #352a16; --blue-bg: #2b2340;
+  --top-bg: linear-gradient(110deg, #2a1d45, #3b2466 60%, #5a2a6e); --top-ink: #fff; --top-muted: #d9c9f5; --top-accent: transparent;
+  --nav-on-bg: #17131f; --nav-on-ink: #c4a7ff; --head-ink: #d7c4ff; --primary-bg: #a77bff; --primary-ink: #160d26; --btn-bg: #2d2540; --btn-ink: #efeaf7;
+  --th-bg: #2d2540; --th-ink: #e6dcf8; --rc: 16px; --rb: 10px; --window: 0 0 0 1px #362c48, 0 10px 26px rgba(0,0,0,.3);
+  --font: "Figtree", -apple-system, "Segoe UI", Roboto, sans-serif; --field-font: var(--font);
+  color-scheme: dark;
+}
+html[data-ui="amoled"] {
+  --desk: #000; --bg: #000; --card: #0b0b0b; --field: #050505; --ink: #f5f5f5; --muted: #9a9a9a; --line: #222;
+  --hi: #222; --lo: #222; --dk: #000; --face: #0b0b0b; --brand: #ffb547; --brand-2: #ffb547; --red: #ff5a5f; --red-bg: #2a0e10;
+  --ok: #5fe08f; --ok-bg: #0c2416; --warn: #ffd166; --warn-bg: #2a2108; --blue-bg: #141414;
+  --top-bg: #000; --top-ink: #fff; --top-muted: #9a9a9a; --top-accent: #ffb547;
+  --nav-on-bg: #ffb547; --nav-on-ink: #000; --head-ink: #ffb547; --primary-bg: #ffb547; --primary-ink: #000; --btn-bg: #141414; --btn-ink: #f5f5f5;
+  --th-bg: #141414; --th-ink: #ffb547; --rc: 12px; --rb: 10px; --window: 0 0 0 1px #1d1d1d;
+  --font: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; --field-font: var(--font);
+  color-scheme: dark;
+}
+html[data-ui="nord"] .tag, html[data-ui="lavender"] .tag, html[data-ui="amoled"] .tag { background: transparent; }
+html[data-ui="nord"] .lab-in.from-photo input, html[data-ui="nord"] .lab-in.from-photo select,
+html[data-ui="lavender"] .lab-in.from-photo input, html[data-ui="lavender"] .lab-in.from-photo select,
+html[data-ui="amoled"] .lab-in.from-photo input, html[data-ui="amoled"] .lab-in.from-photo select { background: #2b2a12; color: var(--ink); }
+html[data-ui="nord"] .hosp-l3, html[data-ui="lavender"] .hosp-l3, html[data-ui="amoled"] .hosp-l3 { color: var(--red); }
+html[data-ui="nord"] .slide, html[data-ui="lavender"] .slide, html[data-ui="amoled"] .slide { color: #000; }
+/* the title-bar Reload button follows the title bar's ink in every flat look */
+html.flat .reload-btn { background: transparent !important; color: var(--top-ink) !important; border-color: color-mix(in srgb, var(--top-ink) 45%, transparent) !important; box-shadow: none !important; }
+html.flat .back-btn { color: var(--top-ink); background: color-mix(in srgb, var(--top-ink) 12%, transparent); }
