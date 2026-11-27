@@ -2498,6 +2498,7 @@ const App = (() => {
             ${otWaReady() ? `<button class="btn wa" id="ot-wa-bot" ${sel.length ? '' : 'disabled'} title="${esc(otWaNumbers().join(', '))}">WhatsApp group + OT contacts (${otWaNumbers().length})</button>` : ''}
             <button class="btn" id="ot-mail" ${sel.length ? '' : 'disabled'} title="${esc(Store.meta.otEmail ? 'To ' + Store.meta.otEmail : 'Set the address in Settings')}">Email OT list PDF</button>
             <button class="btn" id="ot-xr" ${sel.length ? '' : 'disabled'}>Pre-op imaging PDF (X-ray, CT, MRI)</button>
+            <button class="btn wa" id="ot-xr-wa" ${sel.length ? '' : 'disabled'}>${otXrLabel(sel)}</button>
             <button class="btn" id="ot-consent" ${sel.length ? '' : 'disabled'}>Consent forms (Tamil)</button>
           </div>
           <p class="muted small">The print PDF puts the same list twice on one landscape sheet — top and bottom — to print and cut.</p>
@@ -2860,6 +2861,51 @@ const App = (() => {
         document.body.appendChild(pop);
         // on-screen Tamil keyboard for the Tamil boxes (name, implant, fracture)
         TaKeys.attach($('.sug-box', pop), '[data-cfk="nameTa"], [data-cfk="consentImplant"], [data-cfk="exitBone"]', $('[data-ta-kb]', pop));
+      };
+      // Pre-op images as separate pictures (not a PDF). Safari only shares straight from a tap, so the first tap
+      // collects the pictures and the second tap opens the share sheet.
+      $('#ot-xr-wa', el).onclick = async () => {
+        const [cases] = build();
+        const key = cases.map((c) => c.id).join(',');
+        if (otXrShare && otXrShare.key === key) {
+          const { files, text } = otXrShare;
+          otXrShare = null;
+          $('#ot-xr-wa').textContent = OT_XR_WA;
+          return Share.sendWithFiles(text, files);
+        }
+        const btn = $('#ot-xr-wa');
+        btn.disabled = true;
+        btn.textContent = 'Collecting pictures…';
+        const files = [];
+        const lines = [];
+        const none = [];
+        const KINDS = [['xray', 'XRAY'], ['ct', 'CT'], ['mri', 'MRI']];
+        for (const [i, c] of cases.entries()) {
+          const base = `${i + 1}_${String(c.name || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'PATIENT'}`;
+          let got = 0;
+          for (const [k, word] of KINDS) {
+            const ids = frozenImgs(c, k);
+            for (const [j, iid] of ids.entries()) {
+              const data = await Store.getImage(iid).catch(() => null);
+              if (!data || !/^data:/.test(data)) continue;
+              const [head, b64] = data.split(',');
+              const type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+              const bin = atob(b64);
+              const bytes = new Uint8Array(bin.length);
+              for (let x = 0; x < bin.length; x++) bytes[x] = bin.charCodeAt(x);
+              files.push(new File([bytes], `${base}_${word}${ids.length > 1 ? '_' + (j + 1) : ''}.${/png/.test(type) ? 'png' : 'jpg'}`, { type }));
+              got++;
+            }
+          }
+          if (got) lines.push(`${i + 1}. ${String(c.name || '').toUpperCase()} ${ageSex(c)} — ${String(c.diagnosis || '').toUpperCase()}`);
+          else none.push(c.name);
+        }
+        const b2 = $('#ot-xr-wa') || btn; // the page may have been redrawn meanwhile
+        b2.disabled = false;
+        if (!files.length) { b2.textContent = OT_XR_WA; return toast('No pre-op X-ray, CT or MRI uploaded for these cases.', 4000); }
+        otXrShare = { key, files, text: `PRE-OP IMAGING\n${lines.join('\n')}` };
+        b2.textContent = otXrLabel();
+        toast(`${files.length} picture${files.length === 1 ? '' : 's'} ready — tap the button again to open WhatsApp.${none.length ? ` No images: ${none.join(', ')}.` : ''}`, 6000);
       };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
@@ -3564,6 +3610,10 @@ const App = (() => {
     p.catch(() => caseDocsCache.delete(id));
     return p;
   }
+  // OT list → pictures collected for WhatsApp (kept across redraws until sent or the selection changes)
+  const OT_XR_WA = 'WhatsApp pre-op images (one by one)';
+  let otXrShare = null;
+  const otXrLabel = () => (otXrShare ? `📤 Send ${otXrShare.files.length} picture${otXrShare.files.length === 1 ? '' : 's'} now` : OT_XR_WA);
   const recOt = (cases, dd) => keepRecord('otlist', { key: dd.date, title: `OT list — ${fmtDate(dd.date)}`, cases, args: [cases, dd] });
   // the pictures a (frozen) case had, of one kind, oldest first
   const frozenImgs = (c, kind) => listOf(c.images).filter((i) => i.kind === kind).map((i) => i.id);
