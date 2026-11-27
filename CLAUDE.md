@@ -108,6 +108,10 @@
   pelvis/acetabulum = abdominopelvic organs, vessels, sciatic nerve; arthroplasty (plan) = limb shortening/lengthening, dislocation,
   loosening, periprosthetic fracture; cervical/dorsolumbar = dural tear CSF leak + cord / root injury (replaces the template one-liner).
   The page shrinks text down to 7pt to stay on one A4 sheet.
+- Forms (CONSENT_TPLS): upper, lower, cervical, dorsolumbar, pelvis (lower with இடுப்பு எலும்பு), arthroplasty, arthroscopy, paeds
+  (tenotomy / PMSTR / quadricepsplasty; parent wording). consentKind auto-picks arthroplasty (plan, no fracture), arthroscopy
+  (CONSENT_SCOPE_RE), paeds (CONSENT_PAEDS_RE, no fracture), pelvis; the three elective forms take no CONSENT_MORE extras.
+  c.minor === true forces parent wording (used for the blank paediatric form).
 - Also CONSENT_MORE (first 2 by CONSENT_MORE_ORDER): tumour recurrence/HPE, open # debridement/flap/amputation, child growth plate,
   hip DVT/PE/pneumonia/bedsore (+AVN for NOF fixation), nail fat embolism/malrotation, ex-fix pin tract, clavicle brachial plexus/
   pneumothorax, upper limb nerves (wrist drop), peroneal nerve (foot drop), compartment syndrome, peri-articular stiffness/arthritis,

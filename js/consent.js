@@ -22,6 +22,54 @@ const CONSENT_BLOOD_SPINE = 'மேலும், இரத்த நாளங்
 const CONSENT_ANAES_SPINE = 'மேலும், மயக்க மருந்து ஒவ்வாமையால் மூச்சுத்திணறல், மாரடைப்பு, மேஜையில் மரணம் போன்றவை ஏற்படலாம் என அறிவேன். தேவைப்பட்டால் செயற்கை சுவாசத்தில் இருக்கும் நிலை வரலாம் என அறிவேன்.';
 const CONSENT_LIMB_OPEN = (limb) => `{NAME} ஆகிய எனக்கு அடிபட்டு அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எனது ${limb} எலும்பு முறிவு ஏற்பட்டுள்ளது என்று கூறினர். அதற்கு {PROC} கொண்டு அறுவை சிகிச்சை செய்து சரிசெய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.`;
 
+
+// ---- Forms beyond trauma (wording written for Callus; the department should review it) ----
+const CONSENT_ANAES = 'மேலும், அறுவை சிகிச்சையின் போது மயக்க மருந்து கொடுப்பதால் மூச்சுத்திணறல், மாரடைப்பு மற்றும் மேசை மேல் மரணம் போன்றவை ஏற்படலாம் என அறிவேன். தேவைப்பட்டால் அறுவை சிகிச்சைக்குப் பின்னர் செயற்கை சுவாசம் பொருத்தும் நிலை வரலாம் என அறிவேன்.';
+const CONSENT_SSI = 'மேலும், அறுவை சிகிச்சைக்குப் பின்னர் புண் சீழ் பிடித்தல் (SSI), இரத்தத்தில் கிருமி தொற்று ஏற்படுதல் (Septicemia) மற்றும் எலும்பில் சீழ்பிடித்தல் (Osteomyelitis) போன்ற பல சிக்கல்கள் ஏற்பட வாய்ப்புள்ளது என அறிவேன்.';
+const CONSENT_CLOSE = 'அனைத்து முன்னெச்சரிக்கை நடவடிக்கைகளுடன் இவ்வறுவை சிகிச்சை செய்யப்பட்டாலும், மேற்குறிப்பிட்ட ஏதேனும் ஒன்று ஏற்படுமாயின் அதற்கு மருத்துவரோ மருத்துவமனை நிர்வாகமோ பொறுப்பல்ல என்பதை ஒப்புக்கொள்கிறேன்.';
+const CONSENT_DVT = 'மேலும், அறுவை சிகிச்சைக்குப் பின்னர் காலில் உள்ள இரத்த நாளங்களில் இரத்தம் கட்டி (DVT), அந்தக் கட்டி நுரையீரலுக்குச் சென்று அடைத்து (Pulmonary embolism) மூச்சுத்திணறல், மாரடைப்பு மற்றும் உயிரிழப்பு ஏற்படலாம் என அறிவேன்.';
+const CONSENT_FORMS_MORE = {
+  arthroplasty: {
+    label: 'Arthroplasty (joint replacement)', bone: 'கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    paras: [
+      '{NAME} ஆகிய எனக்கு நீண்ட நாட்களாக மூட்டு வலி மற்றும் நடப்பதில் சிரமம் இருப்பதால் அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எனது மூட்டு தேய்மானம் அடைந்துள்ளது / சேதம் அடைந்துள்ளது என்று கூறினர். அதற்கு பாதிக்கப்பட்ட மூட்டின் பகுதிகளை அகற்றி {PROC} பொருத்தும் மூட்டு மாற்று அறுவை சிகிச்சை செய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
+      CONSENT_ANAES,
+      'மேலும், இரத்த நாளங்கள் சேதம் அடைந்து அதிக இரத்தம் இழப்பு ஏற்பட வாய்ப்புள்ளது என அறிவேன். அதற்கு இரத்தம் ஏற்றும் நிலை வரலாம் என அறிவேன். அவ்வாறு ஏற்றும் இரத்தத்தினால் ஒவ்வாமை ஏற்பட்டு உயிரிழக்க வாய்ப்புள்ளது என அறிவேன்.',
+      CONSENT_DVT,
+      'மேலும், நரம்புகள் சேதம் அடைந்து காலில் உணர்ச்சியின்மை அல்லது பாதத்தைத் தூக்க இயலாமை (Foot drop) ஏற்பட வாய்ப்புள்ளது என அறிவேன்.',
+      'மேலும், உலோகத்தினால் ஆன செயற்கை மூட்டு பொருத்திய பின்னர் காலின் நீளம் குறைந்தோ அல்லது கூடியோ (கால் நீள வேறுபாடு) போக வாய்ப்புள்ளது என அறிவேன். செயற்கை மூட்டு இடம் விலகுதல் (Dislocation), தளர்ந்து போதல் (Loosening), மூட்டு இறுக்கம், தொடர்ந்து வலி இருத்தல், செயற்கை மூட்டைச் சுற்றியுள்ள எலும்பு உடைதல் போன்றவை ஏற்படலாம் என அறிவேன். செயற்கை மூட்டு நாளடைவில் தேய்மானம் அடைந்து பல ஆண்டுகளுக்குப் பின்னர் மறு அறுவை சிகிச்சை (Revision) தேவைப்படலாம் என அறிவேன்.',
+      'மேலும், செயற்கை மூட்டில் கிருமி தொற்று ஏற்பட்டால் நீண்ட நாட்கள் ஆன்டிபயாடிக் சிகிச்சை, செயற்கை மூட்டை அகற்றுதல் மற்றும் ஒன்றுக்கு மேற்பட்ட மறு அறுவை சிகிச்சைகள் தேவைப்படலாம் என அறிவேன்.',
+      CONSENT_SSI,
+      CONSENT_CLOSE,
+    ],
+  },
+  arthroscopy: {
+    label: 'Arthroscopy (ligament / meniscus / labrum)', bone: 'மூட்டு', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    paras: [
+      '{NAME} ஆகிய எனக்கு மூட்டு வலி மற்றும் மூட்டு ஆட்டம் (Instability) காரணமாக அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதனை செய்த மருத்துவர்கள் எனது மூட்டினுள் உள்ள தசைநார் (Ligament) / சவ்வு (Meniscus / Labrum) கிழிந்துள்ளது என்று கூறினர். அதற்கு நுண்துளை (Arthroscopy) முறையில் {PROC} அறுவை சிகிச்சை செய்து சரிசெய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
+      CONSENT_ANAES,
+      'மேலும், நுண்துளை முறையில் செய்ய இயலாத நிலையில் திறந்த அறுவை சிகிச்சையாக மாற்ற நேரிடலாம் என அறிவேன். ஒட்டுவதற்கான தசைநார் (Graft) எடுக்கப்படும் இடத்தில் வலி, உணர்ச்சியின்மை, தசை பலவீனம் ஏற்படலாம் என அறிவேன்.',
+      'மேலும், மூட்டினுள் கிருமி தொற்று (Septic arthritis) ஏற்பட்டால் மூட்டைச் சுத்தம் செய்ய மறு அறுவை சிகிச்சை தேவைப்படலாம் என அறிவேன். மூட்டில் இரத்தம் அல்லது நீர் சேர்தல், மூட்டு இறுக்கம் ஏற்படலாம் என அறிவேன்.',
+      'மேலும், நரம்புகள், இரத்த நாளங்கள் சேதம் அடைந்து உணர்ச்சியின்மை அல்லது செயல் இழப்பு ஏற்படலாம் என அறிவேன். காலில் இரத்தம் கட்டுதல் (DVT) ஏற்படலாம் என அறிவேன்.',
+      'மேலும், சவ்வு / தசைநார் சீரமைப்புக்குப் பின்னர் ஒட்டிய தசைநார் தளர்தல் அல்லது மீண்டும் கிழிதல் ஏற்படலாம் என்றும், மூட்டு ஆட்டம் முழுமையாகச் சரியாகாமல் போகலாம் என்றும் அறிவேன். பிரேஸ் (Brace) அணிதல் மற்றும் நீண்ட நாட்கள் இயன்முறை சிகிச்சை (Physiotherapy) தேவைப்படும் என்றும், அதனைத் தவறாமல் செய்ய வேண்டும் என்றும் அறிவேன்.',
+      CONSENT_CLOSE,
+    ],
+  },
+  paeds: {
+    label: 'Paediatric (tenotomy / PMSTR / quadricepsplasty / release)', bone: 'கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    paras: [
+      '{NAME} ஆகிய எனக்கு பிறவிக் குறைபாடு / தசை இறுக்கம் காரணமாக கால் / கை வளைவு (Deformity) அல்லது மூட்டு இறுக்கம் (Contracture) உள்ளது என்று என்னைப் பரிசோதனை செய்த மருத்துவர்கள் கூறினர். அதனைச் சரிசெய்ய {PROC} (தசைநார் வெட்டுதல் - Tenotomy, மென்திசு விடுவித்தல் - PMSTR, Quadricepsplasty போன்றவை) அறுவை சிகிச்சை செய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
+      'மேலும், அறுவை சிகிச்சையின் போது மயக்க மருந்து கொடுப்பதால் மூச்சுத்திணறல், மாரடைப்பு மற்றும் உயிரிழப்பு போன்றவை ஏற்படலாம் என அறிவேன். தேவைப்பட்டால் அறுவை சிகிச்சைக்குப் பின்னர் செயற்கை சுவாசம் பொருத்தும் நிலை வரலாம் என அறிவேன்.',
+      'மேலும், அறுவை சிகிச்சைக்குப் பின்னர் மாவுக்கட்டு (Cast) மற்றும் பிரேஸ் (Brace / Foot abduction brace) நீண்ட நாட்கள் அணிய வேண்டும் என்றும், தொடர் சிகிச்சைக்கும் இயன்முறை சிகிச்சைக்கும் (Physiotherapy) தவறாமல் வர வேண்டும் என்றும் அறிவேன்.',
+      'மேலும், குறைபாடு முழுமையாகச் சரியாகாமல் போகவோ (Under-correction), அதிகமாகச் சரியாகவோ (Over-correction), வளர்ச்சியின் போது மீண்டும் வரவோ (Recurrence) வாய்ப்புள்ளது என்றும், அதற்கு மறு அறுவை சிகிச்சை தேவைப்படலாம் என்றும் அறிவேன்.',
+      'மேலும், நரம்புகள், இரத்த நாளங்கள் சேதம் அடைந்து உணர்ச்சியின்மை, செயல் இழப்பு அல்லது இரத்த ஓட்டம் குறைதல் ஏற்படலாம் என அறிவேன். தோல் புண், தோல் அழுகுதல் (Skin necrosis), மாவுக்கட்டினால் அழுத்தப் புண், புண் ஆறாமை ஏற்படலாம் என அறிவேன்.',
+      'மேலும், மூட்டு இறுக்கம், தசை பலவீனம் (Extension lag) ஏற்படலாம் என்றும், எலும்பு வளர்ச்சிப் பகுதி (Growth plate) பாதிக்கப்பட்டு கை / கால் நீளம் குறைதல் அல்லது வளைதல் ஏற்படலாம் என்றும் அறிவேன்.',
+      CONSENT_SSI,
+      CONSENT_CLOSE,
+    ],
+  },
+};
+
 const CONSENT_TPLS = {
   upper: {
     label: 'Upper limb', bone: 'கை', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
@@ -53,6 +101,9 @@ const CONSENT_TPLS = {
     ],
   },
 };
+
+CONSENT_TPLS.pelvis = { ...CONSENT_TPLS.lower, label: 'Pelvis / acetabulum', bone: 'இடுப்பு', paras: CONSENT_TPLS.lower.paras.map((t) => t.replace(/கால் எலும்பு/g, 'இடுப்பு எலும்பு')) };
+Object.assign(CONSENT_TPLS, CONSENT_FORMS_MORE);
 
 // Implant exit: the implant paragraph is about removing it, not fixing the bone.
 const CONSENT_EXIT_RE = /IMPLANT\s*(EXIT|REMOVAL)|HARDWARE\s*REMOVAL|REMOVAL\s+OF\s+(THE\s+)?(IMPLANTS?|HARDWARE|PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|EXTERNAL\s+FIXATOR|JESS)|\b(PLATES?|NAILS?|K[\s-]?WIRES?|WIRES?|SCREWS?|TBW|PFN|DHS|ILIM|IMIL|IMN|ORTHOFIX|EX\s?FIX|FIXATOR|JESS|LRS|ILIZAROV|IMPLANTS?)\s+(EXIT|REMOVAL)\b|\bROI\b/;
@@ -176,11 +227,12 @@ function consentExtras(c, kind) {
   if (consentIsExit(c)) return [];
   if (kind === 'cervical') return [CONSENT_EXTRA.spine('கைகள், கால்கள்')];
   if (kind === 'dorsolumbar') return [CONSENT_EXTRA.spine('கால்கள்')];
+  if (kind === 'arthroplasty' || kind === 'arthroscopy' || kind === 'paeds') return []; // these forms already say it
   const out = [];
   const plan = String(`${c?.plan || ''} ${c?.procedureDone || ''}`).toUpperCase();
   const all = String(`${c?.diagnosis || ''} ${plan}`).toUpperCase();
   const arthro = CONSENT_ARTHROPLASTY_RE.test(plan);
-  if (kind === 'lower' && consentPelvic(c)) out.push(CONSENT_EXTRA.pelvis);
+  if (kind === 'pelvis' || (kind === 'lower' && consentPelvic(c))) out.push(CONSENT_EXTRA.pelvis);
   if (arthro) out.push(CONSENT_EXTRA.arthroplasty);
   const upper = kind === 'upper';
   const limb = upper ? 'கை' : 'கால்';
@@ -202,8 +254,22 @@ function consentExtras(c, kind) {
   return out;
 }
 const consentPelvic = (c) => /PELVI|ACETABUL|\bILIUM\b|ILIAC WING|PUBIC RAMI|PUBIC RAMUS|SACRO\s*ILIAC|\bSI JOINT\b|SYMPHYSIS/.test(String(`${c?.diagnosis || ''} ${c?.plan || ''}`).toUpperCase());
+const CONSENT_SCOPE_RE = /ARTHROSCOP|\bACL\b|\bPCL\b|CRUCIATE|MENISC|BANKART|ROTATOR CUFF|LABRAL|\bSLAP\b|\bMPFL\b|LATARJET|LIGAMENT RECONSTRUCTION/;
+const CONSENT_PAEDS_RE = /CTEV|CLUB ?FOOT|TENOTOMY|\bPMSTR\b|POSTERO ?MEDIAL (SOFT TISSUE )?RELEASE|QUADRICEPS ?PLASTY|QUADRICEPSPLASTY|JUDET|CEREBRAL PALSY|CONTRACTURE|SOFT TISSUE RELEASE|TENDON (LENGTHENING|TRANSFER)|\bTAL\b|DDH|PERTHES|\bSCFE\b|GUIDED GROWTH|HEMIEPIPHYSIODESIS|ARTHROGRYPOSIS|CONGENITAL/;
 function consentKind(c) {
   if (c && CONSENT_TPLS[c.consentTpl]) return c.consentTpl;
+  {
+    const dx = String(c?.diagnosis || '').toUpperCase();
+    const pl = String(`${c?.plan || ''} ${c?.procedureDone || ''}`).toUpperCase();
+    const all = `${dx} ${pl}`;
+    const fracture = /FRACTURE|#|DISLOCATION|INJURY|TRAUMA/.test(dx);
+    if (!consentIsExit(c)) {
+      if (!fracture && CONSENT_ARTHROPLASTY_RE.test(pl)) return 'arthroplasty';
+      if (CONSENT_SCOPE_RE.test(all) && !/FRACTURE/.test(dx)) return 'arthroscopy';
+      if (!fracture && CONSENT_PAEDS_RE.test(all)) return 'paeds';
+    }
+    if (consentPelvic(c) && !CONSENT_RE.cervical.test(dx) && !CONSENT_RE.spine.test(dx)) return 'pelvis';
+  }
   for (const text of [c?.diagnosis, c?.plan]) {
     const t = String(text || '').toUpperCase();
     if (!t.trim()) continue;
@@ -344,7 +410,7 @@ const taName = (name) => String(name || '').trim().split(/[\s.]+/).filter(Boolea
 const consentNameTa = (c) => String(c.nameTa || '').trim() || taName(c.name);
 
 // Under 18: the parent signs for "எனது மகனுக்கு / மகளுக்கு", and the patient's parts become அவன் / அவள்.
-const consentMinor = (c) => ageYears(c) < 18;
+const consentMinor = (c) => c?.minor === true || ageYears(c) < 18;
 function consentForChild(text, sex) {
   const P = sex === 'M' ? { son: 'மகன்', dat: 'மகனுக்கு', poss: 'அவனது', him: 'அவனை', to: 'அவனுக்கு', was: 'அனுமதிக்கப்பட்டான்' }
     : sex === 'F' ? { son: 'மகள்', dat: 'மகளுக்கு', poss: 'அவளது', him: 'அவளை', to: 'அவளுக்கு', was: 'அனுமதிக்கப்பட்டாள்' }
@@ -476,7 +542,7 @@ const ConsentForm = (() => {
     };
     const exit = consentIsExit(c);
     // Pelvis / acetabulum: "இடுப்பு எலும்பு" (hip bone) where the lower limb form says "கால் எலும்பு"
-    const pelvic = consentKind(c) === 'lower' && consentPelvic(c);
+    const pelvic = (consentKind(c) === 'lower' && consentPelvic(c)) || consentKind(c) === 'pelvis';
     const paras = tpl.paras.map((t, i) => (!exit ? t : i === 0 ? CONSENT_EXIT_OPEN(consentExitFracture(c)) : /கொண்டு அறுவை சிகிச்சை செய்யும் போது|\{SCREW\} செலுத்தும்/.test(t) ? CONSENT_EXIT_PARA(tpl.bone) : t))
       .map((t) => (pelvic ? t.replace(/கால் எலும்பு/g, 'இடுப்பு எலும்பு') : t));
     // procedure-specific risks go just before the closing paragraph
