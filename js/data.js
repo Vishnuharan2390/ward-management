@@ -620,6 +620,16 @@ function sundayAdmUnit(iso) {
 const DOW_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const isWoundCase = (c) => CHART_TEMPLATES.inflam.match.test(`${c.comorbid || ''} ${c.diagnosis || ''} ${c.plan || ''} ${c.procedureDone || ''}`)
   || Object.values(c.charts || {}).some((ch) => ch.type === 'inflam');
+const isCKD = (c) => CHART_TEMPLATES.rft.match.test(`${c.comorbid || ''} ${c.diagnosis || ''}`)
+  || Object.values(c.charts || {}).some((ch) => ch.type === 'rft');
+// the latest blood transfusion marked done (a to-do like "BLOOD TRANSFUSION" / "TRANSFUSE 1 UNIT PRBC"), as a date
+const TRANSFUSION_RE = /TRANSFUS|\bPRBC\b|PACKED (RED )?CELLS|WHOLE BLOOD|\bBT\b/i;
+function lastTransfusion(c) {
+  const at = Math.max(0, ...listOf(c.tasks).filter((t) => t.done && TRANSFUSION_RE.test(t.text || '')).map((t) => t.doneAt || t.at || 0));
+  if (!at) return '';
+  const d = new Date(at);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 const isDiabetic = (c) => CHART_TEMPLATES.dm.match.test(`${c.comorbid || ''} ${c.diagnosis || ''}`)
   || Object.values(c.charts || {}).some((ch) => ch.type === 'dm');
 // the last date any of these values was entered (charts or investigation sets)
@@ -642,6 +652,22 @@ function monitorDue(c, unitId, today = todayISO()) {
     if (last !== today && (onDay || (stale && (daysSince(c.doa) ?? 0) >= 2))) {
       out.push({ k: 'inflam', title: 'ESR / qCRP', keys: [['esr', 'ESR'], ['crp', 'qCRP']], last,
         why: onDay ? `weekly — every ${DOW_NAMES[day]} for Unit ${unitId}` : last ? `overdue — last ${fmtDate(last)}` : 'not done yet' });
+    }
+  }
+  if (isCKD(c)) {
+    const last = lastValueDate(c, ['urea', 'creat']);
+    if (last !== today && (!last || daysSince(last) >= 2)) {
+      out.push({ k: 'rft', title: 'RFT', keys: [['urea', 'Urea'], ['creat', 'Creat'], ['na', 'Na'], ['k', 'K']], last,
+        why: last ? `CKD — every 2 days — last ${fmtDate(last)}` : 'CKD — every 2 days — not done yet' });
+    }
+  }
+  {
+    // blood transfusion done → repeat CBC the next day (asked until a CBC dated after the transfusion is in; for a week)
+    const bt = lastTransfusion(c);
+    const since = bt ? daysSince(bt) : null;
+    if (bt && since >= 1 && since <= 7 && !(lastValueDate(c, ['hb']) > bt)) {
+      out.push({ k: 'cbc', title: 'Repeat CBC', keys: [['hb', 'Hb'], ['wbc', 'WBC'], ['plt', 'PLT']], last: '',
+        why: `after blood transfusion on ${fmtDate(bt)}` });
     }
   }
   if (isDiabetic(c)) {

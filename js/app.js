@@ -898,15 +898,25 @@ const App = (() => {
     const due = monitorDue(c, Store.meta.unitId);
     if (!due.length) return '';
     return `<div class="rd-due" role="note">${due.map((d) => `<div class="rd-due-row" data-due="${d.k}">
-        <div class="rd-due-h">🩸 ${esc(d.title)} due today <span class="muted small">${esc(d.why)}</span></div>
+        <div class="rd-due-h">🩸 ${esc(d.title)} due${d.k === 'cbc' ? '' : ' today'} <span class="muted small">${esc(d.why)}</span></div>
         <div class="rd-due-in">${d.keys.map(([k, l]) => `<label>${esc(l)}<input data-due-in="${k}" inputmode="decimal" data-no-clear></label>`).join('')}
-          <button type="button" class="btn small primary" data-due-save="${d.k}">Save to chart</button></div></div>`).join('')}</div>`;
+          <button type="button" class="btn small primary" data-due-save="${d.k}">${d.k === 'cbc' ? 'Save' : 'Save to chart'}</button></div></div>`).join('')}</div>`;
   }
   function dueSave(caseId, kind, row) {
     const c = Store.cases[caseId];
     const v = {};
     $$('[data-due-in]', row).forEach((x) => { if (x.value.trim()) v[x.dataset.dueIn] = x.value.trim(); });
     if (!Object.keys(v).length) return toast('Type the values first');
+    if (kind === 'cbc') {
+      // CBC: into today's investigation set, like a result entered on rounds
+      const set = 'rv_' + todayISO().replace(/-/g, '');
+      const ch = {};
+      if (!c.labs?.[set]) ch[`labs.${set}`] = { date: todayISO(), at: Date.now(), by: Store.who(), v };
+      else for (const [k, x] of Object.entries(v)) ch[`labs.${set}.v.${k}`] = x;
+      Store.patch('cases', caseId, ch);
+      logUpdate(caseId, `Repeat CBC after transfusion: ${Object.entries(v).map(([k, x]) => `${k === 'hb' ? 'Hb' : k.toUpperCase()} ${x}`).join(', ')}`);
+      return toast(`✓ CBC saved to ${c.name}'s investigations`);
+    }
     const chId = Object.entries(c.charts || {}).find(([, ch]) => ch.type === kind)?.[0] || `auto_${kind}`;
     const ch = {};
     if (!c.charts?.[chId]) {
@@ -5993,7 +6003,7 @@ const App = (() => {
         if (dx.toUpperCase() !== String(c.diagnosis || '').trim().toUpperCase()) Store.patch('cases', id, { diagnosis: dx });
         // wound cases / diabetics in the wards get their ESR-CRP / diabetic chart made (fixed id: two phones can't make two)
         if (['preop', 'posted', 'postop'].includes(c.status || 'preop')) {
-          for (const [kind, test] of [['inflam', isWoundCase], ['dm', isDiabetic]]) {
+          for (const [kind, test] of [['inflam', isWoundCase], ['dm', isDiabetic], ['rft', isCKD]]) {
             if (test(c) && !Object.values(c.charts || {}).some((ch) => ch.type === kind) && !c.charts?.[`auto_${kind}`]) {
               const tpl = CHART_TEMPLATES[kind];
               Store.patch('cases', id, { [`charts.auto_${kind}`]: { type: kind, title: tpl.title, cols: tpl.cols.map(chartCol), at: Date.now(), rows: {} } });

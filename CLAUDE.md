@@ -71,7 +71,9 @@
   ESR_DOW[unit] = admission day + 2 (UNIT_ADM_DOW I Mon … VI Sat → Wed, Thu, Fri, Sat, Sun, Mon); also asked any day if none in 7 days
   (and admitted ≥ 2 days). Diabetics (isDiabetic, dm match on comorbid/diagnosis): FBS / PPBS when none in the last 2 days.
 - Save writes a row (today) into the case's chart of that type, made if missing; tagSpecs also makes charts.auto_inflam / auto_dm for
-  active wound / diabetic cases. Sunday admissions rotate (SUNDAY_ADM: 29 Nov 2026 = Unit V, then VI, I, II…; sundayAdmUnit) — not used for ESR.
+  active wound / diabetic / CKD cases. CKD (isCKD, rft match on comorbid/diagnosis): RFT (urea, creat, Na, K) into the RFT chart when
+  none in 2 days. Blood transfusion to-do marked done (lastTransfusion: c.tasks done + TRANSFUSION_RE, doneAt) → "Repeat CBC" from the
+  next day until an Hb dated after it (up to 7 days); saved into today's investigation set labs.rv_YYYYMMDD. Sunday admissions rotate (SUNDAY_ADM: 29 Nov 2026 = Unit V, then VI, I, II…; sundayAdmUnit) — not used for ESR.
 
 ## WhatsApp chat → admission day PPT
 - Deck page "📎 Add exported WhatsApp chat" (#deck-wa) → Import.readChat (js/app.js) → WaImport.readExport (js/wa-import.js).
