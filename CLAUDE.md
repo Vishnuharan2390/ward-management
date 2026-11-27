@@ -163,10 +163,10 @@
 
 ## Pre-op imaging (OT list → "Pre-op imaging PDF")
 - otXrays in js/app.js: KINDS per page = 1 for X-ray, CT and MRI (one image per page, phone PDF and printout alike).
-- "WhatsApp pre-op images (one by one)" (#ot-xr-wa): 1st tap collects the pictures as files (1_NAME_XRAY_2.jpg…, X-ray → CT → MRI per case)
-  into otXrShare (survives redraws), 2nd tap → Share.sendWithFiles (share sheet; Safari needs the share straight from a tap).
-  All pictures in ONE share; each gets a navy strip "1. NAME 40/M · X-RAY 1/2"; files numbered 01_, 02_…; the text lists
-  each patient with "Pictures 1–3: X-RAY ×2, CT" + "No images: …".
+- "WhatsApp pre-op radiographs" (#ot-xr-wa, otXrShare / otXrLabel in js/app.js): 1st tap collects the pictures; then one share per tap
+  (Safari needs a tap per share): step 1 = text "GOOD MORNING SIR / PRE-OP RADIOGRAPHS OF TOMORROW POSTED CASES SIR / THANK YOU SIR";
+  then per case its pictures (X-ray → CT → MRI, each with a navy strip "NAME 40/M · XRAY 1") + caption "NAME, AGE/SEX\nDIAGNOSIS\nXRAY, CT"
+  (WhatsApp puts it on the first picture). Button shows "📤 2/4 · Send case 1: NAME (3 pictures)".
 
 ## Ward status PDF / printout
 - No plan (diagnosis + "DONE: procedure" once done; post-op also POD). To-dos in two columns: INVESTIGATION (invTodoText) and

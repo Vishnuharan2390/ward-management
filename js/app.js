@@ -2864,23 +2864,28 @@ const App = (() => {
       };
       // Pre-op images as separate pictures (not a PDF). Safari only shares straight from a tap, so the first tap
       // collects the pictures and the second tap opens the share sheet.
+      // Pre-op radiographs on WhatsApp, the way the unit sends them: the greeting as its own message, then for each
+      // case its pictures with the patient's details as the caption of the first one. One share per tap (Safari only
+      // shares straight from a tap), so the button walks through the steps: greeting → case 1 → case 2 …
       $('#ot-xr-wa', el).onclick = async () => {
         const [cases] = build();
         const key = cases.map((c) => c.id).join(',');
         if (otXrShare && otXrShare.key === key) {
-          const { files, text } = otXrShare;
-          otXrShare = null;
-          $('#ot-xr-wa').textContent = OT_XR_WA;
-          return Share.sendWithFiles(text, files);
+          const st = otXrShare.steps[otXrShare.i++];
+          if (otXrShare.i >= otXrShare.steps.length) otXrShare = null;
+          $('#ot-xr-wa').textContent = otXrLabel();
+          if (st.files) Share.sendWithFiles(st.text, st.files); else Share.send(st.text);
+          if (otXrShare) toast(`Next: ${otXrShare.steps[otXrShare.i].say} — tap the button again after sending.`, 5000);
+          else toast('All cases sent.', 3000);
+          return;
         }
         const btn = $('#ot-xr-wa');
         btn.disabled = true;
         btn.textContent = 'Collecting pictures…';
-        const files = [];
-        const lines = [];
+        const steps = [{ say: 'greeting', text: 'GOOD MORNING SIR\nPRE-OP RADIOGRAPHS OF TOMORROW POSTED CASES SIR\nTHANK YOU SIR' }];
         const none = [];
-        const KINDS = [['xray', 'X-RAY'], ['ct', 'CT'], ['mri', 'MRI']];
-        // each picture gets a strip on top naming the patient, so it can't be mixed up even if the text is lost
+        const KINDS = [['xray', 'XRAY'], ['ct', 'CT'], ['mri', 'MRI']];
+        // a strip on top of each picture: name and XRAY / CT / MRI, so it stays with its patient whatever happens to the text
         const stamp = (data, label) => new Promise((res) => {
           const im = new Image();
           im.onload = () => {
@@ -2905,11 +2910,10 @@ const App = (() => {
           im.onerror = () => res(null);
           im.src = data;
         });
-        let no = 0;
         for (const [i, c] of cases.entries()) {
           const nm = String(c.name || '').toUpperCase() || 'PATIENT';
           const base = `${i + 1}_${nm.replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'PATIENT'}`;
-          const from = no + 1;
+          const files = [];
           const what = [];
           for (const [k, word] of KINDS) {
             const ids = frozenImgs(c, k);
@@ -2917,24 +2921,23 @@ const App = (() => {
             for (const [j, iid] of ids.entries()) {
               const data = await Store.getImage(iid).catch(() => null);
               if (!data || !/^data:/.test(data)) continue;
-              const tag = `${word}${ids.length > 1 ? ` ${j + 1}/${ids.length}` : ''}`;
-              const blob = await stamp(data, `${i + 1}. ${nm} ${ageSex(c)} · ${tag}`);
+              const blob = await stamp(data, `${nm} ${ageSex(c)} · ${word}${ids.length > 1 ? ` ${j + 1}` : ''}`);
               if (!blob) continue;
-              no++;
               n++;
-              files.push(new File([blob], `${String(no).padStart(2, '0')}_${base}_${word.replace('-', '')}${ids.length > 1 ? '_' + (j + 1) : ''}.jpg`, { type: 'image/jpeg' }));
+              files.push(new File([blob], `${base}_${word}${ids.length > 1 ? '_' + (j + 1) : ''}.jpg`, { type: 'image/jpeg' }));
             }
-            if (n) what.push(n > 1 ? `${word} ×${n}` : word);
+            if (n) what.push(word);
           }
-          if (no >= from) lines.push(`*${i + 1}. ${nm}* ${ageSex(c)} — ${String(c.diagnosis || '').toUpperCase()}\n    ${no > from ? `Pictures ${from}–${no}` : `Picture ${from}`}: ${what.join(', ')}`);
-          else none.push(c.name);
+          if (!files.length) { none.push(nm); continue; }
+          steps.push({ say: `${nm} (${files.length} picture${files.length === 1 ? '' : 's'})`, files,
+            text: `${nm}, ${ageSex(c)}\n${String(c.diagnosis || '').toUpperCase()}\n${what.join(', ')}` });
         }
         const b2 = $('#ot-xr-wa') || btn; // the page may have been redrawn meanwhile
         b2.disabled = false;
-        if (!files.length) { b2.textContent = OT_XR_WA; return toast('No pre-op X-ray, CT or MRI uploaded for these cases.', 4000); }
-        otXrShare = { key, files, text: `*PRE-OP IMAGING* (${files.length} pictures, in this order)\n\n${lines.join('\n')}${none.length ? `\n\nNo images: ${none.map((x) => String(x).toUpperCase()).join(', ')}` : ''}` };
+        if (steps.length < 2) { b2.textContent = OT_XR_WA; return toast('No pre-op X-ray, CT or MRI uploaded for these cases.', 4000); }
+        otXrShare = { key, steps, i: 0 };
         b2.textContent = otXrLabel();
-        toast(`${files.length} picture${files.length === 1 ? '' : 's'} ready — tap the button again to open WhatsApp.${none.length ? ` No images: ${none.join(', ')}.` : ''}`, 6000);
+        toast(`Ready: greeting + ${steps.length - 1} case${steps.length === 2 ? '' : 's'}. Tap the button for each message, in order.${none.length ? ` No images: ${none.join(', ')}.` : ''}`, 7000);
       };
       $('#ot-xr', el).onclick = async () => {
         const [cases, dd] = build();
@@ -3640,9 +3643,13 @@ const App = (() => {
     return p;
   }
   // OT list → pictures collected for WhatsApp (kept across redraws until sent or the selection changes)
-  const OT_XR_WA = 'WhatsApp pre-op images (one by one)';
+  const OT_XR_WA = 'WhatsApp pre-op radiographs';
   let otXrShare = null;
-  const otXrLabel = () => (otXrShare ? `📤 Send ${otXrShare.files.length} picture${otXrShare.files.length === 1 ? '' : 's'} now` : OT_XR_WA);
+  const otXrLabel = () => {
+    if (!otXrShare) return OT_XR_WA;
+    const { steps, i } = otXrShare;
+    return `📤 ${i + 1}/${steps.length} · Send ${i ? `case ${i}: ${steps[i].say}` : 'greeting'}`;
+  };
   const recOt = (cases, dd) => keepRecord('otlist', { key: dd.date, title: `OT list — ${fmtDate(dd.date)}`, cases, args: [cases, dd] });
   // the pictures a (frozen) case had, of one kind, oldest first
   const frozenImgs = (c, kind) => listOf(c.images).filter((i) => i.kind === kind).map((i) => i.id);
