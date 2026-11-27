@@ -55,6 +55,19 @@ const CONSENT_FORMS_MORE = {
       CONSENT_CLOSE,
     ],
   },
+  tumour: {
+    label: 'Tumour (biopsy / excision / curettage / resection)', bone: 'எலும்பு', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
+    paras: [
+      '{NAME} ஆகிய எனக்கு எலும்பு / மென்திசுவில் கட்டி (Tumour) இருப்பதால் அரசு இராசாசி மருத்துவமனையில் அனுமதிக்கப்பட்டேன். என்னைப் பரிசோதனை செய்த மருத்துவர்கள் X-ray, CT, MRI மற்றும் திசு பரிசோதனை (Biopsy) மூலம் கட்டி உள்ளது என்று கூறினர். அதற்கு {PROC} (திசு பரிசோதனை - Biopsy, கட்டியை அகற்றுதல் - Excision / Curettage / Wide resection, தேவைப்பட்டால் எலும்பு ஒட்டுதல், சிமெண்ட், தகடு அல்லது செயற்கை மூட்டு - Megaprosthesis பொருத்துதல்) அறுவை சிகிச்சை செய்ய வேண்டும் என்று கூறினர். இவ்வறுவை சிகிச்சைக்கு நான் என் மனப்பூர்வ சம்மதம் அளிக்கிறேன்.',
+      CONSENT_ANAES,
+      'மேலும், கட்டிக்கு அதிக இரத்த ஓட்டம் இருப்பதால் அறுவை சிகிச்சையின் போது அதிக இரத்தப் போக்கு ஏற்படலாம் என்றும், பல அலகு இரத்தம் ஏற்றும் நிலை வரலாம் என்றும், அவ்வாறு ஏற்றும் இரத்தத்தினால் ஒவ்வாமை ஏற்பட்டு உயிரிழக்க வாய்ப்புள்ளது என்றும் அறிவேன்.',
+      'மேலும், கட்டியை முழுமையாக அகற்ற இயலாத நிலை வரலாம் என்றும், அகற்றிய பின்னரும் கட்டி மீண்டும் வர (Recurrence) அல்லது உடலின் வேறு பகுதிகளுக்குப் பரவ (Metastasis) வாய்ப்புள்ளது என்றும் அறிவேன். அகற்றிய திசு பரிசோதனைக்கு (HPE) அனுப்பப்படும் என்றும், அதன் முடிவைப் பொறுத்து நோயின் பெயர் மாறலாம் என்றும், மேலும் சிகிச்சை (கீமோதெரபி / கதிர்வீச்சு / மறு அறுவை சிகிச்சை) தேவைப்படலாம் என்றும் அறிவேன்.',
+      'மேலும், கட்டியை ஒட்டியுள்ள நரம்புகள், இரத்த நாளங்கள், தசைகள் சேதம் அடையவோ கட்டியுடன் சேர்த்து அகற்றப்படவோ வாய்ப்புள்ளது என்றும், அதனால் கை / கால் உணர்ச்சியின்மை அல்லது செயல் இழப்பு ஏற்படலாம் என்றும் அறிவேன். கட்டி பெரிய இரத்த நாளங்கள் / நரம்புகளை உள்ளடக்கியிருந்தாலோ மீண்டும் வந்தாலோ கை / காலைத் துண்டித்து அகற்றும் (Amputation) நிலை வரலாம் என அறிவேன்.',
+      'மேலும், கட்டியை அகற்றிய பின்னர் எலும்பு பலவீனமடைந்து உடைய (Fracture) வாய்ப்புள்ளது என்றும், ஒட்டிய எலும்பு / சிமெண்ட் / தகடு / செயற்கை மூட்டு தளர்தல், உடைதல், இடம் விலகுதல் போன்றவை ஏற்பட்டு மறு அறுவை சிகிச்சை தேவைப்படலாம் என்றும் அறிவேன். கை / கால் நீளம் குறைதல், மூட்டு இறுக்கம் ஏற்படலாம் என அறிவேன்.',
+      'மேலும், கீமோதெரபி / கதிர்வீச்சு சிகிச்சையினால் புண் ஆறுவது தாமதமாகலாம் என்றும், புண் சீழ் பிடித்தல் (SSI), செயற்கை மூட்டில் கிருமி தொற்று ஏற்பட்டால் அதனை அகற்ற வேண்டிய நிலை வரலாம் என்றும் அறிவேன். காலில் இரத்தம் கட்டுதல் (DVT), நுரையீரலில் இரத்தக் கட்டி அடைப்பு ஏற்படலாம் என அறிவேன்.',
+      CONSENT_CLOSE,
+    ],
+  },
   paeds: {
     label: 'Paediatric (tenotomy / PMSTR / quadricepsplasty / release)', bone: 'கால்', spine: false, title: 'அறுவை சிகிச்சைக்கான எடுத்துரைக்கப்பட்ட ஒப்புதல் படிவம்',
     paras: [
@@ -230,7 +243,7 @@ function consentExtras(c, kind) {
   if (consentIsExit(c)) return [];
   if (kind === 'cervical') return [CONSENT_EXTRA.spine('கைகள், கால்கள்')];
   if (kind === 'dorsolumbar') return [CONSENT_EXTRA.spine('கால்கள்')];
-  if (kind === 'arthroplasty' || kind === 'arthroscopy' || kind === 'paeds') return []; // these forms already say it
+  if (kind === 'arthroplasty' || kind === 'arthroscopy' || kind === 'paeds' || kind === 'tumour') return []; // these forms already say it
   const out = [];
   const plan = String(`${c?.plan || ''} ${c?.procedureDone || ''}`).toUpperCase();
   const all = String(`${c?.diagnosis || ''} ${plan}`).toUpperCase();
@@ -258,6 +271,7 @@ function consentExtras(c, kind) {
 }
 const consentPelvic = (c) => /PELVI|ACETABUL|\bILIUM\b|ILIAC WING|PUBIC RAMI|PUBIC RAMUS|SACRO\s*ILIAC|\bSI JOINT\b|SYMPHYSIS/.test(String(`${c?.diagnosis || ''} ${c?.plan || ''}`).toUpperCase());
 const CONSENT_SCOPE_RE = /ARTHROSCOP|\bACL\b|\bPCL\b|CRUCIATE|MENISC|BANKART|ROTATOR CUFF|LABRAL|\bSLAP\b|\bMPFL\b|LATARJET|LIGAMENT RECONSTRUCTION/;
+const CONSENT_TUMOUR_RE = /TUMOU?R|\bGCT\b|GIANT\s+CELL|SARCOMA|CHONDROMA|EXOSTOSIS|OSTEOCHONDROMA|BONE\s+CYST|\bABC\b|METASTA|MYELOMA|OSTEOID|EWING|NEOPLASM|LYTIC\s+LESION|CURETTAGE|WIDE\s+(LOCAL\s+)?EXCISION|MEGAPROSTHESIS|\bEPR\b|ENDOPROSTHE/;
 const CONSENT_PAEDS_RE = /CTEV|CLUB ?FOOT|TENOTOMY|\bPMSTR\b|POSTERO ?MEDIAL (SOFT TISSUE )?RELEASE|QUADRICEPS ?PLASTY|QUADRICEPSPLASTY|JUDET|CEREBRAL PALSY|CONTRACTURE|SOFT TISSUE RELEASE|TENDON (LENGTHENING|TRANSFER)|\bTAL\b|DDH|PERTHES|\bSCFE\b|GUIDED GROWTH|HEMIEPIPHYSIODESIS|ARTHROGRYPOSIS|CONGENITAL/;
 function consentKind(c) {
   if (c && CONSENT_TPLS[c.consentTpl]) return c.consentTpl;
@@ -267,6 +281,7 @@ function consentKind(c) {
     const all = `${dx} ${pl}`;
     const fracture = /FRACTURE|#|DISLOCATION|INJURY|TRAUMA/.test(dx);
     if (!consentIsExit(c)) {
+      if (CONSENT_TUMOUR_RE.test(all) && !CONSENT_RE.cervical.test(dx) && !CONSENT_RE.spine.test(dx)) return 'tumour';
       if (!fracture && CONSENT_ARTHROPLASTY_RE.test(pl)) return 'arthroplasty';
       if (CONSENT_SCOPE_RE.test(all) && !/FRACTURE/.test(dx)) return 'arthroscopy';
       if (!fracture && CONSENT_PAEDS_RE.test(all)) return 'paeds';
