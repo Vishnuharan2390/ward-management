@@ -4319,6 +4319,17 @@ const App = (() => {
   }
 
   // ---------------------------------------------------------------- Settings
+  // Settings sections that fold away (implants, levels, unit staff): closed by default, kept open across redraws
+  const foldOpen = new Set();
+  // recorded on the tap itself too: leaving a text box can redraw the page before the 'toggle' event arrives
+  document.addEventListener('click', (e) => {
+    const d = e.target.closest?.('details.fold > summary')?.parentElement;
+    if (d?.id) { if (d.open) foldOpen.delete(d.id); else foldOpen.add(d.id); }
+  }, true);
+  document.addEventListener('toggle', (e) => {
+    const d = e.target;
+    if (d?.classList?.contains('fold') && d.id) { if (d.open) foldOpen.add(d.id); else foldOpen.delete(d.id); }
+  }, true);
   function implantSection() {
     const rules = Object.entries(Store.implants).map(([id, r]) => ({ ...r, id }))
       .sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || (a.name || '').localeCompare(b.name || ''));
@@ -4326,8 +4337,8 @@ const App = (() => {
       ? `plan has: ${r.keywords.slice(0, 3).join(', ')}${r.keywords.length > 3 ? '…' : ''}${r.site?.length ? ` · site: ${r.site.slice(0, 4).join(', ')}${r.site.length > 4 ? '…' : ''}` : ''}`
       : 'plan contains the procedure name');
     return `
-      <div class="card" id="implants">
-        <h3>Implant database</h3>
+      <details class="card fold" id="implants"${foldOpen.has('implants') ? ' open' : ''}>
+        <summary><h3>Implant database</h3></summary>
         <p class="small"><b>Searched first:</b> your previous OT lists — ${OT_HISTORY.length} cases from ${esc(fmtDate(OT_HISTORY.at(-1).date))} to ${esc(fmtDate(OT_HISTORY[0].date))}. The most similar past case (same procedure and bone; side and spelling ignored) gives the implants exactly as written then. <b>Backup:</b> the reference list below.</p>
         <p class="muted small">When a case's plan matches an entry below, its implants fill in automatically (several matches are combined). Your own entries match on the procedure name, e.g. “SHORT PFN” matches “CR/ORIF WITH SHORT PFN LEFT”; the unit's list also checks the bone in the plan or diagnosis, as shown under each name.</p>
         <div class="table-wrap">
@@ -4351,7 +4362,7 @@ const App = (() => {
         </div>
         <label class="block test">Test a diagnosis and plan<input id="impl-test"></label>
         <div id="impl-out" class="muted small"></div>
-      </div>`;
+      </details>`;
   }
 
   function levelSection() {
@@ -4366,8 +4377,8 @@ const App = (() => {
       <td><button class="icon" data-del-lrule title="Delete">✕</button></td>
     </tr>`;
     return `
-      <div class="card" id="levels">
-        <h3>Level of surgery database</h3>
+      <details class="card fold" id="levels"${foldOpen.has('levels') ? ' open' : ''}>
+        <summary><h3>Level of surgery database</h3></summary>
         <p class="muted small">From the Weighted Orthopaedic Procedure List. When a plan contains a procedure's match words, its level fills in. If several match, the highest level wins; a longer match beats a shorter one inside it (“triple arthrodesis” is level II, not the level III “arthrodesis”).</p>
         <div class="table-wrap">
           <table class="board impl-table level-table">
@@ -4389,23 +4400,23 @@ const App = (() => {
         </div>
         <label class="block test">Test a plan<input id="level-test"></label>
         <div id="level-out" class="muted small"></div>
-      </div>`;
+      </details>`;
   }
 
   function staffSection() {
     return `
-      <div class="card" id="staff">
-        <h3>Unit staff</h3>
+      <details class="card fold" id="staff"${foldOpen.has('staff') ? ' open' : ''}>
+        <summary><h3>Unit staff (faculty names)</h3></summary>
         <p class="muted small">Used for the OT list header and signature. One Assistant Professor per line.</p>
         <div class="staff-grid">
           ${allUnits().map((u) => `
-            <div class="staff-unit" data-unit="${u.id}">
-              <b>UNIT ${u.id}</b>
+            <details class="staff-unit fold" id="staff-${u.id}" data-unit="${u.id}"${foldOpen.has('staff-' + u.id) ? ' open' : ''}>
+              <summary><b>UNIT ${u.id}</b> <span class="muted small">${esc(u.chief)}</span></summary>
               <label>Chief<input data-staff="chief" value="${esc(u.chief)}"></label>
               <label>Assistant Professors<textarea data-staff="aps" rows="3">${esc(u.aps.join('\n'))}</textarea></label>
-            </div>`).join('')}
+            </details>`).join('')}
         </div>
-      </div>`;
+      </details>`;
   }
 
   // ---- Settings → Photo storage (owners): photos as files in Firebase Storage instead of inside the database.

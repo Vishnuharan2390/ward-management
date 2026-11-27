@@ -2038,3 +2038,13 @@ html[data-ui="nord"] .slide, html[data-ui="lavender"] .slide, html[data-ui="amol
 /* the title-bar Reload button follows the title bar's ink in every flat look */
 html.flat .reload-btn { background: transparent !important; color: var(--top-ink) !important; border-color: color-mix(in srgb, var(--top-ink) 45%, transparent) !important; box-shadow: none !important; }
 html.flat .back-btn { color: var(--top-ink); background: color-mix(in srgb, var(--top-ink) 12%, transparent); }
+/* Settings: fold-away sections (implants, levels, unit staff) */
+details.fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .5rem; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary h3 { margin: 0; flex: 1; }
+details.fold > summary::after { content: "▸"; font-size: 1.1rem; opacity: .7; transition: transform .15s; }
+details.fold[open] > summary::after { transform: rotate(90deg); }
+details.fold[open] > summary { margin-bottom: .6rem; }
+details.staff-unit.fold > summary { flex-wrap: wrap; }
+details.staff-unit.fold > summary .muted { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.staff-unit.fold:not([open]) > summary { margin: 0; }

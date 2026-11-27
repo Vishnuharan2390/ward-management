@@ -56,6 +56,10 @@
 - The emblem is the Andry tree (assets/andry-tree.svg; title bar + hospital panel via CSS mask). assets/icons/callus-tree.svg = that tree
   in white on navy; the PNG app icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).
 
+## Settings fold-away sections
+- Implant database (#implants), Level of surgery database (#levels), Unit staff (#staff) and each unit inside it (#staff-I…) are
+  <details class="fold">, closed by default; open ones are remembered in foldOpen (js/app.js) across redraws (set on the tap, capture phase).
+
 ## Looks (Settings → Look; css/app.css html[data-ui=…], per device in localStorage wm.ui)
 - Light: modern, ocean, forest, royal, paper, tangerine, glass, material, contrast · Gradient/pastel (html.grad): crimson, aurora, sunset,
   blossom, mint, sorbet · Dark: graphite (default), midnight, nord, lavender, amoled · Retro: win98, xp, mac, dos.
