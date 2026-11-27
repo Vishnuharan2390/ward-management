@@ -68,7 +68,8 @@
 ## Routine ESR / qCRP and FBS / PPBS (rounds "due today" panel)
 - monitorDue(c, unitId) in js/data.js; dueHTML / dueSave in js/app.js (blue panel above "Deranged" on the rounds card).
 - Wound cases (isWoundCase = CHART_TEMPLATES.inflam.match on comorbid/diagnosis/plan/procedure, or an ESR chart): ESR / qCRP weekly on
-  ESR_DOW[unit] = admission day + 2 (UNIT_ADM_DOW I Mon … VI Sat → Wed, Thu, Fri, Sat, Sun, Mon); also asked any day if none in 7 days
+  ESR_DOW[unit] = admission day + 2 (UNIT_ADM_DOW I Mon … VI Sat → Wed, Thu, Fri, Sat, Sun, Mon); also on day 2 from the patient's own DOA;
+  also asked any day if none in 7 days
   (and admitted ≥ 2 days). Diabetics (isDiabetic, dm match on comorbid/diagnosis): FBS / PPBS when none in the last 2 days.
 - Save writes a row (today) into the case's chart of that type, made if missing; tagSpecs also makes charts.auto_inflam / auto_dm for
   active wound / diabetic / CKD cases. CKD (isCKD, rft match on comorbid/diagnosis): RFT (urea, creat, Na, K) into the RFT chart when

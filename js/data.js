@@ -649,9 +649,10 @@ function monitorDue(c, unitId, today = todayISO()) {
     const day = ESR_DOW[unitId];
     const onDay = day === dow;
     const stale = !last || daysSince(last) >= 7;
-    if (last !== today && (onDay || (stale && (daysSince(c.doa) ?? 0) >= 2))) {
+    const d2 = !!c.doa && Math.round((new Date(today + 'T00:00:00') - new Date(c.doa + 'T00:00:00')) / 864e5) === 2; // day 2 from admission
+    if (last !== today && (d2 || onDay || (stale && (daysSince(c.doa) ?? 0) >= 2))) {
       out.push({ k: 'inflam', title: 'ESR / qCRP', keys: [['esr', 'ESR'], ['crp', 'qCRP']], last,
-        why: onDay ? `weekly — every ${DOW_NAMES[day]} for Unit ${unitId}` : last ? `overdue — last ${fmtDate(last)}` : 'not done yet' });
+        why: d2 ? `day 2 from admission (DOA ${fmtDate(c.doa)})` : onDay ? `weekly — every ${DOW_NAMES[day]} for Unit ${unitId}` : last ? `overdue — last ${fmtDate(last)}` : 'not done yet' });
     }
   }
   if (isCKD(c)) {
