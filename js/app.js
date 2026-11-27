@@ -2879,31 +2879,60 @@ const App = (() => {
         const files = [];
         const lines = [];
         const none = [];
-        const KINDS = [['xray', 'XRAY'], ['ct', 'CT'], ['mri', 'MRI']];
+        const KINDS = [['xray', 'X-RAY'], ['ct', 'CT'], ['mri', 'MRI']];
+        // each picture gets a strip on top naming the patient, so it can't be mixed up even if the text is lost
+        const stamp = (data, label) => new Promise((res) => {
+          const im = new Image();
+          im.onload = () => {
+            const w = im.naturalWidth;
+            const h = im.naturalHeight;
+            const bar = Math.max(40, Math.round(w * 0.06));
+            const cv = document.createElement('canvas');
+            cv.width = w;
+            cv.height = h + bar;
+            const g = cv.getContext('2d');
+            g.fillStyle = '#13294b';
+            g.fillRect(0, 0, w, bar);
+            g.drawImage(im, 0, bar);
+            g.fillStyle = '#fff';
+            let fs = Math.round(bar * 0.52);
+            g.font = `700 ${fs}px Arial, sans-serif`;
+            while (fs > 10 && g.measureText(label).width > w - bar * 0.5) { fs--; g.font = `700 ${fs}px Arial, sans-serif`; }
+            g.textBaseline = 'middle';
+            g.fillText(label, bar * 0.25, bar / 2);
+            cv.toBlob((bl) => res(bl), 'image/jpeg', 0.85);
+          };
+          im.onerror = () => res(null);
+          im.src = data;
+        });
+        let no = 0;
         for (const [i, c] of cases.entries()) {
-          const base = `${i + 1}_${String(c.name || '').toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'PATIENT'}`;
-          let got = 0;
+          const nm = String(c.name || '').toUpperCase() || 'PATIENT';
+          const base = `${i + 1}_${nm.replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '') || 'PATIENT'}`;
+          const from = no + 1;
+          const what = [];
           for (const [k, word] of KINDS) {
             const ids = frozenImgs(c, k);
+            let n = 0;
             for (const [j, iid] of ids.entries()) {
               const data = await Store.getImage(iid).catch(() => null);
               if (!data || !/^data:/.test(data)) continue;
-              const [head, b64] = data.split(',');
-              const type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
-              const bin = atob(b64);
-              const bytes = new Uint8Array(bin.length);
-              for (let x = 0; x < bin.length; x++) bytes[x] = bin.charCodeAt(x);
-              files.push(new File([bytes], `${base}_${word}${ids.length > 1 ? '_' + (j + 1) : ''}.${/png/.test(type) ? 'png' : 'jpg'}`, { type }));
-              got++;
+              const tag = `${word}${ids.length > 1 ? ` ${j + 1}/${ids.length}` : ''}`;
+              const blob = await stamp(data, `${i + 1}. ${nm} ${ageSex(c)} · ${tag}`);
+              if (!blob) continue;
+              no++;
+              n++;
+              files.push(new File([blob], `${String(no).padStart(2, '0')}_${base}_${word.replace('-', '')}${ids.length > 1 ? '_' + (j + 1) : ''}.jpg`, { type: 'image/jpeg' }));
             }
+            if (n) what.push(n > 1 ? `${word} ×${n}` : word);
           }
-          if (got) lines.push(`${i + 1}. ${String(c.name || '').toUpperCase()} ${ageSex(c)} — ${String(c.diagnosis || '').toUpperCase()}`);
+          if (no >= from) lines.push(`*${i + 1}. ${nm}* ${ageSex(c)} — ${String(c.diagnosis || '').toUpperCase()}\n    ${no > from ? `Pictures ${from}–${no}` : `Picture ${from}`}: ${what.join(', ')}`);
           else none.push(c.name);
         }
         const b2 = $('#ot-xr-wa') || btn; // the page may have been redrawn meanwhile
         b2.disabled = false;
         if (!files.length) { b2.textContent = OT_XR_WA; return toast('No pre-op X-ray, CT or MRI uploaded for these cases.', 4000); }
-        otXrShare = { key, files, text: `PRE-OP IMAGING\n${lines.join('\n')}` };
+        otXrShare = { key, files, text: `*PRE-OP IMAGING* (${files.length} pictures, in this order)\n\n${lines.join('\n')}${none.length ? `\n\nNo images: ${none.map((x) => String(x).toUpperCase()).join(', ')}` : ''}` };
         b2.textContent = otXrLabel();
         toast(`${files.length} picture${files.length === 1 ? '' : 's'} ready — tap the button again to open WhatsApp.${none.length ? ` No images: ${none.join(', ')}.` : ''}`, 6000);
       };
