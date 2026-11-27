@@ -1809,7 +1809,7 @@ const App = (() => {
             <div class="row-between">
               <div>
                 <h2>${esc(c.name)} <span class="muted">${esc(ageSex(c))}</span> ${dayTag(c)}</h2>
-                <div class="muted">IP ${esc(c.ipNo || '—')}</div>
+                <div class="muted">IP ${esc(c.ipNo || '—')}${c.ward ? ' · Ward ' + esc(c.ward) : ''} · DOA ${esc(fmtDate(c.doa))}${c.scheme ? ' · Scheme ' + esc(c.scheme) : ''}</div>
               </div>
               <select id="case-status" class="badge-select st-${esc(c.status || 'preop')}" aria-label="Case status">${opts(Object.entries(CASE_STATUS), c.status || 'preop')}</select>
             </div>
