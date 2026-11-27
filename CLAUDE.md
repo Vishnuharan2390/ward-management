@@ -57,7 +57,9 @@
   in white on navy; the PNG app icons are rendered from it (Playwright screenshot, 192/512/maskable/apple 180).
 
 ## Wards
-- Ward fields are a dropdown of WARDS (js/data.js) via wardOpts in js/app.js; an old free-typed ward stays selectable.
+- Ward fields are a dropdown of WARDS only (js/data.js) via wardOpts in js/app.js — nothing else can be entered. normWard(w) maps typed
+  forms ("90-A", "90A ORTHO 1", "ward 90a", "101 ICU", "pay ward") to the listed ward, else blank; tagSpecs rewrites stored wards with it;
+  import / OT quick-add / WhatsApp import save through it.
 
 ## Rounds alerts
 - Rounds card: "Deranged" panel (derangedList in js/data.js, derangedHTML in js/app.js) + "Repeat X" chips; ⚠ in the patient jump list.

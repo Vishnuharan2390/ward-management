@@ -49,8 +49,8 @@ const WaImport = (() => {
       }
       const ip = line.match(/\bIP\s*(?:no\.?)?\s*[:.\-]?\s*(\d{3,})\b/i);
       if (ip) { out.ipNo = ip[1]; line = line.replace(ip[0], '').trim(); }
-      const wd = line.match(/\bward\s*(?:no\.?)?\s*[:.\-]?\s*(\w+)/i);
-      if (wd) { out.ward = wd[1].toUpperCase(); line = line.replace(wd[0], '').trim(); }
+      const wd = line.match(/\bward\s*(?:no\.?)?\s*[:.\-]?\s*(\d{2,3}\s*-?\s*(?:ICU\b|[A-F]\b)?|SICU\b|PAY\s*WARD\b|TRIAGE\b)/i);
+      if (wd) { out.ward = typeof normWard === 'function' ? normWard(wd[1]) : wd[1].toUpperCase(); line = line.replace(wd[0], '').trim(); }
       line = line.replace(/^[,;\-–\s]+|[,;\-–\s]+$/g, '');
       if (!line) continue;
       const nm = !out.name && line.match(NAME_RE);

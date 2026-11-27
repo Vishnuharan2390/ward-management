@@ -12,11 +12,10 @@ const App = (() => {
   const allCases = () => Object.entries(Store.cases).map(([id, c]) => ({ id, ...c }));
   const caseList = () => allCases().filter((c) => !c.otOnly);
   const statusBadge = (s) => `<span class="badge st-${esc(s || 'preop')}">${esc(CASE_STATUS[s] || 'Pre-op')}</span>`;
-  // Ward: pick from the hospital's wards; an older free-typed ward stays as its own option.
+  // Ward: only the hospital's wards (WARDS); anything else typed earlier is read as the ward it means.
   const wardOpts = (v) => {
-    const cur = String(v || '').trim().toUpperCase();
-    const list = cur && !WARDS.includes(cur) ? [cur, ...WARDS] : WARDS;
-    return `<option value="">—</option>${list.map((w) => `<option${w === cur ? ' selected' : ''}>${esc(w)}</option>`).join('')}`;
+    const cur = normWard(v);
+    return `<option value="">—</option>${WARDS.map((w) => `<option${w === cur ? ' selected' : ''}>${esc(w)}</option>`).join('')}`;
   };
   const levelOpts = (sel) => opts([['', '—'], ...LEVELS.map((l) => [l, l])], sel || '');
   const schemeOpts = (sel) => opts([['', '—'], ...SCHEMES.map((s) => [s, s])], sel || '');
@@ -666,7 +665,7 @@ const App = (() => {
           const plan = c.plan.trim().toUpperCase();
           const diagnosis = c.diagnosis.trim().toUpperCase();
           Store.create('cases', nid, {
-            name: c.name.trim().toUpperCase(), age: String(c.age).trim(), sex: c.sex, ipNo: (c.ipNo || '').trim(), ward: (c.ward || '').trim().toUpperCase(),
+            name: c.name.trim().toUpperCase(), age: String(c.age).trim(), sex: c.sex, ipNo: (c.ipNo || '').trim(), ward: normWard(c.ward),
             mode: c.mode.trim().toUpperCase(), diagnosis, plan, doa: c.doa || todayISO(),
             implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
             status: 'preop', work: {}, treatment: String(c.treatment || '').trim() || STANDARD_TREATMENT.join('\n'), writtenBy: (c.writtenBy || '').trim().toUpperCase(),
@@ -2646,7 +2645,7 @@ const App = (() => {
           const diagnosis = v('diagnosis').toUpperCase();
           const nid = uid();
           Store.create('cases', nid, {
-            otOnly: true, name: v('name').toUpperCase(), age: v('age'), sex: qf.elements.sex.value, ipNo: v('ipNo'), ward: v('ward').toUpperCase(),
+            otOnly: true, name: v('name').toUpperCase(), age: v('age'), sex: qf.elements.sex.value, ipNo: v('ipNo'), ward: normWard(v('ward')),
             diagnosis, plan, doa: todayISO(), status: 'preop', scheme: qf.elements.scheme.value, work: { anaes: qf.elements.anaes.value },
             implants: plan ? suggestImplantsFor(plan, diagnosis, Store.implants).implants : '', level: plan ? levelFor(plan, Store.levels).level || '' : '',
           });
@@ -5875,6 +5874,8 @@ const App = (() => {
         // viral markers positive → (HBsAg+/HCV+/PLHA) in the diagnosis (letter case aside: typing makes it capitals)
         const dx = diagnosisWithViral(c);
         if (dx.toUpperCase() !== String(c.diagnosis || '').trim().toUpperCase()) Store.patch('cases', id, { diagnosis: dx });
+        // ward: only one of WARDS, written exactly ("90-A", "90A ORTHO 1" → "90A"; not a listed ward → blank)
+        if ((c.ward || '') !== normWard(c.ward)) Store.patch('cases', id, { ward: normWard(c.ward) });
       }
     }, 2500);
   }

@@ -467,6 +467,18 @@ const SPECIALTIES = {
 const UNIT_NAMES = { VI: 'Foot & ankle' };
 const SCHEME_UNIT = 'VI';
 const WARDS = ['90A', '90B', '90C', '90D', '90E', '90F', '500B', '500C', '500D', 'SICU', 'PAYWARD', '99', 'TRIAGE', '101-ICU', '101A'];
+// Any typed ward → exactly one of WARDS ("90-A", "90 A ORTHO 1", "ward 90a" → "90A"; "101 ICU" → "101-ICU"), else ''.
+const wardKey = (w) => String(w || '').toUpperCase().replace(/PAY[\s-]*WARD/g, 'PAYWARD').replace(/\bWARD\b|\bNO\b\.?/g, '').replace(/ORTHO.*$|UNIT.*$/, '').replace(/[^A-Z0-9]/g, '');
+function normWard(w) {
+  const k = wardKey(w);
+  if (!k) return '';
+  let best = '';
+  for (const x of WARDS) {
+    const xk = wardKey(x);
+    if ((k === xk || (k.startsWith(xk) && !/^[0-9A-F]/.test(k.slice(xk.length)))) && xk.length > wardKey(best).length) best = x;
+  }
+  return best;
+}
 const NO_SCHEME_REASONS = ['NO CMCHIS CARD', 'NOT ELIGIBLE (INCOME / RATION CARD)', 'OUT OF STATE PATIENT', 'DOCUMENTS NOT AVAILABLE', 'PATIENT NOT WILLING',
   'PROCEDURE NOT COVERED', 'IMPLANT NOT COVERED', 'SCHEME LIMIT EXHAUSTED', 'EMERGENCY — NOT REGISTERED IN TIME'];
 const specOfUnit = (romanId) => Object.keys(SPECIALTIES).find((k) => SPECIALTIES[k].unit === romanId) || '';
