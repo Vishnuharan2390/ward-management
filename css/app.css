@@ -437,6 +437,29 @@ a.btn[aria-disabled="true"] { opacity: .45; }
   .picker td:nth-child(8) select, .picker td:nth-child(9) select { width: 100%; min-width: 0 !important; }
   .picker td:nth-child(10) { grid-area: img; text-align: right; }
   .picker td:nth-child(11) { grid-area: hide; text-align: right; }
+
+  /* Post-op PPT list — its own columns: 1 tick · 2 name (+ missing) · 3 age/sex · 4 diagnosis · 5 procedure ·
+     6 date of surgery · 7 picture counts · 8 Edit */
+  .picker.po-table tr[data-row] {
+    grid-template-columns: 30px minmax(0, 1fr) auto;
+    grid-template-areas: "cb name age" "cb dx dx" "cb plan plan" "cb dos edit" "cb img img";
+    gap: .25rem .6rem; padding: .7rem .5rem;
+  }
+  .picker.po-table td { text-align: left; color: inherit; font-weight: 400; }
+  .picker.po-table td::before { content: none; }
+  .picker.po-table td:nth-child(1) { grid-area: cb; display: block; padding-top: .2rem; }
+  .picker.po-table td:nth-child(2) { grid-area: name; }
+  .picker.po-table td:nth-child(2) b { font-size: 1.02rem; }
+  .picker.po-table td:nth-child(2) .miss { margin-top: .1rem; }
+  .picker.po-table td:nth-child(3) { grid-area: age; color: var(--muted); text-align: right; padding-top: .1rem; }
+  .picker.po-table td:nth-child(4) { grid-area: dx; color: var(--muted); font-size: .9rem; }
+  .picker.po-table td:nth-child(5) { grid-area: plan; color: var(--brand); font-weight: 600; }
+  .picker.po-table td:nth-child(5):not(:empty)::before { content: "▸ "; }
+  .picker.po-table td.po-done:nth-child(5):not(:empty)::before { content: "✓ "; }
+  .picker.po-table td:nth-child(6) { grid-area: dos; color: var(--muted); font-size: .85rem; }
+  .picker.po-table td:nth-child(6)::before { content: "DOS "; }
+  .picker.po-table td:nth-child(7) { grid-area: img; color: var(--muted); font-size: .8rem; white-space: normal; }
+  .picker.po-table td:nth-child(8) { grid-area: edit; text-align: right; }
 }
 
 /* OT list x2 on one sheet */

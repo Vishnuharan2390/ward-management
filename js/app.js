@@ -3392,7 +3392,7 @@ const App = (() => {
                     <td><b>${esc(c.name)}</b>${miss.length ? `<div class="miss small">missing: ${esc(miss.join(', '))}</div>` : ''}</td>
                     <td class="nowrap">${esc(ageSex(c))}</td>
                     <td>${esc(c.diagnosis)}</td>
-                    <td>${esc(c.procedureDone || c.plan)}</td>
+                    <td class="${c.procedureDone ? 'po-done' : ''}">${esc(c.procedureDone || c.plan)}</td>
                     <td class="nowrap">${esc(fmtDate(surgeryDate(c))) || '—'}</td>
                     <td class="nowrap small">Pre X ${cnt(c, 'xray')} · CT/MRI ${cnt(c, 'ct', 'mri')} · Post X ${cnt(c, 'poxray')}</td>
                     <td><a href="#/case/${c.id}" class="small" data-nopick>Edit</a></td>
